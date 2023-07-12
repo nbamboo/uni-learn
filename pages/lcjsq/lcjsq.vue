@@ -46,6 +46,11 @@
 					<uni-easyinput v-model="valiFormData.age" />
 					<uni-icons class="tb" type="color" size="22"></uni-icons>
 				</uni-forms-item>
+				<uni-forms-item>
+					<view class="cb3">
+						<uni-data-checkbox v-model="radio1" :localdata="sex"></uni-data-checkbox>
+					</view>
+				</uni-forms-item>
 			</uni-forms>
 			<!-- <button type="primary" @click="submit('valiForm')">提交</button> -->
 		</view>
@@ -79,7 +84,15 @@
 							errorMessage: '年龄只能输入数字'
 						}]
 					}
-				}
+				},
+				radio1: 0,
+				sex: [{
+					text: '期初',
+					value: 0
+				}, {
+					text: '期末',
+					value: 1
+				}]
 			}
 		},
 		methods: {
@@ -109,6 +122,12 @@
 	.cb2 {
 		position: absolute;
 		left: -64%;
+		top: 24%;
+	}
+	
+	.cb3 {
+		position: absolute;
+		left: -60%;
 		top: 24%;
 	}
 
