@@ -112,9 +112,6 @@ try {
     uniIcons: function () {
       return Promise.all(/*! import() | uni_modules/uni-icons/components/uni-icons/uni-icons */[__webpack_require__.e("common/vendor"), __webpack_require__.e("uni_modules/uni-icons/components/uni-icons/uni-icons")]).then(__webpack_require__.bind(null, /*! @/uni_modules/uni-icons/components/uni-icons/uni-icons.vue */ 93))
     },
-    uniDataCheckbox: function () {
-      return Promise.all(/*! import() | uni_modules/uni-data-checkbox/components/uni-data-checkbox/uni-data-checkbox */[__webpack_require__.e("common/vendor"), __webpack_require__.e("uni_modules/uni-data-checkbox/components/uni-data-checkbox/uni-data-checkbox")]).then(__webpack_require__.bind(null, /*! @/uni_modules/uni-data-checkbox/components/uni-data-checkbox/uni-data-checkbox.vue */ 117))
-    },
   }
 } catch (e) {
   if (
@@ -235,6 +232,13 @@ exports.default = void 0;
 //
 //
 //
+//
+//
+//
+//
+//
+//
+//
 var _default = {
   data: function data() {
     return {
@@ -260,19 +264,17 @@ var _default = {
             format: 'number',
             errorMessage: '年龄只能输入数字'
           }]
-        },
-        radio1: 0,
-        sex: [{
-          text: '男',
-          value: 0
-        }, {
-          text: '女',
-          value: 1
-        }, {
-          text: '未知',
-          value: 2
-        }]
-      }
+        }
+      },
+      items: [{
+        value: 'USA',
+        name: '期初',
+        checked: 'true'
+      }, {
+        value: 'CHN',
+        name: '期末'
+      }],
+      current: 0
     };
   },
   methods: {}

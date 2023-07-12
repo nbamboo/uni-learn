@@ -18,6 +18,11 @@
 	left: -64%;
 	top: 24%;
 }
+.radio_flex {
+	display: flex;
+	justify-content: flex-start;
+	align-items: center;
+}
 .tb {
 	position: absolute;
 	right: 4%;

@@ -47,8 +47,15 @@
 					<uni-icons class="tb" type="color" size="22"></uni-icons>
 				</uni-forms-item>
 				<uni-forms-item>
-					<view class="cb3">
-						<uni-data-checkbox v-model="radio1" :localdata="sex"></uni-data-checkbox>
+					<view class="cb2">
+						<radio-group class="radio_flex" @change="radioChange" >
+							<label class="radio_flex" v-for="(item, index) in items" :key="item.value" style="padding-right: 80px;">
+								<view>
+									<radio :value="item.value" :checked="index === current" style="transform:scale(0.5)"/>
+								</view>
+								<view>{{item.name}}</view>
+							</label>
+						</radio-group>
 					</view>
 				</uni-forms-item>
 			</uni-forms>
@@ -85,14 +92,17 @@
 						}]
 					}
 				},
-				radio1: 0,
-				sex: [{
-					text: '期初',
-					value: 0
-				}, {
-					text: '期末',
-					value: 1
-				}]
+				items: [{
+						value: 'USA',
+						name: '期初',
+						checked: 'true'
+					},
+					{
+						value: 'CHN',
+						name: '期末'
+					}
+				],
+				current: 0
 			}
 		},
 		methods: {
@@ -125,12 +135,12 @@
 		top: 24%;
 	}
 	
-	.cb3 {
-		position: absolute;
-		left: -60%;
-		top: 24%;
+	.radio_flex {
+		display: flex;
+		justify-content: flex-start;
+		align-items: center;
 	}
-
+	
 	.tb {
 		position: absolute;
 		right: 4%;
