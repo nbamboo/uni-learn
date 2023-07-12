@@ -64,7 +64,7 @@
 					v-if="clearable && isVal && !disabled && type !== 'textarea'"
 					class="content-clear-icon"
 					:class="{ 'is-textarea-icon': type === 'textarea' }"
-					type="clear"
+					type="none"
 					:size="clearSize"
 					:color="msg ? '#dd524d' : focusShow ? primaryColor : '#c0c4cc'"
 					@click="onClear"

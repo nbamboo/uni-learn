@@ -9477,9 +9477,9 @@ internalMixin(Vue);
 
 /***/ }),
 /* 26 */
-/*!**********************************************************************!*\
-  !*** /Users/nbamboo/Documents/HBuilderProjects/uni-learn/pages.json ***!
-  \**********************************************************************/
+/*!**********************************************************!*\
+  !*** D:/Documents/HBuilderProjects/uni-learn/pages.json ***!
+  \**********************************************************/
 /*! no static exports found */
 /***/ (function(module, exports) {
 
@@ -10032,9 +10032,9 @@ module.exports = _asyncToGenerator, module.exports.__esModule = true, module.exp
 
 /***/ }),
 /* 71 */
-/*!******************************************************************************************************************!*\
-  !*** /Users/nbamboo/Documents/HBuilderProjects/uni-learn/uni_modules/uni-forms/components/uni-forms/validate.js ***!
-  \******************************************************************************************************************/
+/*!******************************************************************************************************!*\
+  !*** D:/Documents/HBuilderProjects/uni-learn/uni_modules/uni-forms/components/uni-forms/validate.js ***!
+  \******************************************************************************************************/
 /*! no static exports found */
 /***/ (function(module, exports, __webpack_require__) {
 
@@ -10802,9 +10802,9 @@ module.exports = _getPrototypeOf, module.exports.__esModule = true, module.expor
 
 /***/ }),
 /* 76 */
-/*!***************************************************************************************************************!*\
-  !*** /Users/nbamboo/Documents/HBuilderProjects/uni-learn/uni_modules/uni-forms/components/uni-forms/utils.js ***!
-  \***************************************************************************************************************/
+/*!***************************************************************************************************!*\
+  !*** D:/Documents/HBuilderProjects/uni-learn/uni_modules/uni-forms/components/uni-forms/utils.js ***!
+  \***************************************************************************************************/
 /*! no static exports found */
 /***/ (function(module, exports, __webpack_require__) {
 
@@ -11158,9 +11158,9 @@ exports.isEqual = isEqual;
 /* 96 */,
 /* 97 */,
 /* 98 */
-/*!***************************************************************************************************************!*\
-  !*** /Users/nbamboo/Documents/HBuilderProjects/uni-learn/uni_modules/uni-icons/components/uni-icons/icons.js ***!
-  \***************************************************************************************************************/
+/*!***************************************************************************************************!*\
+  !*** D:/Documents/HBuilderProjects/uni-learn/uni_modules/uni-icons/components/uni-icons/icons.js ***!
+  \***************************************************************************************************/
 /*! no static exports found */
 /***/ (function(module, exports, __webpack_require__) {
 

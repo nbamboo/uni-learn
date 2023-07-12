@@ -28,4 +28,30 @@
 	right: 4%;
 	top: 24%;
 }
+.result-wrapper {
+	margin-top: 4%;
+	padding: 8% 0;
+	border-top: 1rpx solid #ddd;
+}
+.result-caption {
+	font-weight: 600;
+}
+.result {
+	font-size: 60rpx;
+	color: #333;
+}
+.pmt-btn-clear {
+  border: 1rpx solid #eee;
+  border-radius: 2px;
+  outline: none;
+  margin-right: 10rpx;
+}
+.pmt-btn-cal {
+  border: 1rpx solid #eee;
+  border-radius: 2rpx;
+  outline: none;
+  color: #fff;
+  background-color: #008cff;
+  margin-right: 10rpx;
+}
 

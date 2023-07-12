@@ -48,10 +48,12 @@
 				</uni-forms-item>
 				<uni-forms-item>
 					<view class="cb2">
-						<radio-group class="radio_flex" @change="radioChange" >
-							<label class="radio_flex" v-for="(item, index) in items" :key="item.value" style="padding-right: 80px;">
+						<radio-group class="radio_flex" @change="radioChange">
+							<label class="radio_flex" v-for="(item, index) in items" :key="item.value"
+								style="padding-right: 135rpx;">
 								<view>
-									<radio :value="item.value" :checked="index === current" style="transform:scale(0.5)"/>
+									<radio :value="item.value" :checked="index === current"
+										style="transform:scale(0.5)" />
 								</view>
 								<view>{{item.name}}</view>
 							</label>
@@ -59,6 +61,14 @@
 					</view>
 				</uni-forms-item>
 			</uni-forms>
+			<view class="result-wrapper">
+				<text class="result-caption">&nbsp;计算结果 = </text>
+				<text class="result">111</text>
+			</view>
+			<div style="text-align: right">
+			  <button type="default" size="mini" class="pmt-btn-clear" @click="submit('valiForm')">清空</button>
+			  <button type="primary" size="mini" class="pmt-btn-cal" @click="submit('valiForm')">计算</button>
+			</div>
 			<!-- <button type="primary" @click="submit('valiForm')">提交</button> -->
 		</view>
 	</view>
@@ -134,16 +144,47 @@
 		left: -64%;
 		top: 24%;
 	}
-	
+
 	.radio_flex {
 		display: flex;
 		justify-content: flex-start;
 		align-items: center;
 	}
-	
+
 	.tb {
 		position: absolute;
 		right: 4%;
 		top: 24%;
+	}
+
+	.result-wrapper {
+		margin-top: 4%;
+		padding: 8% 0;
+		border-top: 1rpx solid #ddd;
+	}
+
+	.result-caption {
+		font-weight: 600;
+	}
+
+	.result {
+		font-size: 60rpx;
+		color: #333;
+	}
+	
+	.pmt-btn-clear {
+	  border: 1rpx solid #eee;
+	  border-radius: 2px;
+	  outline: none;
+	  margin-right: 10rpx;
+	}
+	
+	.pmt-btn-cal {
+	  border: 1rpx solid #eee;
+	  border-radius: 2rpx;
+	  outline: none;
+	  color: #fff;
+	  background-color: #008cff;
+	  margin-right: 10rpx;
 	}
 </style>
