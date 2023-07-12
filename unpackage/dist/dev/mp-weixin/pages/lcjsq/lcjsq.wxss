@@ -1,0 +1,26 @@
+
+.example {
+	padding: 8%;
+	background-color: #fff;
+}
+.bfb {
+	position: absolute;
+	right: -8%;
+	top: 24%;
+}
+.cb1 {
+	position: absolute;
+	left: -50%;
+	top: 24%;
+}
+.cb2 {
+	position: absolute;
+	left: -64%;
+	top: 24%;
+}
+.tb {
+	position: absolute;
+	right: 4%;
+	top: 24%;
+}
+

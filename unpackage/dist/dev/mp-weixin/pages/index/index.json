@@ -1,0 +1,7 @@
+{
+  "navigationBarTitleText": "银行从业个人理财计算器",
+  "usingComponents": {
+    "my-tabs": "/components/myTabs/myTabs",
+    "my-unit": "/components/myUnit/myUnit"
+  }
+}
