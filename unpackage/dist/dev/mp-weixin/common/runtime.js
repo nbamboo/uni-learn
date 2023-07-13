@@ -105,11 +105,11 @@
 /******/
 /******/
 /******/ 		// mini-css-extract-plugin CSS loading
-/******/ 		var cssChunks = {"components/myTabs/myTabs":1,"components/myUnit/myUnit":1,"uni_modules/uni-forms/components/uni-forms-item/uni-forms-item":1,"uni_modules/uni-forms/components/uni-forms/uni-forms":1,"uni_modules/uni-icons/components/uni-icons/uni-icons":1,"uni_modules/uni-easyinput/components/uni-easyinput/uni-easyinput":1,"uni_modules/uni-card/components/uni-card/uni-card":1};
+/******/ 		var cssChunks = {"components/myUnit/myUnit":1};
 /******/ 		if(installedCssChunks[chunkId]) promises.push(installedCssChunks[chunkId]);
 /******/ 		else if(installedCssChunks[chunkId] !== 0 && cssChunks[chunkId]) {
 /******/ 			promises.push(installedCssChunks[chunkId] = new Promise(function(resolve, reject) {
-/******/ 				var href = "" + ({"components/myTabs/myTabs":"components/myTabs/myTabs","components/myUnit/myUnit":"components/myUnit/myUnit","uni_modules/uni-forms/components/uni-forms-item/uni-forms-item":"uni_modules/uni-forms/components/uni-forms-item/uni-forms-item","uni_modules/uni-forms/components/uni-forms/uni-forms":"uni_modules/uni-forms/components/uni-forms/uni-forms","uni_modules/uni-icons/components/uni-icons/uni-icons":"uni_modules/uni-icons/components/uni-icons/uni-icons","uni_modules/uni-easyinput/components/uni-easyinput/uni-easyinput":"uni_modules/uni-easyinput/components/uni-easyinput/uni-easyinput","uni_modules/uni-card/components/uni-card/uni-card":"uni_modules/uni-card/components/uni-card/uni-card"}[chunkId]||chunkId) + ".wxss";
+/******/ 				var href = "" + ({"components/myTabs/myTabs":"components/myTabs/myTabs","components/myUnit/myUnit":"components/myUnit/myUnit"}[chunkId]||chunkId) + ".wxss";
 /******/ 				var fullhref = __webpack_require__.p + href;
 /******/ 				var existingLinkTags = document.getElementsByTagName("link");
 /******/ 				for(var i = 0; i < existingLinkTags.length; i++) {
