@@ -27,7 +27,7 @@
 				toolDatas: [{
 					"toolType": "理财计算器",
 					"toolDesc": "66666",
-					"iconType": "color",
+					"iconType": "icon-jisuanqi2",
 					"action": "计算",
 					"url":"/pages/lcjsq/lcjsq"
 				}]
@@ -46,7 +46,7 @@
 					this.toolDatas = [{
 						"toolType": "理财计算器",
 						"toolDesc": "66666",
-						"iconType": "color",
+						"iconType": "icon-jisuanqi2",
 						"action": "计算",
 						"url":"/pages/lcjsq/lcjsq"
 					}]
@@ -54,49 +54,49 @@
 					this.toolDatas = [{
 							"toolType": "年金终值表",
 							"toolDesc": "66666",
-							"iconType": "wallet",
+							"iconType": "icon-biaoge-chakan",
 							"action": "查看",
 							"url":"/pages/view/view"
 						},
 						{
 							"toolType": "年金现值表",
 							"toolDesc": "66666",
-							"iconType": "settings-filled",
+							"iconType": "icon-biaoge",
 							"action": "查看",
 							"url":"/pages/view/view"
 						},
 						{
 							"toolType": "复利现值表",
 							"toolDesc": "66666",
-							"iconType": "auth-filled",
+							"iconType": "icon-qianbao",
 							"action": "查看"	,
 							"url":"/pages/view/view"
 						},
 						{
 							"toolType": "复利终值表",
 							"toolDesc": "66666",
-							"iconType": "shop-filled",
+							"iconType": "icon-a-MenuCaigouduizhang2x",
 							"action": "查看"	,						
 							"url":"/pages/view/view"
 						},
 						{
 							"toolType": "个人所得税税率表",
 							"toolDesc": "（综合所得适用）",
-							"iconType": "staff-filled",
-							"action": "查看",
-							"url":"/pages/view/view"
-						},
-						{
-							"toolType": "个人所得税税率表（",
-							"toolDesc": "经营所得适用）",
-							"iconType": "vip-filled",
+							"iconType": "icon-liuliangqianbao",
 							"action": "查看",
 							"url":"/pages/view/view"
 						},
 						{
 							"toolType": "个人所得税税率表",
-							"toolDesc": "（年终奖适用）",
-							"iconType": "plus-filled",
+							"toolDesc": "经营所得适用",
+							"iconType": "icon-Nimbersbiaoge",
+							"action": "查看",
+							"url":"/pages/view/view"
+						},
+						{
+							"toolType": "个人所得税税率表",
+							"toolDesc": "年终奖适用",
+							"iconType": "icon--_biaoge",
 							"action": "查看",
 							"url":"/pages/view/view"
 						}

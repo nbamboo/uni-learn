@@ -17,7 +17,7 @@
 						</label>
 					</view>
 					<uni-easyinput v-model="valiFormData.age" />
-					<uni-icons class="tb" type="color" size="22"></uni-icons>
+					<uni-icons class="tb" custom-prefix="iconfont" type="icon-icon-" size="20"></uni-icons>
 				</uni-forms-item>
 				<uni-forms-item>
 					<view class="cb2">
@@ -26,7 +26,7 @@
 						</label>
 					</view>
 					<uni-easyinput v-model="valiFormData.age" />
-					<uni-icons class="tb" type="color" size="22"></uni-icons>
+					<uni-icons class="tb" custom-prefix="iconfont" type="icon-icon-" size="20"></uni-icons>
 				</uni-forms-item>
 				<uni-forms-item>
 					<view class="cb2">
@@ -35,7 +35,8 @@
 						</label>
 					</view>
 					<uni-easyinput v-model="valiFormData.age" />
-					<uni-icons class="tb" type="color" size="22"></uni-icons>
+					<uni-icons class="tb" custom-prefix="iconfont" type="icon-icon-" size="20"></uni-icons>
+				</uni-forms-item>
 				</uni-forms-item>
 				<uni-forms-item>
 					<view class="cb2">
@@ -44,7 +45,8 @@
 						</label>
 					</view>
 					<uni-easyinput v-model="valiFormData.age" />
-					<uni-icons class="tb" type="color" size="22"></uni-icons>
+					<uni-icons class="tb" custom-prefix="iconfont" type="icon-icon-" size="20"></uni-icons>
+				</uni-forms-item>
 				</uni-forms-item>
 				<uni-forms-item>
 					<view class="cb2">
@@ -66,10 +68,10 @@
 				<text class="result">111</text>
 			</view>
 			<div style="text-align: right">
-			  <button type="default" size="mini" class="pmt-btn-clear" @click="submit('valiForm')">清空</button>
-			  <button type="primary" size="mini" class="pmt-btn-cal" @click="submit('valiForm')">计算</button>
+				<button type="default" size="mini" class="pmt-btn-clear" @click="submit('valiForm')">清空</button>
+				<button type="default" size="mini" class="pmt-btn-cal" hover-class="btn-hover"
+					@click="submit('valiForm')">计算</button>
 			</div>
-			<!-- <button type="primary" @click="submit('valiForm')">提交</button> -->
 		</view>
 	</view>
 </template>
@@ -171,20 +173,18 @@
 		font-size: 60rpx;
 		color: #333;
 	}
-	
+
 	.pmt-btn-clear {
-	  border: 1rpx solid #eee;
-	  border-radius: 2px;
-	  outline: none;
-	  margin-right: 10rpx;
+		margin-right: 10rpx;
 	}
-	
+
 	.pmt-btn-cal {
-	  border: 1rpx solid #eee;
-	  border-radius: 2rpx;
-	  outline: none;
-	  color: #fff;
-	  background-color: #008cff;
-	  margin-right: 10rpx;
+		background-color: #008cff !important;
+		color: #ffffff !important;
+		margin-right: 10rpx;
+	}
+
+	.btn-hover {
+		background-color: #0c6bf9 !important;
 	}
 </style>

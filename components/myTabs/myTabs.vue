@@ -43,8 +43,6 @@
 		display: flex;
 		justify-content: space-around;
 		box-sizing: border-box;
-		border-top: 2upx solid #dddddd;
-		border-bottom: 2upx solid #dddddd;
 		min-width: 100%;
 		overflow-x: auto;
 		
@@ -56,7 +54,7 @@
 		}
 		.tab-item.active{
 			position: relative;
-			color: #3682FF;
+			color: #008cff;
 		}
 		.tab-item.active::after{
 			content: "";
@@ -65,7 +63,7 @@
 			left:50%;
 			transform: translateX(-50%);
 			width: 100%;
-			border-bottom: 4upx solid #3682FF;
+			border-bottom: 4upx solid #008cff;
 			animation: test ease 1 0s;
 		}
 	}

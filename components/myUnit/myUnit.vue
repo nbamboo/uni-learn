@@ -3,14 +3,14 @@
 		<uni-card @tap="tap(toolData)">
 			<view class="uni-flex uni-row">
 				<view class="text" style="width: 20%;">
-					<uni-icons :type="toolData.iconType" size="25" color="blue"></uni-icons>
+					<uni-icons custom-prefix="iconfont" :type="toolData.iconType" size="25"></uni-icons>
 				</view>
 				<view style="-webkit-flex: 1;flex: 1;">
 					<view>{{toolData.toolType}}</view>
 					<view>{{toolData.toolDesc}}</view>
 				</view>
 				<view class="text" style="width: 25%;">
-					<button size="mini" type="primary">{{toolData.action}} ></button>
+					<button size="mini" type="default" class="pmt-btn" hover-class="btn-hover">{{toolData.action}}</button>
 				</view>
 			</view>
 		</uni-card>
@@ -36,5 +36,14 @@
 <style>
 	.text {
 		padding-top: 4%;
+	}
+	
+	.pmt-btn {
+	  background-color: #008cff !important;
+	  color: #ffffff !important;
+	}
+	
+	.btn-hover {
+		background-color: #0c6bf9 !important;
 	}
 </style>
