@@ -1,6 +1,6 @@
 @font-face {
-  font-family: "iconfont"; /* Project id 4166063 */
-  src: url('/static/iconfont.ttf') format('truetype');
+	font-family: "iconfont"; /* Project id 4166063 */
+	src: url('/static/iconfont.ttf') format('truetype');
 }
 
 .iconfont {
@@ -9,6 +9,34 @@
   font-style: normal;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+.icon-jisuanqi2:before {
+  content: "\e613";
+}
+
+.icon-dizhiguanli:before {
+  content: "\e604";
+}
+
+.icon-fuwuxiangmuzongbi:before {
+  content: "\e6d1";
+}
+
+.icon-liandongshichuang:before {
+  content: "\e6d2";
+}
+
+.icon-a-MenuJibendanwei2x:before {
+  content: "\e602";
+}
+
+.icon-a-MenuCaiwuguanli2x:before {
+  content: "\e603";
+}
+
+.icon-a-MenuYingfumingxi2x:before {
+  content: "\e605";
 }
 
 .icon-liuliangqianbao:before {
@@ -23,18 +51,6 @@
   content: "\e601";
 }
 
-.icon-jisuanqi2:before {
-  content: "\eb18";
-}
-
-.icon-jisuanqi:before {
-  content: "\e76a";
-}
-
-.icon-jisuanqi1:before {
-  content: "\e66b";
-}
-
 .icon-Nimbersbiaoge:before {
   content: "\e65a";
 }
@@ -43,23 +59,7 @@
   content: "\e726";
 }
 
-.icon-pre_icon_jisuanqi:before {
-  content: "\e63b";
-}
-
-.icon-biaoge:before {
-  content: "\e6d5";
-}
-
 .icon-biaoge-chakan:before {
   content: "\e660";
-}
-
-.icon-biaoge1:before {
-  content: "\e8a1";
-}
-
-.icon--_biaoge:before {
-  content: "\e6cb";
 }
 

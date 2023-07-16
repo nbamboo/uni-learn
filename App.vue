@@ -15,6 +15,8 @@
 
 <style lang="scss">
 	@import "@/static/iconfont.css";
+	// font-family: "iconfont"; /* Project id 4166063 */
+	// src: url('/static/iconfont.ttf') format('truetype');
 	/*每个页面公共css */
 	@import '@/uni_modules/uni-scss/index.scss';
 	/* #ifndef APP-NVUE */

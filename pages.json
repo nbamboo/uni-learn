@@ -16,6 +16,15 @@
             }
             
         }
+        ,{
+            "path" : "pages/njzzb/njzzb",
+            "style" :                                                                                    
+            {
+                "navigationBarTitleText": "",
+                "enablePullDownRefresh": false
+            }
+            
+        }
     ],
 	"globalStyle": {
 		"navigationBarTextStyle": "black",

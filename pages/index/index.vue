@@ -2,6 +2,7 @@
 	<view class='purchase-list'>
 		<my-tabs @change="tapChange" :modelData="modelData" :initIndex="initIndex"></my-tabs>
 		<my-unit @change="tapTool" v-for="(item, index) in toolDatas" :key="index" :toolData="item"></my-unit>
+		<king-table></king-table>
 	</view>
 
 </template>
@@ -61,42 +62,42 @@
 						{
 							"toolType": "年金现值表",
 							"toolDesc": "66666",
-							"iconType": "icon-biaoge",
+							"iconType": "icon-dizhiguanli",
 							"action": "查看",
 							"url":"/pages/view/view"
 						},
 						{
 							"toolType": "复利现值表",
 							"toolDesc": "66666",
-							"iconType": "icon-qianbao",
+							"iconType": "icon-fuwuxiangmuzongbi",
 							"action": "查看"	,
 							"url":"/pages/view/view"
 						},
 						{
 							"toolType": "复利终值表",
 							"toolDesc": "66666",
-							"iconType": "icon-a-MenuCaigouduizhang2x",
+							"iconType": "icon-a-MenuYingfumingxi2x",
 							"action": "查看"	,						
 							"url":"/pages/view/view"
 						},
 						{
 							"toolType": "个人所得税税率表",
 							"toolDesc": "（综合所得适用）",
-							"iconType": "icon-liuliangqianbao",
+							"iconType": "icon-a-MenuCaiwuguanli2x",
 							"action": "查看",
 							"url":"/pages/view/view"
 						},
 						{
 							"toolType": "个人所得税税率表",
 							"toolDesc": "经营所得适用",
-							"iconType": "icon-Nimbersbiaoge",
+							"iconType": "icon-a-MenuCaigouduizhang2x",
 							"action": "查看",
 							"url":"/pages/view/view"
 						},
 						{
 							"toolType": "个人所得税税率表",
 							"toolDesc": "年终奖适用",
-							"iconType": "icon--_biaoge",
+							"iconType": "icon-qianbao",
 							"action": "查看",
 							"url":"/pages/view/view"
 						}
