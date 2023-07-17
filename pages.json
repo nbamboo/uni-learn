@@ -15,12 +15,12 @@
                 "enablePullDownRefresh": false
             }
             
-        }
-        ,{
+        },
+        {
             "path" : "pages/njzzb/njzzb",
             "style" :                                                                                    
             {
-                "navigationBarTitleText": "",
+                "navigationBarTitleText": "年金终值表",
                 "enablePullDownRefresh": false
             }
             

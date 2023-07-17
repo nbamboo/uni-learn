@@ -2,7 +2,6 @@
 	<view class='purchase-list'>
 		<my-tabs @change="tapChange" :modelData="modelData" :initIndex="initIndex"></my-tabs>
 		<my-unit @change="tapTool" v-for="(item, index) in toolDatas" :key="index" :toolData="item"></my-unit>
-		<king-table></king-table>
 	</view>
 
 </template>
