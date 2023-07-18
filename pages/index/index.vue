@@ -2,7 +2,6 @@
 	<view class='purchase-list'>
 		<my-tabs @change="tapChange" :modelData="modelData" :initIndex="initIndex"></my-tabs>
 		<my-unit @change="tapTool" v-for="(item, index) in toolDatas" :key="index" :toolData="item"></my-unit>
-		<king-table></king-table>
 	</view>
 
 </template>
@@ -57,14 +56,14 @@
 							"toolDesc": "66666",
 							"iconType": "icon-biaoge-chakan",
 							"action": "查看",
-							"url":"/pages/view/view"
+							"url":"/pages/njzzb/njzzb"
 						},
 						{
 							"toolType": "年金现值表",
 							"toolDesc": "66666",
 							"iconType": "icon-dizhiguanli",
 							"action": "查看",
-							"url":"/pages/view/view"
+							"url":"/pages/njxzb/njxzb"
 						},
 						{
 							"toolType": "复利现值表",

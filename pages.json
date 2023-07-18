@@ -20,7 +20,16 @@
             "path" : "pages/njzzb/njzzb",
             "style" :                                                                                    
             {
-                "navigationBarTitleText": "",
+                "navigationBarTitleText": "年金终值表",
+                "enablePullDownRefresh": false
+            }
+            
+        }
+        ,{
+            "path" : "pages/njxzb/njxzb",
+            "style" :                                                                                    
+            {
+                "navigationBarTitleText": "年金现值表",
                 "enablePullDownRefresh": false
             }
             
