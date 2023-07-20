@@ -2,6 +2,7 @@
 	<view class='purchase-list'>
 		<my-tabs @change="tapChange" :modelData="modelData" :initIndex="initIndex"></my-tabs>
 		<my-unit @change="tapTool" v-for="(item, index) in toolDatas" :key="index" :toolData="item"></my-unit>
+		<button open-type="share" type="primary" size="mini">分享给好友</button>
 	</view>
 
 </template>
@@ -119,7 +120,7 @@
 
 <style lang='scss'>
 	.purchase-list {
-		background-color: #f5f5f5;
+		background-color: #ffffff;
 		height: 100%;
 		overflow: hidden;
 

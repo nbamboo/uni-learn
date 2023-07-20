@@ -10,6 +10,10 @@ App.mpType = 'app'
 const app = new Vue({
     ...App
 })
+
+import share from '@/mixins/share.js'
+Vue.mixin(share)
+
 app.$mount()
 // #endif
 

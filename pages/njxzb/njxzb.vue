@@ -208,7 +208,7 @@
 					key: 'f'
 				  }
 				],
-				tableHeight: (20 + 1) * 96,
+				tableHeight: (200 + 1) * 96,
 				tableWidth: 200 * 6 + 60
 			}
 		},

@@ -233,7 +233,7 @@ export default {
 				return {
 					color: '#333',
 					backgroundColor: '#fff',
-					disableColor: '#F7F6F6',
+					disableColor: '#fff',
 					borderColor: '#e5e5e5'
 				};
 			}

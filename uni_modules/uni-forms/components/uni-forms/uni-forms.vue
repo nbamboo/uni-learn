@@ -1,4 +1,4 @@
-<template>
+	<template>
 	<view class="uni-forms">
 		<form>
 			<slot></slot>
