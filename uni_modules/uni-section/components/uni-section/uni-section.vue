@@ -53,7 +53,7 @@
 			},
       titleFontSize: {
         type: String,
-        default: '14px'
+        default: '20px'
       },
 			titleColor:{
 				type: String,

@@ -38,8 +38,8 @@
 <style lang='scss'>
 	.my-tabs {
 		background-color: #ffffff;
-		height: 88upx;
-		font-size: 28upx;
+		height: 44px;
+		font-size: 16px;
 		display: flex;
 		justify-content: space-around;
 		box-sizing: border-box;
@@ -47,9 +47,9 @@
 		overflow-x: auto;
 		
 		.tab-item{
-			line-height: 48upx;
-			padding: 20upx;
-			min-width: 100upx;
+			line-height: 24px;
+			padding: 10px;
+			min-width: 50px;
 			text-align: center;
 		}
 		.tab-item.active{
@@ -60,10 +60,10 @@
 			content: "";
 			position: absolute;
 			bottom: 0;
-			left:50%;
+			left: 50%;
 			transform: translateX(-50%);
 			width: 100%;
-			border-bottom: 4upx solid #008cff;
+			border-bottom: 2px solid #008cff;
 			animation: test ease 1 0s;
 		}
 	}

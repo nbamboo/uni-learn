@@ -23,7 +23,51 @@
 			"navigationBarTitleText": "年金现值表",
 			"enablePullDownRefresh": false
 		}
-	}],
+	}, {
+		"path": "pages/flxzb/flxzb",
+		"style": {
+			"navigationBarTitleText": "复利现值表",
+			"enablePullDownRefresh": false
+		}
+
+	}, {
+		"path": "pages/flzzb/flzzb",
+		"style": {
+			"navigationBarTitleText": "复利终值表",
+			"enablePullDownRefresh": false
+		}
+
+	}, {
+		"path": "pages/swbzh/swbzh",
+		"style": {
+			"navigationBarTitleText": "个人所得税税率表(综合所得适用)",
+			"enablePullDownRefresh": false
+		}
+
+	}, {
+		"path": "pages/swbjy/swbjy",
+		"style": {
+			"navigationBarTitleText": "个人所得税税率表(经营所得适用)",
+			"enablePullDownRefresh": false
+		}
+
+	}, {
+		"path": "pages/swbnzj/swbnzj",
+		"style": {
+			"navigationBarTitleText": "个人所得税税率表(年终奖适用)",
+			"enablePullDownRefresh": false
+		}
+
+	}    ,{
+            "path" : "pages/about/about",
+            "style" :                                                                                    
+            {
+                "navigationBarTitleText": "",
+                "enablePullDownRefresh": false
+            }
+            
+        }
+    ],
 	"globalStyle": {
 		"navigationBarTextStyle": "black",
 		"navigationBarTitleText": "uni-app",
@@ -32,5 +76,27 @@
 		"app-plus": {
 			"background": "#efeff4"
 		}
+	},
+	"tabBar": {
+		"color": "#7A7E83",
+		"selectedColor": "#008cff",
+		"borderStyle": "black",
+		"backgroundColor": "#ffffff",
+		"list": [{
+			"pagePath": "pages/index/index",
+			"iconPath": "static/image/gj1.png",
+			"selectedIconPath": "static/image/gj2.png",
+			"text": "工具"
+		}, {
+			"pagePath": "pages/swbjy/swbjy",
+			"iconPath": "static/image/st1.png",
+			"selectedIconPath": "static/image/st2.png",
+			"text": "试题"
+		}, {
+			"pagePath": "pages/about/about",
+			"iconPath": "static/image/gy1.png",
+			"selectedIconPath": "static/image/gy2.png",
+			"text": "关于"
+		}]
 	}
 }

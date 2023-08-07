@@ -6,8 +6,8 @@
 					<uni-icons custom-prefix="iconfont" :type="toolData.iconType" size="25"></uni-icons>
 				</view>
 				<view style="-webkit-flex: 1;flex: 1;">
-					<view>{{toolData.toolType}}</view>
-					<view>{{toolData.toolDesc}}</view>
+					<view style="font-size: 16px;">{{toolData.toolType}}</view>
+					<view style="font-size: 14px;">{{toolData.toolDesc}}</view>
 				</view>
 				<view class="text" style="width: 25%;">
 					<button size="mini" type="default" class="pmt-btn" hover-class="btn-hover">{{toolData.action}}</button>

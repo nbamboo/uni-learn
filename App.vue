@@ -24,12 +24,6 @@
 	@import './common/uni.css';
 	@import '@/static/customicons.css';
 
-	// 设置整个项目的背景色
-	page {
-		// background-color: #ffffff;
-		// wx155e3184342ca871
-	}
-
 	/* #endif */
 	.example-info {
 		font-size: 14px;
