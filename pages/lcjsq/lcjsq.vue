@@ -235,7 +235,8 @@
 							checked: false
 						}
 					],
-					this.current = 1
+					this.current = 1,
+					this.result = ''
 			},
 
 			radioChange: function(evt) {

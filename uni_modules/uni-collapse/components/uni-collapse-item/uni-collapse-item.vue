@@ -318,7 +318,7 @@
 
 			&-text {
 				flex: 1;
-				font-size: 14px;
+				font-size: 16px;
 				/* #ifndef APP-NVUE */
 				white-space: nowrap;
 				color: inherit;

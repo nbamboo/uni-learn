@@ -67,6 +67,15 @@
             }
             
         }
+        ,{
+            "path" : "pages/exam/exam",
+            "style" :                                                                                    
+            {
+                "navigationBarTitleText": "",
+                "enablePullDownRefresh": false
+            }
+            
+        }
     ],
 	"globalStyle": {
 		"navigationBarTextStyle": "black",
@@ -87,12 +96,14 @@
 			"iconPath": "static/image/gj1.png",
 			"selectedIconPath": "static/image/gj2.png",
 			"text": "工具"
-		}, {
-			"pagePath": "pages/swbjy/swbjy",
-			"iconPath": "static/image/st1.png",
-			"selectedIconPath": "static/image/st2.png",
-			"text": "试题"
-		}, {
+		}, 
+		// {
+		// 	"pagePath": "pages/exam/exam",
+		// 	"iconPath": "static/image/st1.png",
+		// 	"selectedIconPath": "static/image/st2.png",
+		// 	"text": "试题"
+		// }, 
+		{
 			"pagePath": "pages/about/about",
 			"iconPath": "static/image/gy1.png",
 			"selectedIconPath": "static/image/gy2.png",
