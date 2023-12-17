@@ -30,7 +30,7 @@
 					isShowAnswer: false,
 					explainText: "22222",
 					explainJsqData: {
-						rate:'10',
+						rate: '10',
 						nper: '5',
 						pv: '-500000',
 						fv: '0',
@@ -63,7 +63,7 @@
 					isShowAnswer: false,
 					explainText: "22222",
 					explainJsqData: {
-						rate:'10',
+						rate: '10',
 						nper: '5',
 						pv: '-500000',
 						fv: '0',
@@ -97,7 +97,7 @@
 					isShowAnswer: false,
 					explainText: "22222",
 					explainJsqData: {
-						rate:'10',
+						rate: '10',
 						nper: '5',
 						pv: '-500000',
 						fv: '0',

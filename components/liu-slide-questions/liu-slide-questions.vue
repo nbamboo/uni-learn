@@ -1,9 +1,13 @@
 <template>
 	<view :class="{'page-main-show-answer': isShowAnswer, 'page-main': !isShowAnswer}">
-		<!-- 		<view class="topbox">
-			<image class="topimg" :src="topBanner"></image>
-			<view class="imgtext">你是一个完美主义者吗？</view>
-		</view> -->
+		<view class="uni-flex" style="justify-content: space-between; align-items: center; padding: 20rpx 48rpx">
+			<view>
+				<view>{{currentIndex + 1}}/14</view>
+			</view>
+			<view>
+				<button size="mini" type="default" class="dtk-btn" @click="showDtk()">答题卡</button>
+			</view>
+		</view>
 		<swiper :class="{'swipercard-show-answer': isShowAnswer, 'swipercard': !isShowAnswer}" previous-margin="0"
 			next-margin="0" :circular="false" :autoplay="false" :current="currentIndex" @change="eventHandle">
 			<block v-for="(item, index) in newQuestionsAnswer" :key="index">
@@ -73,6 +77,18 @@
 				</swiper-item>
 			</block>
 		</swiper>
+		<liu-popup type="center" ref="center" :currentTime="currentTime">
+			<view class="cu-dialog">
+				<scroll-view :scroll-y=true>
+						<view>
+							<text>答题卡</text>
+						</view>
+						<view v-for="(item, index) in newQuestionsAnswer" :key="index">
+							<button @click="selectSubject(index)">{{index+1}}</button>
+						</view>
+				</scroll-view>
+			</view>
+		</liu-popup>
 	</view>
 </template>
 
@@ -95,7 +111,6 @@
 					if (newArr.length) {
 						this.newQuestionsAnswer = JSON.parse(JSON.stringify(newArr))
 						this.totalNum = newArr.length
-						// this.setEmptyData()
 					}
 				},
 			}
@@ -103,13 +118,12 @@
 		data() {
 			return {
 				isShowAnswer: false,
-				// topBanner: require('../../static/banner.png'),
 				chooseonImg: require('../../static/image/chooseon.png'),
 				chooseonImg2: require('../../static/image/chooseerror.png'),
 				totalNum: 0,
 				currentIndex: 0,
 				newQuestionsAnswer: [],
-				// formSubmitData: [], //提交所需数据
+				currentTime: 0
 			};
 		},
 		methods: {
@@ -139,41 +153,22 @@
 					return false
 				}
 			},
-			
+
 			showJsq(jsqData) {
-				jsqData.time = new Date().getTime()
+				this.currentTime = new Date().getTime()
+				jsqData.time = this.currentTime
 				this.$emit("showJsq", jsqData)
 			},
-			
-			//创建提交数组的数据结构
-			// setEmptyData() {
-			// 	this.newQuestionsAnswer.forEach((res) => {
-			// 		let userAnswer = ''
-			// 		res.children && res.children.forEach(item => {
-			// 			if (!item.isSelect) item.isSelect = 0
-			// 			else userAnswer = item
-			// 		})
-			// 		if (res.problemType == 'QUESTION') userAnswer = res.userAnswer
-			// 		this.formSubmitData.push({
-			// 			id: res.id, //题目id
-			// 			userAnswer: userAnswer, //答案
-			// 		})
-			// 	})
-			// },
-			// submitData() {
-			// 	for (var i = 0; i < this.formSubmitData.length; i++) {
-			// 		if (!this.formSubmitData[i].userAnswer) {
-			// 			let toast = '请完成第' + (i + 1) + '题后提交！'
-			// 			uni.showToast({
-			// 				title: toast,
-			// 				icon: 'none'
-			// 			})
-			// 			this.currentIndex = i
-			// 			return
-			// 		}
-			// 	}
-			// 	this.$emit("submit", this.formSubmitData)
-			// },
+			//显示答题卡弹框
+			showDtk() {
+				this.$refs['center'].open()
+			},
+			//选择题号触发动作
+			selectSubject(index) {
+				this.currentIndex = index
+				//向子组件传递变化的时间，子组件捕获到变化后，执行关闭动作
+				this.currentTime = new Date().getTime()
+			},
 			//单选事件
 			singChoose(j, e) {
 				// 解析状态下，就别瞎jb搞了
@@ -191,31 +186,8 @@
 						}
 					}
 					this.newQuestionsAnswer[j].children[e].isSelect = 1
-					// 这块结合业务逻辑可以进行优化处理
-					// 例如只保存用户已选择答案Id等
-					// this.formSubmitData[j].userAnswer = this.newQuestionsAnswer[j].children[e]
 				}
-				// this.newQuestionsAnswer = JSON.parse(JSON.stringify(this.newQuestionsAnswer))
 			},
-			//多选事件
-			// multyChoose(j, e) {
-			// 	this.newQuestionsAnswer[j].children[e].isSelect = this.newQuestionsAnswer[j].children[e].isSelect ^ 1
-			// 	let obj = []
-			// 	for (var i = 0; i < this.newQuestionsAnswer[j].children.length; i++) {
-			// 		if (this.newQuestionsAnswer[j].children[i].isSelect) {
-			// 			// 这块结合业务逻辑可以进行优化处理
-			// 			// 例如 只保存用户已选择答案Id等
-			// 			// obj.push(this.newQuestionsAnswer[j].children[i].id)
-			// 			obj.push(this.newQuestionsAnswer[j].children[i])
-			// 		}
-			// 	}
-			// 	this.formSubmitData[j].userAnswer = obj
-			// 	this.newQuestionsAnswer = JSON.parse(JSON.stringify(this.newQuestionsAnswer))
-			// },
-			//富文本
-			// bindTextAreaBlur(index) {
-			// 	this.formSubmitData[index].userAnswer = this.newQuestionsAnswer[index].userAnswer
-			// },
 			//swiper改变时
 			eventHandle(e) {
 				// 这块可以结合业务逻辑进行优化处理，如左右滑动切换题目时做一些提示处理等
@@ -246,44 +218,19 @@
 		height: 120vh;
 	}
 
-	/* 	.topbox {
-		width: 100%;
-		height: 140rpx;
-		position: relative;
-	}
-
-	.topbox .topimg {
-		width: 100%;
-		height: 100%;
-	}
-
-	.topbox .imgtext {
-		position: absolute;
-		bottom: 60rpx;
-		left: 58rpx;
-		font-size: 36rpx;
-		font-weight: normal;
-		color: #FFFFFF;
-		line-height: 36rpx;
-		text-shadow: 0rpx 2rpx 4rpx rgba(0, 0, 0, 0.5);
-
-	} */
-
 	.swipercard {
 		width: 100%;
 		height: 80vh;
-		/* background: green; */
 	}
 
 	.swipercard-show-answer {
 		width: 100%;
 		height: 120vh;
-		/* background: red; */
 	}
 
 	.itembox {
 		width: calc(100% - 96rpx);
-		padding: 32rpx 48rpx;
+		padding: 0rpx 48rpx;
 	}
 
 	.box-hd {
@@ -321,13 +268,12 @@
 	.contentbox {
 		font-size: 30rpx;
 		color: #333333;
-		margin-top: 48rpx;
+		/* 		margin-top: 10rpx; */
 	}
 
 	.boxtitle .textl {
 		width: 50rpx;
 		height: 34rpx;
-		/* background: linear-gradient(90deg, #00aaff 0%, #ffffff 100%); */
 	}
 
 	.boxbody {
@@ -349,10 +295,6 @@
 		background: #FFFFFF;
 		border: 2rpx solid #BFBDBD;
 	}
-
-	/* 	.sinchoose2 {
-		border-radius: 6rpx;
-	} */
 
 	.sinchoose-on {
 		width: 32rpx;
@@ -401,7 +343,7 @@
 		color: #FFFFFF;
 		margin: 0 10rpx;
 	}
-	
+
 	.ftbtn3 {
 		width: 250rpx;
 		height: 80rpx;
@@ -411,7 +353,21 @@
 		font-size: 30rpx;
 		font-weight: 500;
 		color: #008cff;
-		/* margin: 0 10rpx; */
 	}
-	
+
+	.dtk-btn {
+		background-color: #008cff !important;
+		color: #ffffff !important;
+	}
+
+	.cu-dialog {
+		display: inline-block;
+		vertical-align: middle;
+		width: 600rpx;
+		height: 600rpx;
+		max-width: 100%;
+		max-height: 100%;
+		background-color: #f8f8f8;
+		border-radius: 1rpx;
+	}
 </style>

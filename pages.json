@@ -68,7 +68,7 @@
 	}, {
 		"path": "pages/exam/exam",
 		"style": {
-			"navigationBarTitleText": "个人所得税税率表(年终奖适用)",
+			"navigationBarTitleText": "个人理财计算典型例题",
 			"enablePullDownRefresh": false
 		}
 
