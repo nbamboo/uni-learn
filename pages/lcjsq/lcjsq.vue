@@ -7,7 +7,8 @@
 					<view class="cb1">
 						<text class="content_size">利率</text>
 					</view>
-					<uni-easyinput v-model="valiFormData.rate" type="digit" />
+					<uni-easyinput v-model="valiFormData.rate" :type="inputType" />
+					<uni-icons class="tb" custom-prefix="iconfont" type="icon-icon-" size="20"></uni-icons>
 					<text class="bfb">%</text>
 
 				</uni-forms-item>
@@ -19,7 +20,7 @@
 									:disabled="parmitems[0].checkboxDisabledValue" />期数
 							</label>
 						</view>
-						<uni-easyinput v-model="valiFormData.nper" type="digit"
+						<uni-easyinput v-model="valiFormData.nper" :type="inputType"
 							:disabled="parmitems[0].inputDisabledValue" />
 						<uni-icons class="tb" custom-prefix="iconfont" type="icon-icon-" size="20"></uni-icons>
 					</uni-forms-item>
@@ -30,7 +31,7 @@
 									:disabled="parmitems[1].checkboxDisabledValue" />现值
 							</label>
 						</view>
-						<uni-easyinput v-model="valiFormData.pv" type="digit"
+						<uni-easyinput v-model="valiFormData.pv" :type="inputType"
 							:disabled="parmitems[1].inputDisabledValue" />
 						<uni-icons class="tb" custom-prefix="iconfont" type="icon-icon-" size="20"></uni-icons>
 					</uni-forms-item>
@@ -41,7 +42,7 @@
 									:disabled="parmitems[2].checkboxDisabledValue" />终值
 							</label>
 						</view>
-						<uni-easyinput v-model="valiFormData.fv" type="digit"
+						<uni-easyinput v-model="valiFormData.fv" :type="inputType"
 							:disabled="parmitems[2].inputDisabledValue" />
 						<uni-icons class="tb" custom-prefix="iconfont" type="icon-icon-" size="20"></uni-icons>
 					</uni-forms-item>
@@ -54,7 +55,7 @@
 								每期付款额
 							</label>
 						</view>
-						<uni-easyinput v-model="valiFormData.pmt" type="digit"
+						<uni-easyinput v-model="valiFormData.pmt" :type="inputType"
 							:disabled="parmitems[3].inputDisabledValue" />
 						<uni-icons class="tb" custom-prefix="iconfont" type="icon-icon-" size="20"></uni-icons>
 					</uni-forms-item>
@@ -90,8 +91,21 @@
 
 <script>
 	export default {
+		props: {
+			dataResourceType: {
+				type: String,
+				default: 'inside',
+			},
+			dataContent: {
+				type: String,
+				default: ''
+			}
+
+		},
 		data() {
 			return {
+				// 输入框键盘类型
+				inputType: getApp().globalData.inputType,
 				// 校验表单数据
 				valiFormData: {
 					rate: '',
@@ -182,7 +196,8 @@
 			},
 
 			calculateResult(params, current) {
-				if(this.showResult(params) > 1 ) {
+				console.log(this.inputType)
+				if (this.showResult(params) > 1) {
 					this.result = '';
 					return;
 				}
@@ -269,7 +284,7 @@
 					}
 				}
 			},
-			
+
 			showResult: function(params) {
 				let nullCount = 0;
 				if (params.rate == null) {
@@ -365,7 +380,58 @@
 					pmt /= 1 + rate;
 				}
 				return pmt.toFixed(4);
+			},
+
+			handleChange() {
+				// console.log('子组件接收到父组件传递的数据', this.dataResourceType);
+				if (this.dataResourceType === "outer") {
+					var outerDataContent = JSON.parse(this.dataContent)
+					
+					this.valiFormData = {
+							rate: outerDataContent.rate,
+							nper: outerDataContent.nper,
+							pv: outerDataContent.pv,
+							fv: outerDataContent.fv,
+							pmt: outerDataContent.pmt,
+						},
+						this.parmitems = [{
+								value: "nper",
+								inputDisabledValue: outerDataContent.nper === '',
+								checkboxDisabledValue: true,
+								checked: !(outerDataContent.nper === '')
+							},
+							{
+								value: "pv",
+								inputDisabledValue: outerDataContent.pv === '',
+								checkboxDisabledValue: true,
+								checked: !(outerDataContent.pv === '')
+							},
+							{
+								value: "fv",
+								inputDisabledValue: outerDataContent.fv === '',
+								checkboxDisabledValue: true,
+								checked: !(outerDataContent.fv === '')
+							},
+							{
+								value: "pmt",
+								inputDisabledValue: outerDataContent.pmt === '',
+								checkboxDisabledValue: true,
+								checked: !(outerDataContent.pmt === '')
+							}
+						],
+						this.current = outerDataContent.current,
+						this.result = outerDataContent.result
+				} else {
+					this.reset()
+				}
 			}
+		},
+		mounted() {
+			this.$watch(() => this.dataContent, (newVal, oldVal) => {
+				if (newVal !== oldVal) {
+					this.handleChange(); // 调用处理函数
+				}
+			});
 		}
 	}
 </script>
@@ -434,7 +500,7 @@
 	}
 
 	.pmt-btn-cal {
-		background-color: #008cff !important;
+		background-color: #008cff!important;
 		color: #ffffff !important;
 		margin-right: 10rpx;
 		font-size: 18px;

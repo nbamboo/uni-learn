@@ -5,6 +5,7 @@
 		<view style="text-align: center; padding: 10%;">
 			<button open-type="share" type="primary" size="default" class="pmt-btn">分享给好友</button>
 		</view>
+		<ad unit-id="adunit-3e42e98e41630403" ad-type="video" ad-theme="white"></ad>
 	</view>
 
 </template>
@@ -133,7 +134,7 @@
 	}
 	
 	.pmt-btn {
-	  background-color: #008cff !important;
+	  background-color: #008cff!important;
 	  color: #ffffff !important;
 	  border-radius: 25px;
 	}

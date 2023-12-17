@@ -58,25 +58,21 @@
 			"enablePullDownRefresh": false
 		}
 
-	}    ,{
-            "path" : "pages/about/about",
-            "style" :                                                                                    
-            {
-                "navigationBarTitleText": "",
-                "enablePullDownRefresh": false
-            }
-            
-        }
-        ,{
-            "path" : "pages/exam/exam",
-            "style" :                                                                                    
-            {
-                "navigationBarTitleText": "",
-                "enablePullDownRefresh": false
-            }
-            
-        }
-    ],
+	}, {
+		"path": "pages/about/about",
+		"style": {
+			"navigationBarTitleText": "",
+			"enablePullDownRefresh": false
+		}
+
+	}, {
+		"path": "pages/exam/exam",
+		"style": {
+			"navigationBarTitleText": "个人所得税税率表(年终奖适用)",
+			"enablePullDownRefresh": false
+		}
+
+	}],
 	"globalStyle": {
 		"navigationBarTextStyle": "black",
 		"navigationBarTitleText": "uni-app",
@@ -92,22 +88,23 @@
 		"borderStyle": "black",
 		"backgroundColor": "#ffffff",
 		"list": [{
-			"pagePath": "pages/index/index",
-			"iconPath": "static/image/gj1.png",
-			"selectedIconPath": "static/image/gj2.png",
-			"text": "工具"
-		}, 
-		// {
-		// 	"pagePath": "pages/exam/exam",
-		// 	"iconPath": "static/image/st1.png",
-		// 	"selectedIconPath": "static/image/st2.png",
-		// 	"text": "试题"
-		// }, 
-		{
-			"pagePath": "pages/about/about",
-			"iconPath": "static/image/gy1.png",
-			"selectedIconPath": "static/image/gy2.png",
-			"text": "关于"
-		}]
+				"pagePath": "pages/index/index",
+				"iconPath": "static/image/gj1.png",
+				"selectedIconPath": "static/image/gj2.png",
+				"text": "工具"
+			},
+			{
+				"pagePath": "pages/exam/exam",
+				"iconPath": "static/image/st1.png",
+				"selectedIconPath": "static/image/st2.png",
+				"text": "例题"
+			}, 
+			{
+				"pagePath": "pages/about/about",
+				"iconPath": "static/image/gy1.png",
+				"selectedIconPath": "static/image/gy2.png",
+				"text": "关于"
+			}
+		]
 	}
 }

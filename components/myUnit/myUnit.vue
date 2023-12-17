@@ -39,7 +39,7 @@
 	}
 	
 	.pmt-btn {
-	  background-color: #008cff !important;
+	  background-color: #008cff!important;
 	  color: #ffffff !important;
 	}
 	
