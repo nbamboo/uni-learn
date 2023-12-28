@@ -50,12 +50,12 @@
 			//宽
 			width: {
 				type: String,
-				default: 'auto',
+				default: '650rpx',
 			},
 			//高
 			height: {
 				type: String,
-				default: 'auto',
+				default: '650rpx',
 			},
 			//背景色
 			bgColor: {

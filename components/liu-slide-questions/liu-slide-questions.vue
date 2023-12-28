@@ -2,7 +2,7 @@
 	<view :class="{'page-main-show-answer': isShowAnswer, 'page-main': !isShowAnswer}">
 		<view class="uni-flex" style="justify-content: space-between; align-items: center; padding: 20rpx 48rpx">
 			<view>
-				<view>{{currentIndex + 1}}/14</view>
+				<view>{{currentIndex + 1}}/{{totalNum}}</view>
 			</view>
 			<view>
 				<button size="mini" type="default" class="dtk-btn" @click="showDtk()">答题卡</button>
@@ -36,20 +36,6 @@
 									</view>
 								</view>
 							</view>
-							<!-- 							<view v-if="item.problemType == 'MULTY'">
-								<view class="boxbody" v-for="(self,idxm) in item.children" :key="idxm">
-									<view class="chooseitem" @click="multyChoose(index,idxm)">
-										<image class="sinchoose-on" v-if="self.isSelect" :src="chooseonImg2" mode="">
-										</image>
-										<view class="sinchoose sinchoose2" v-else></view>
-										<view class="bodyr">{{self.alias}}、{{self.answer}}</view>
-									</view>
-								</view>
-							</view>
-							<view class="writeitem" v-if="item.problemType == 'QUESTION'">
-								<textarea class="textInfo" v-model="item.userAnswer" @input="bindTextAreaBlur(index)"
-									auto-height maxlength="200" placeholder="请输入您的答案" />
-							</view> -->
 						</view>
 						<view class="footbtn">
 							<view class="ftbtn1" v-if="(index + 1) > 1" @click="back(index)">上一题</view>
@@ -80,12 +66,17 @@
 		<liu-popup type="center" ref="center" :currentTime="currentTime">
 			<view class="cu-dialog">
 				<scroll-view :scroll-y=true>
-						<view>
-							<text>答题卡</text>
-						</view>
-						<view v-for="(item, index) in newQuestionsAnswer" :key="index">
-							<button @click="selectSubject(index)">{{index+1}}</button>
-						</view>
+					<view>
+						<text>答题卡</text>
+					</view>
+					<uni-grid :column="3" :show-border="false" :square="false">
+						<uni-grid-item v-for="(item, index) in newQuestionsAnswer" :key="index">
+							<view class="grid-item-box">
+								<button @click="selectSubject(index)">{{index+1}}</button>
+								<text class="text">{{index+1}}</text>
+							</view>
+						</uni-grid-item>
+					</uni-grid>
 				</scroll-view>
 			</view>
 		</liu-popup>
@@ -364,9 +355,7 @@
 		display: inline-block;
 		vertical-align: middle;
 		width: 600rpx;
-		height: 600rpx;
 		max-width: 100%;
-		max-height: 100%;
 		background-color: #f8f8f8;
 		border-radius: 1rpx;
 	}

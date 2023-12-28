@@ -123,6 +123,40 @@
 						answer: '23100',
 						isSelect: 0 //这个是用来回显的字段(0:未选中；1:选中)(可不传)
 					}],
+				},{
+					id: '4',
+					title: '李女士未来2年内每年年末存入银行10000元，假定年利率为10％，每年付息一次，则该笔投资2年后的本利和是（  ）元。 ',
+					problemType: 'SINGLE',
+					trueAnswer: "A",
+					isShowAnswer: false,
+					explainText: "22222",
+					explainJsqData: {
+						rate: '10',
+						nper: '5',
+						pv: '-500000',
+						fv: '0',
+						pmt: '',
+						current: 1,
+						result: '131898.7404'
+					},
+					explainImageSrc: '../../static/image/about2.png',
+					children: [{
+						alias: 'A',
+						answer: '23000',
+						isSelect: 0 //这个是用来回显的字段(0:未选中；1:选中)(可不传)
+					}, {
+						alias: 'B',
+						answer: '20000',
+						isSelect: 0 //这个是用来回显的字段(0:未选中；1:选中)(可不传)
+					}, {
+						alias: 'C',
+						answer: '21000',
+						isSelect: 0 //这个是用来回显的字段(0:未选中；1:选中)(可不传)
+					}, {
+						alias: 'D',
+						answer: '23100',
+						isSelect: 0 //这个是用来回显的字段(0:未选中；1:选中)(可不传)
+					}],
 				}], //问题列表数据
 			}
 		},
