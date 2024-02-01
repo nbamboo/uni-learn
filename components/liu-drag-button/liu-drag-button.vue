@@ -108,11 +108,11 @@
 
 <style scoped>
 	.movable-view {
-		width: 100rpx;
-		height: 100rpx;
+		width: 80rpx;
+		height: 80rpx;
 		/* background: linear-gradient(360deg, #008cff0%, #008cff100%); */
-		box-shadow: 0px 4rpx 12rpx 0px #008cff;
-		border-radius: 50rpx;
+		box-shadow: 0px 3rpx 10rpx 0px #008cff;
+		border-radius: 40rpx;
 		color: #FFFFFF;
 		font-size: 26rpx;
 		touch-action: none;

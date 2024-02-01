@@ -1,0 +1,7 @@
+{
+  "name": "getExamItem",
+  "dependencies": {},
+  "extensions": {
+    "uni-cloud-jql": {}
+  }
+}

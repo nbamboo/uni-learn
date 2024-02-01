@@ -5,7 +5,7 @@
 				<view>{{currentIndex + 1}}/{{totalNum}}</view>
 			</view>
 			<view>
-				<button size="mini" type="default" class="dtk-btn" @click="showDtk()">答题卡</button>
+				<button size="mini" type="default" class="dtk-btn" @click="showDtk(currentIndex)">答题卡</button>
 			</view>
 		</view>
 		<swiper :class="{'swipercard-show-answer': isShowAnswer, 'swipercard': !isShowAnswer}" previous-margin="0"
@@ -13,10 +13,6 @@
 			<block v-for="(item, index) in newQuestionsAnswer" :key="index">
 				<swiper-item class="swiperitem">
 					<view class="itembox">
-						<!-- 						<view class="box-hd">
-							<view class="hdname">当前第<view class="text1">{{ index+ 1}}</view>道题</view>
-							<view class="hdnum">共{{totalNum}}道题</view>
-						</view> -->
 						<view class="contentbox">
 							<view class="boxtitle">
 								<text class="textl">{{index+1}}、</text>
@@ -41,7 +37,6 @@
 							<view class="ftbtn1" v-if="(index + 1) > 1" @click="back(index)">上一题</view>
 							<view class="ftbtn1" @click="switchShowAnser(item)">解析</view>
 							<view class="ftbtn1" v-if="(index + 1) < totalNum" @click="next(index)">下一题</view>
-							<!-- <view class="ftbtn2" v-else @click="submitData">提交</view> -->
 						</view>
 
 						<view class="boxbody" v-show="item.isShowAnswer">
@@ -51,35 +46,18 @@
 									<text>{{item.trueAnswer}}</text>
 								</view>
 							</view>
-							<view>
+<!-- 							<view>
 								<view>
 									<text>解析：</text>
 									<text>{{item.explainText}}</text>
 								</view>
-							</view>
+							</view> -->
 							<view class="ftbtn3" @click="showJsq(item.explainJsqData)">填充至计算器</view>
 						</view>
 					</view>
 				</swiper-item>
 			</block>
 		</swiper>
-		<liu-popup type="center" ref="center" :currentTime="currentTime">
-			<view class="cu-dialog">
-				<scroll-view :scroll-y=true>
-					<view>
-						<text>答题卡</text>
-					</view>
-					<uni-grid :column="3" :show-border="false" :square="false">
-						<uni-grid-item v-for="(item, index) in newQuestionsAnswer" :key="index">
-							<view class="grid-item-box">
-								<button @click="selectSubject(index)">{{index+1}}</button>
-								<text class="text">{{index+1}}</text>
-							</view>
-						</uni-grid-item>
-					</uni-grid>
-				</scroll-view>
-			</view>
-		</liu-popup>
 	</view>
 </template>
 
@@ -92,6 +70,11 @@
 				default () {
 					return []
 				}
+			},
+			
+			chooseIndex: {
+				type: Number,
+				default: 0
 			}
 		},
 		watch: {
@@ -102,8 +85,16 @@
 					if (newArr.length) {
 						this.newQuestionsAnswer = JSON.parse(JSON.stringify(newArr))
 						this.totalNum = newArr.length
+						
 					}
 				},
+			},
+			chooseIndex: {
+				deep: true,
+				immediate: true,
+				handler(newIndex) {
+					this.currentIndex = newIndex
+				}
 			}
 		},
 		data() {
@@ -151,14 +142,9 @@
 				this.$emit("showJsq", jsqData)
 			},
 			//显示答题卡弹框
-			showDtk() {
-				this.$refs['center'].open()
-			},
-			//选择题号触发动作
-			selectSubject(index) {
-				this.currentIndex = index
-				//向子组件传递变化的时间，子组件捕获到变化后，执行关闭动作
+			showDtk(dtkData) {
 				this.currentTime = new Date().getTime()
+				this.$emit("showDtk", dtkData)
 			},
 			//单选事件
 			singChoose(j, e) {

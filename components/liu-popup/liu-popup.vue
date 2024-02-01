@@ -18,10 +18,6 @@
 <script>
 	export default {
 		props: {
-			currentTime: {
-				type: Number,
-				default: 0,
-			},
 			//是否开启动画
 			animation: {
 				type: Boolean,
@@ -50,12 +46,12 @@
 			//宽
 			width: {
 				type: String,
-				default: '650rpx',
+				default: 'auto',
 			},
 			//高
 			height: {
 				type: String,
-				default: '650rpx',
+				default: 'auto',
 			},
 			//背景色
 			bgColor: {
@@ -63,7 +59,7 @@
 				default: '#FFFFFF',
 			},
 			//是否开启自定义导航栏
-			isBar: {
+			isBar:{
 				type: Boolean,
 				default: false,
 			},
@@ -76,9 +72,9 @@
 					const custom = uni.getMenuButtonBoundingClientRect();
 					console.log(JSON.stringify(custom))
 					if (custom) {
-						const navigationBarHeight = custom.top - statusBarHeight;
-						const navHeight = navigationBarHeight * 2 + custom.bottom;
-						return navHeight + 'px';
+					    const navigationBarHeight = custom.top - statusBarHeight;
+					    const navHeight = navigationBarHeight * 2 + custom.bottom;
+					    return navHeight + 'px';
 					}
 					return statusBarHeight + 44 + 'px';
 					// #endif
@@ -108,9 +104,8 @@
 				${[['top', 'bottom'].includes(this.typeData || this.type) ? 'left' : 'top']} : 0;
 				`;
 			},
-			safeBottom() {
-				return this.safeArea && ['left', 'right', 'bottom'].includes(this.typeData || this.type) ?
-					'env(safe-area-inset-bottom)' : '0px'
+			safeBottom(){
+				return this.safeArea && ['left','right', 'bottom'].includes(this.typeData || this.type) ? 'env(safe-area-inset-bottom)' : '0px'
 			},
 			scrollPopup() {
 				//获取页面标签高度
@@ -128,7 +123,7 @@
 				background:${this.bgColor};
 				`;
 				}
-
+				
 				return `${[this.typeData || this.type]} : ${this.isShow ? '0px !important' : '-100vh'};
 				max-width:100%;
 				max-height:100%;
@@ -157,12 +152,6 @@
 				passive: false
 			});
 			// #endif
-			//从父组件接收到变化的时间，执行关闭动作
-			this.$watch(() => this.currentTime, (newVal, oldVal) => {
-				if (newVal !== oldVal) {
-					this.isShow = false;
-				}
-			});
 		},
 
 		methods: {

@@ -72,6 +72,14 @@
 			"enablePullDownRefresh": false
 		}
 
+	},
+	{
+		"path" : "pages/subject/subject",
+		"style" : 
+		{
+			"navigationBarTitleText" : "",
+			"enablePullDownRefresh" : false
+		}
 	}],
 	"globalStyle": {
 		"navigationBarTextStyle": "black",
