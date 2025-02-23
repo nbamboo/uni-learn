@@ -122,6 +122,12 @@
 </script>
 
 <style lang='scss'>
+	
+	.active {
+		position: absolute; 
+		bottom: 0rpx
+	}
+	
 	.purchase-list {
 		background-color: #ffffff;
 		height: 100%;
