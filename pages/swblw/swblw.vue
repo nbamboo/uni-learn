@@ -82,7 +82,7 @@
 		display: block;
 		position: relative;
 		overflow: scroll;
-		width: 100%;
+		width: 95%;
 		height: 100%;
 	}
 
@@ -136,7 +136,7 @@
 
 	.table__head__td__text {
 		display: inline;
-		padding-left: 40%;
+		padding-left: 25%;
 	}
 	
 	.table__head__td:nth-child(2) .table__head__td__text{
