@@ -9,7 +9,7 @@
 			uni.getSystemInfo({
 				success: e => {
 					console.log(e.osName);
-					this.globalData.inputType = e.osName == "ios" ? "digit" : "text";
+					this.globalData.inputType = e.osName == "ios" ? "text" : "text";
 				}
 			})
 		},

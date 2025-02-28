@@ -91,6 +91,13 @@
 							"url":"/pages/swbzh/swbzh"
 						},
 						{
+							"toolType": "个人劳务报酬所得预扣率表",
+							"toolDesc": "劳务报酬所得预扣预缴适用",
+							"iconType": "icon-a-MenuCaiwuguanli2x",
+							"action": "查看",
+							"url":"/pages/swblw/swblw"
+						},
+						{
 							"toolType": "个人所得税税率表",
 							"toolDesc": "经营所得适用",
 							"iconType": "icon-a-MenuCaigouduizhang2x",
