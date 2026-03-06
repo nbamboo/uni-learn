@@ -61,7 +61,7 @@
 				<!-- 右侧区域：1列（功能键）-->
 				<view class="keyboard-right">
 					<view class="key-btn key-btn-backspace" @click="handleBackspace">
-						<text class="backspace-arrow">⌫</text>
+						<image class="backspace-icon-svg" src="data:image/svg+xml;base64,PHN2ZyBjbGFzcz0iaWNvbiIgdmlld0JveD0iMCAwIDEzNTUgMTAyNCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIiB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCI+PHBhdGggZD0iTTQxMC4xNjYgMTIxLjQ2N2g3NzUuMzIzdjc4MS4wNjZINDEwLjE2NkwxNTkuOTk1IDUxMmwyNTAuMTctMzkwLjUzM3ptNTUzLjM2MiAxOTQuNzM4Yy04LjcwNy0xMS42OTMtMjguOTkxLTExLjY5My0zNy42OTggMEw3NjkuMTU3IDQ3NC4wMjZsLTE1Ni42MjYtMTU3LjgyYy04LjcwNy0xMS42OTQtMjYuMTItOC43NzYtMzcuNzIxIDAtMTEuNjAxIDguNzc1LTExLjYwMSAyNi4zMDMgMCAzNy45OTZMNzMxLjQ4MyA1MTIgNTc0LjgxIDY2OS44MjFjLTExLjYwMSA4Ljc1My0xMS42MDEgMjYuMjggMCAzNy45NzQgOC43MyAxMS42OTMgMjYuMTIgMTEuNjkzIDM3LjcyIDBsMTU2LjY1LTE1Ny44MjEgMTU2LjY1IDE1Ny44MmM4LjcwNyAxMS42OTQgMjYuMDk3IDExLjY5NCAzNy42OTggMCAxMS42MDEtOC43NzUgMTEuNjAxLTI2LjMwMyAwLTM3Ljk5Nkw4MDYuOTAxIDUxMmwxNTYuNjczLTE1Ny44MjFjMTEuNTc4LTguNzUzIDExLjU3OC0yNi4yOCAwLTM3Ljk3NHoiIGRhdGEtc3BtLWFuY2hvci1pZD0iYTMxM3guc2VhcmNoX2luZGV4LjAuaTAuMTU2NjNhODFoUEZCc0EiIGNsYXNzPSJzZWxlY3RlZCIvPjwvc3ZnPg==" mode="aspectFill"></image>
 					</view>
 					<view class="key-btn key-btn-clear" @click="handleClear">
 						<text class="key-text">清空</text>
@@ -334,10 +334,10 @@ export default {
 	font-weight: 500;
 }
 
-/* 退格键 */
-.backspace-arrow {
-	font-size: 36rpx;
-	color: #666;
+/* 退格键SVG图标 */
+.backspace-icon-svg {
+	width: 64rpx;
+	height: 64rpx;
 }
 
 /* 清空键 */
