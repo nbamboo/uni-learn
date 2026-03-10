@@ -620,21 +620,21 @@
 
 	.bfb {
 		position: absolute;
-		right: -8%;
-		top: 24%;
+		right: -10%;
+		top: 18%;
 		font-size: 16px;
 	}
 
 	.cb1 {
 		position: absolute;
 		left: -50%;
-		top: 24%;
+		top: 18%;
 	}
 
 	.cb2 {
 		position: absolute;
 		left: -64%;
-		top: 24%;
+		top: 18%;
 	}
 
 	.radio_flex {
@@ -646,12 +646,12 @@
 	.tb {
 		position: absolute;
 		right: 4%;
-		top: 24%;
+		top: 18%;
 	}
 
 	/* 自定义输入框样式 */
 	.custom-input {
-		width: 100%;
+		width: 90%;
 		height: 70rpx;
 		border: 1rpx solid #d9d9d9;
 		border-radius: 8rpx;
