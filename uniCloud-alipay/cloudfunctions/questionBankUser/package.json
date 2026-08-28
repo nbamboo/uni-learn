@@ -1,0 +1,12 @@
+{
+  "name": "questionBankUser",
+  "version": "1.0.0",
+  "description": "题库用户做题记录、错题和收藏云函数",
+  "main": "index.js",
+  "scripts": {
+    "test": "node test.js"
+  },
+  "dependencies": {
+    "uni-id-common": "file:../../../uni_modules/uni-id-common/uniCloud/cloudfunctions/common/uni-id-common"
+  }
+}

@@ -3,6 +3,12 @@
 		<uni-load-more status="loading"></uni-load-more>
 	</view>
 
+	<view class="empty-state error-state" v-else-if="loadError">
+		<uni-icons type="refreshempty" size="42" color="#d34d4d"></uni-icons>
+		<text>{{ loadError }}</text>
+		<button @tap="retryLoad">重新加载</button>
+	</view>
+
 	<view class="practice-page" v-else-if="currentQuestion">
 		<view class="progress-track">
 			<view class="progress-fill" :style="{ width: progressPercent + '%' }"></view>
@@ -163,7 +169,9 @@
 
 <script>
 	import { buildPracticeQuestions } from '@/data/practice-questions.js'
-	import { isFavorite, recordAnswer, toggleFavorite } from '@/data/practice.js'
+	import { getPracticeState, isFavorite, recordAnswer, toggleFavorite } from '@/data/practice.js'
+	import { getAllPracticeQuestions } from '@/services/question-bank.js'
+	import { getPracticeStateSnapshot } from '@/services/user-practice.js'
 	import FinanceCalculator from '@/components/finance-calculator/finance-calculator.vue'
 
 	export default {
@@ -173,6 +181,7 @@
 		data() {
 			return {
 				questionList: [],
+				practiceConfig: null,
 				currentIndex: 0,
 				selectedAnswers: [],
 				submitted: false,
@@ -189,7 +198,9 @@
 				ignoreMouseUntil: 0,
 				swipeAnimating: false,
 				mode: 'sequence',
-				loading: true
+				loading: true,
+				loadError: '',
+				favoriteQuestionIds: []
 			}
 		},
 		computed: {
@@ -220,9 +231,9 @@
 				return Object.keys(this.sessionAnswers).length
 			}
 		},
-		async onLoad(options) {
+		onLoad(options) {
 			this.mode = options.mode || 'sequence'
-			const config = {
+			this.practiceConfig = {
 				subjectId: options.subjectId,
 				mode: this.mode,
 				chapterId: options.chapterId,
@@ -231,18 +242,49 @@
 				startId: options.startId,
 				limit: options.limit
 			}
-			try {
-				this.questionList = await buildPracticeQuestions(config)
-				this.setNavigationTitle()
-				if (this.questionList.length) {
-					this.loadQuestion(0)
-					this.resetCardPosition(false)
-				}
-			} finally {
-				this.loading = false
-			}
+			this.setNavigationTitle()
+			this.loadQuestions()
 		},
 		methods: {
+			async loadQuestions(forceRefresh) {
+				this.loading = true
+				this.loadError = ''
+				this.questionList = []
+				this.currentIndex = 0
+				try {
+					if (this.mode === 'chapter') {
+						const result = await getAllPracticeQuestions(Object.assign({}, this.practiceConfig, {
+							pageSize: 50
+						}), {
+							forceRefresh: Boolean(forceRefresh)
+						})
+						this.questionList = result.items
+					} else {
+						this.questionList = await buildPracticeQuestions(this.practiceConfig)
+					}
+					try {
+						const snapshot = await getPracticeStateSnapshot(this.practiceConfig.subjectId, {
+							localState: getPracticeState()
+						})
+						this.favoriteQuestionIds = snapshot.favoriteQuestionIds || []
+					} catch (syncError) {
+						this.favoriteQuestionIds = []
+					}
+					if (this.questionList.length) {
+						this.loadQuestion(0)
+						this.resetCardPosition(false)
+					}
+				} catch (error) {
+					this.loadError = error && error.errCode === 'QUESTION_BANK_SUBJECT_NOT_FOUND'
+						? '该科目题库尚未发布'
+						: (error && (error.errMsg || error.message)) || '练习题目加载失败'
+				} finally {
+					this.loading = false
+				}
+			},
+			retryLoad() {
+				this.loadQuestions(true)
+			},
 			setNavigationTitle() {
 				const titles = {
 					smart: '智能练习',
@@ -262,7 +304,7 @@
 				this.selectedAnswers = saved ? saved.selected.slice() : []
 				this.submitted = Boolean(saved)
 				this.lastResult = saved ? saved.correct : false
-				this.favorite = isFavorite(question.id)
+				this.favorite = this.favoriteQuestionIds.indexOf(question.id) > -1 || isFavorite(question.id)
 				this.scrollTop = this.scrollTop === 0 ? 1 : 0
 			},
 			handleCardPositionChange(event) {
@@ -426,6 +468,10 @@
 			},
 			favoriteCurrent() {
 				this.favorite = toggleFavorite(this.currentQuestion)
+				const questionId = this.currentQuestion.id
+				const index = this.favoriteQuestionIds.indexOf(questionId)
+				if (this.favorite && index === -1) this.favoriteQuestionIds.unshift(questionId)
+				if (!this.favorite && index > -1) this.favoriteQuestionIds.splice(index, 1)
 				uni.showToast({ title: this.favorite ? '已加入收藏' : '已取消收藏', icon: 'none' })
 			},
 			openAnswerSheet() {
@@ -541,4 +587,5 @@
 	.loading-state { display: flex; align-items: center; justify-content: center; min-height: 70vh; }
 	.empty-state text { margin-top: 20rpx; }
 	.empty-state button { margin-top: 30rpx; border-radius: 40rpx; background: #008cff; color: #ffffff; font-size: 28rpx; }
+	.error-state { color: #bd3f3f; }
 </style>

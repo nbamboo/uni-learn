@@ -1,0 +1,171 @@
+{
+  "bsonType": "object",
+  "description": "题库科目目录，保存当前启用版本、章节及知识点统计",
+  "required": [
+    "_id",
+    "subjectId",
+    "name",
+    "level",
+    "status",
+    "activeVersion",
+    "questionCount",
+    "chapters",
+    "knowledgeGroups",
+    "updatedAt"
+  ],
+  "permission": {
+    "read": false,
+    "create": false,
+    "update": false,
+    "delete": false,
+    "count": false
+  },
+  "properties": {
+    "_id": {
+      "bsonType": "string",
+      "title": "目录ID",
+      "description": "与科目ID保持一致，例如 junior-personal-finance",
+      "minLength": 1,
+      "maxLength": 64,
+      "trim": "both"
+    },
+    "subjectId": {
+      "bsonType": "string",
+      "title": "科目ID",
+      "description": "科目的稳定唯一标识",
+      "minLength": 1,
+      "maxLength": 64,
+      "trim": "both",
+      "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+    },
+    "name": {
+      "bsonType": "string",
+      "title": "科目名称",
+      "minLength": 1,
+      "maxLength": 64,
+      "trim": "both"
+    },
+    "level": {
+      "bsonType": "string",
+      "title": "考试级别",
+      "enum": [
+        "初级",
+        "中级"
+      ]
+    },
+    "status": {
+      "bsonType": "int",
+      "title": "启用状态",
+      "description": "0 表示停用，1 表示启用",
+      "enum": [
+        0,
+        1
+      ]
+    },
+    "activeVersion": {
+      "bsonType": "string",
+      "title": "当前题库版本",
+      "description": "云函数查询题目时使用的当前启用版本",
+      "minLength": 1,
+      "maxLength": 64,
+      "trim": "both"
+    },
+    "questionCount": {
+      "bsonType": "int",
+      "title": "题目总数",
+      "minimum": 0
+    },
+    "chapters": {
+      "bsonType": "array",
+      "arrayType": "object",
+      "title": "章节目录",
+      "minLength": 1,
+      "maxLength": 100,
+      "items": {
+        "bsonType": "object",
+        "required": [
+          "id",
+          "subjectId",
+          "name",
+          "count"
+        ],
+        "properties": {
+          "id": {
+            "bsonType": "string",
+            "title": "章节ID",
+            "minLength": 1,
+            "maxLength": 32,
+            "trim": "both"
+          },
+          "subjectId": {
+            "bsonType": "string",
+            "title": "科目ID",
+            "minLength": 1,
+            "maxLength": 64,
+            "trim": "both"
+          },
+          "name": {
+            "bsonType": "string",
+            "title": "章节名称",
+            "minLength": 1,
+            "maxLength": 128,
+            "trim": "both"
+          },
+          "count": {
+            "bsonType": "int",
+            "title": "章节题数",
+            "minimum": 0
+          }
+        }
+      }
+    },
+    "knowledgeGroups": {
+      "bsonType": "array",
+      "arrayType": "object",
+      "title": "知识点目录",
+      "maxLength": 1000,
+      "items": {
+        "bsonType": "object",
+        "required": [
+          "name",
+          "chapterId",
+          "chapter",
+          "count"
+        ],
+        "properties": {
+          "name": {
+            "bsonType": "string",
+            "title": "知识点名称",
+            "minLength": 1,
+            "maxLength": 128,
+            "trim": "both"
+          },
+          "chapterId": {
+            "bsonType": "string",
+            "title": "章节ID",
+            "minLength": 1,
+            "maxLength": 32,
+            "trim": "both"
+          },
+          "chapter": {
+            "bsonType": "string",
+            "title": "章节名称",
+            "minLength": 1,
+            "maxLength": 128,
+            "trim": "both"
+          },
+          "count": {
+            "bsonType": "int",
+            "title": "知识点题数",
+            "minimum": 0
+          }
+        }
+      }
+    },
+    "updatedAt": {
+      "bsonType": "date",
+      "title": "目录更新时间",
+      "description": "题库目录对应版本的发布时间"
+    }
+  }
+}

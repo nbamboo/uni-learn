@@ -1,0 +1,16 @@
+[
+  {
+    "IndexName": "uniq_subject_id",
+    "MgoKeySchema": {
+      "MgoIndexKeys": [
+        {
+          "Name": "subjectId",
+          "Direction": "1",
+          "Type": "varchar"
+        }
+      ],
+      "MgoIsUnique": true,
+      "MgoIsSparse": false
+    }
+  }
+]

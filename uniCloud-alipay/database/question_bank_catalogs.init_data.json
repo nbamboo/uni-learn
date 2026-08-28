@@ -1,0 +1,798 @@
+[
+  {
+    "_id": "junior-personal-finance",
+    "subjectId": "junior-personal-finance",
+    "name": "初级个人理财",
+    "level": "初级",
+    "status": 1,
+    "activeVersion": "2026-08-21",
+    "questionCount": 822,
+    "chapters": [
+      {
+        "id": "1",
+        "subjectId": "junior-personal-finance",
+        "name": "第一章 个人理财概述",
+        "count": 79
+      },
+      {
+        "id": "2",
+        "subjectId": "junior-personal-finance",
+        "name": "第二章 个人理财业务相关法律法规",
+        "count": 146
+      },
+      {
+        "id": "3",
+        "subjectId": "junior-personal-finance",
+        "name": "第三章 理财投资市场概述",
+        "count": 167
+      },
+      {
+        "id": "4",
+        "subjectId": "junior-personal-finance",
+        "name": "第四章 金融投资产品概述",
+        "count": 161
+      },
+      {
+        "id": "5",
+        "subjectId": "junior-personal-finance",
+        "name": "第五章 客户分类与需求分析",
+        "count": 64
+      },
+      {
+        "id": "6",
+        "subjectId": "junior-personal-finance",
+        "name": "第六章 理财规划计算工具与方法",
+        "count": 85
+      },
+      {
+        "id": "7",
+        "subjectId": "junior-personal-finance",
+        "name": "第七章 理财师的工作流程和方法",
+        "count": 87
+      },
+      {
+        "id": "8",
+        "subjectId": "junior-personal-finance",
+        "name": "附录 理财师金融服务技巧",
+        "count": 33
+      }
+    ],
+    "knowledgeGroups": [
+      {
+        "name": "银行个人理财业务分类",
+        "chapterId": "1",
+        "chapter": "第一章 个人理财概述",
+        "count": 21
+      },
+      {
+        "name": "理财师的执业资格",
+        "chapterId": "1",
+        "chapter": "第一章 个人理财概述",
+        "count": 16
+      },
+      {
+        "name": "个人理财业务的发展",
+        "chapterId": "1",
+        "chapter": "第一章 个人理财概述",
+        "count": 7
+      },
+      {
+        "name": "国内个人理财业务迅速发展的原因",
+        "chapterId": "1",
+        "chapter": "第一章 个人理财概述",
+        "count": 7
+      },
+      {
+        "name": "理财师的职业特征",
+        "chapterId": "1",
+        "chapter": "第一章 个人理财概述",
+        "count": 7
+      },
+      {
+        "name": "理财师队伍状况",
+        "chapterId": "1",
+        "chapter": "第一章 个人理财概述",
+        "count": 7
+      },
+      {
+        "name": "个人理财业务相关主体",
+        "chapterId": "1",
+        "chapter": "第一章 个人理财概述",
+        "count": 6
+      },
+      {
+        "name": "个人理财定义",
+        "chapterId": "1",
+        "chapter": "第一章 个人理财概述",
+        "count": 4
+      },
+      {
+        "name": "工作流程与主要内容",
+        "chapterId": "1",
+        "chapter": "第一章 个人理财概述",
+        "count": 4
+      },
+      {
+        "name": "民事法律关系介绍",
+        "chapterId": "2",
+        "chapter": "第二章 个人理财业务相关法律法规",
+        "count": 31
+      },
+      {
+        "name": "个人独资企业法和合伙企业法",
+        "chapterId": "2",
+        "chapter": "第二章 个人理财业务相关法律法规",
+        "count": 18
+      },
+      {
+        "name": "商业银行理财产品涉及的重要法律法规",
+        "chapterId": "2",
+        "chapter": "第二章 个人理财业务相关法律法规",
+        "count": 17
+      },
+      {
+        "name": "合同法律制度",
+        "chapterId": "2",
+        "chapter": "第二章 个人理财业务相关法律法规",
+        "count": 14
+      },
+      {
+        "name": "保险代理业务涉及的相关法律法规",
+        "chapterId": "2",
+        "chapter": "第二章 个人理财业务相关法律法规",
+        "count": 9
+      },
+      {
+        "name": "《个人外汇管理办法》介绍",
+        "chapterId": "2",
+        "chapter": "第二章 个人理财业务相关法律法规",
+        "count": 8
+      },
+      {
+        "name": "继承法律制度",
+        "chapterId": "2",
+        "chapter": "第二章 个人理财业务相关法律法规",
+        "count": 8
+      },
+      {
+        "name": "物权法律制度",
+        "chapterId": "2",
+        "chapter": "第二章 个人理财业务相关法律法规",
+        "count": 8
+      },
+      {
+        "name": "黄金业务涉及的法律法规",
+        "chapterId": "2",
+        "chapter": "第二章 个人理财业务相关法律法规",
+        "count": 7
+      },
+      {
+        "name": "婚姻法律制度",
+        "chapterId": "2",
+        "chapter": "第二章 个人理财业务相关法律法规",
+        "count": 6
+      },
+      {
+        "name": "基金代销业务涉及的法律法规",
+        "chapterId": "2",
+        "chapter": "第二章 个人理财业务相关法律法规",
+        "count": 6
+      },
+      {
+        "name": "法律知识的重要性",
+        "chapterId": "2",
+        "chapter": "第二章 个人理财业务相关法律法规",
+        "count": 3
+      },
+      {
+        "name": "私募资产管理业务涉及的法律法规",
+        "chapterId": "2",
+        "chapter": "第二章 个人理财业务相关法律法规",
+        "count": 3
+      },
+      {
+        "name": "《外汇业务指引》中关于个人经常项目外汇业务的介绍",
+        "chapterId": "2",
+        "chapter": "第二章 个人理财业务相关法律法规",
+        "count": 2
+      },
+      {
+        "name": "《银行保险机构消费者权益保护管理办法》的主要规定",
+        "chapterId": "2",
+        "chapter": "第二章 个人理财业务相关法律法规",
+        "count": 2
+      },
+      {
+        "name": "《银行保险机构消费者权益保护管理办法》的主要内容",
+        "chapterId": "2",
+        "chapter": "第二章 个人理财业务相关法律法规",
+        "count": 2
+      },
+      {
+        "name": "中国法律体系简介",
+        "chapterId": "2",
+        "chapter": "第二章 个人理财业务相关法律法规",
+        "count": 2
+      },
+      {
+        "name": "金融衍生品市场介绍",
+        "chapterId": "3",
+        "chapter": "第三章 理财投资市场概述",
+        "count": 29
+      },
+      {
+        "name": "保险市场介绍",
+        "chapterId": "3",
+        "chapter": "第三章 理财投资市场概述",
+        "count": 22
+      },
+      {
+        "name": "债券市场介绍",
+        "chapterId": "3",
+        "chapter": "第三章 理财投资市场概述",
+        "count": 17
+      },
+      {
+        "name": "贵金属市场及其他投资市场介绍",
+        "chapterId": "3",
+        "chapter": "第三章 理财投资市场概述",
+        "count": 16
+      },
+      {
+        "name": "股票市场介绍",
+        "chapterId": "3",
+        "chapter": "第三章 理财投资市场概述",
+        "count": 12
+      },
+      {
+        "name": "金融市场的构成要素",
+        "chapterId": "3",
+        "chapter": "第三章 理财投资市场概述",
+        "count": 11
+      },
+      {
+        "name": "直接融资市场和间接融资市场",
+        "chapterId": "3",
+        "chapter": "第三章 理财投资市场概述",
+        "count": 11
+      },
+      {
+        "name": "货币市场和资本市场",
+        "chapterId": "3",
+        "chapter": "第三章 理财投资市场概述",
+        "count": 10
+      },
+      {
+        "name": "货币市场介绍",
+        "chapterId": "3",
+        "chapter": "第三章 理财投资市场概述",
+        "count": 9
+      },
+      {
+        "name": "外汇市场介绍",
+        "chapterId": "3",
+        "chapter": "第三章 理财投资市场概述",
+        "count": 7
+      },
+      {
+        "name": "金融市场功能",
+        "chapterId": "3",
+        "chapter": "第三章 理财投资市场概述",
+        "count": 6
+      },
+      {
+        "name": "金融市场的概念",
+        "chapterId": "3",
+        "chapter": "第三章 理财投资市场概述",
+        "count": 5
+      },
+      {
+        "name": "发行市场和流通市场",
+        "chapterId": "3",
+        "chapter": "第三章 理财投资市场概述",
+        "count": 4
+      },
+      {
+        "name": "金融市场的特点",
+        "chapterId": "3",
+        "chapter": "第三章 理财投资市场概述",
+        "count": 4
+      },
+      {
+        "name": "有形市场和无形市场",
+        "chapterId": "3",
+        "chapter": "第三章 理财投资市场概述",
+        "count": 4
+      },
+      {
+        "name": "银行理财产品分类及特点",
+        "chapterId": "4",
+        "chapter": "第四章 金融投资产品概述",
+        "count": 17
+      },
+      {
+        "name": "基金的分类",
+        "chapterId": "4",
+        "chapter": "第四章 金融投资产品概述",
+        "count": 15
+      },
+      {
+        "name": "信托计划",
+        "chapterId": "4",
+        "chapter": "第四章 金融投资产品概述",
+        "count": 13
+      },
+      {
+        "name": "保险资产管理计划",
+        "chapterId": "4",
+        "chapter": "第四章 金融投资产品概述",
+        "count": 11
+      },
+      {
+        "name": "国债",
+        "chapterId": "4",
+        "chapter": "第四章 金融投资产品概述",
+        "count": 11
+      },
+      {
+        "name": "基金的流动性及收益情况",
+        "chapterId": "4",
+        "chapter": "第四章 金融投资产品概述",
+        "count": 11
+      },
+      {
+        "name": "贵金属",
+        "chapterId": "4",
+        "chapter": "第四章 金融投资产品概述",
+        "count": 10
+      },
+      {
+        "name": "资管新规概述",
+        "chapterId": "4",
+        "chapter": "第四章 金融投资产品概述",
+        "count": 9
+      },
+      {
+        "name": "银行代理保险产品主要类型介绍",
+        "chapterId": "4",
+        "chapter": "第四章 金融投资产品概述",
+        "count": 8
+      },
+      {
+        "name": "银行代销金融投资产品概述",
+        "chapterId": "4",
+        "chapter": "第四章 金融投资产品概述",
+        "count": 8
+      },
+      {
+        "name": "合伙制私募基金",
+        "chapterId": "4",
+        "chapter": "第四章 金融投资产品概述",
+        "count": 7
+      },
+      {
+        "name": "银行理财产品概述",
+        "chapterId": "4",
+        "chapter": "第四章 金融投资产品概述",
+        "count": 7
+      },
+      {
+        "name": "基金的概念及特点",
+        "chapterId": "4",
+        "chapter": "第四章 金融投资产品概述",
+        "count": 6
+      },
+      {
+        "name": "特殊类型基金",
+        "chapterId": "4",
+        "chapter": "第四章 金融投资产品概述",
+        "count": 5
+      },
+      {
+        "name": "银行理财子公司及产品",
+        "chapterId": "4",
+        "chapter": "第四章 金融投资产品概述",
+        "count": 4
+      },
+      {
+        "name": "基金子公司产品",
+        "chapterId": "4",
+        "chapter": "第四章 金融投资产品概述",
+        "count": 3
+      },
+      {
+        "name": "期货资产管理产品",
+        "chapterId": "4",
+        "chapter": "第四章 金融投资产品概述",
+        "count": 3
+      },
+      {
+        "name": "券商资产管理计划",
+        "chapterId": "4",
+        "chapter": "第四章 金融投资产品概述",
+        "count": 3
+      },
+      {
+        "name": "银行代理保险概述",
+        "chapterId": "4",
+        "chapter": "第四章 金融投资产品概述",
+        "count": 3
+      },
+      {
+        "name": "银行理财产品风险及法律约束",
+        "chapterId": "4",
+        "chapter": "第四章 金融投资产品概述",
+        "count": 3
+      },
+      {
+        "name": "基金的风险及法律约束",
+        "chapterId": "4",
+        "chapter": "第四章 金融投资产品概述",
+        "count": 2
+      },
+      {
+        "name": "保险概述",
+        "chapterId": "4",
+        "chapter": "第四章 金融投资产品概述",
+        "count": 1
+      },
+      {
+        "name": "银行代理保险产品的风险及法律约束",
+        "chapterId": "4",
+        "chapter": "第四章 金融投资产品概述",
+        "count": 1
+      },
+      {
+        "name": "生命周期与客户需求的关系",
+        "chapterId": "5",
+        "chapter": "第五章 客户分类与需求分析",
+        "count": 21
+      },
+      {
+        "name": "客户需求分析",
+        "chapterId": "5",
+        "chapter": "第五章 客户分类与需求分析",
+        "count": 12
+      },
+      {
+        "name": "从理财规划需求角度分类客户信息",
+        "chapterId": "5",
+        "chapter": "第五章 客户分类与需求分析",
+        "count": 4
+      },
+      {
+        "name": "定量信息和定性信息的分类",
+        "chapterId": "5",
+        "chapter": "第五章 客户分类与需求分析",
+        "count": 4
+      },
+      {
+        "name": "开户资料",
+        "chapterId": "5",
+        "chapter": "第五章 客户分类与需求分析",
+        "count": 4
+      },
+      {
+        "name": "企业经营理念的发展",
+        "chapterId": "5",
+        "chapter": "第五章 客户分类与需求分析",
+        "count": 4
+      },
+      {
+        "name": "财务信息和非财务信息的分类",
+        "chapterId": "5",
+        "chapter": "第五章 客户分类与需求分析",
+        "count": 3
+      },
+      {
+        "name": "面谈沟通",
+        "chapterId": "5",
+        "chapter": "第五章 客户分类与需求分析",
+        "count": 3
+      },
+      {
+        "name": "不同的客户分类方法",
+        "chapterId": "5",
+        "chapter": "第五章 客户分类与需求分析",
+        "count": 2
+      },
+      {
+        "name": "调查问卷",
+        "chapterId": "5",
+        "chapter": "第五章 客户分类与需求分析",
+        "count": 2
+      },
+      {
+        "name": "理财师工作职责的要求",
+        "chapterId": "5",
+        "chapter": "第五章 客户分类与需求分析",
+        "count": 2
+      },
+      {
+        "name": "数据挖掘",
+        "chapterId": "5",
+        "chapter": "第五章 客户分类与需求分析",
+        "count": 2
+      },
+      {
+        "name": "线上沟通",
+        "chapterId": "5",
+        "chapter": "第五章 客户分类与需求分析",
+        "count": 1
+      },
+      {
+        "name": "复利与年金系数表",
+        "chapterId": "6",
+        "chapter": "第六章 理财规划计算工具与方法",
+        "count": 15
+      },
+      {
+        "name": "期末年金与期初年金",
+        "chapterId": "6",
+        "chapter": "第六章 理财规划计算工具与方法",
+        "count": 15
+      },
+      {
+        "name": "货币时间价值概念与影响因素",
+        "chapterId": "6",
+        "chapter": "第六章 理财规划计算工具与方法",
+        "count": 8
+      },
+      {
+        "name": "现值与终值的计算",
+        "chapterId": "6",
+        "chapter": "第六章 理财规划计算工具与方法",
+        "count": 8
+      },
+      {
+        "name": "财务计算器",
+        "chapterId": "6",
+        "chapter": "第六章 理财规划计算工具与方法",
+        "count": 5
+      },
+      {
+        "name": "净现值（NPV）",
+        "chapterId": "6",
+        "chapter": "第六章 理财规划计算工具与方法",
+        "count": 5
+      },
+      {
+        "name": "金融理财工具的特点及比较",
+        "chapterId": "6",
+        "chapter": "第六章 理财规划计算工具与方法",
+        "count": 4
+      },
+      {
+        "name": "永续年金",
+        "chapterId": "6",
+        "chapter": "第六章 理财规划计算工具与方法",
+        "count": 4
+      },
+      {
+        "name": "有效利率的计算",
+        "chapterId": "6",
+        "chapter": "第六章 理财规划计算工具与方法",
+        "count": 4
+      },
+      {
+        "name": "增长型年金",
+        "chapterId": "6",
+        "chapter": "第六章 理财规划计算工具与方法",
+        "count": 4
+      },
+      {
+        "name": "Excel的使用",
+        "chapterId": "6",
+        "chapter": "第六章 理财规划计算工具与方法",
+        "count": 4
+      },
+      {
+        "name": "72法则",
+        "chapterId": "6",
+        "chapter": "第六章 理财规划计算工具与方法",
+        "count": 3
+      },
+      {
+        "name": "货币时间价值在理财规划中的应用",
+        "chapterId": "6",
+        "chapter": "第六章 理财规划计算工具与方法",
+        "count": 2
+      },
+      {
+        "name": "内部回报率（IRR）",
+        "chapterId": "6",
+        "chapter": "第六章 理财规划计算工具与方法",
+        "count": 2
+      },
+      {
+        "name": "时间价值的计算公式和基本参数",
+        "chapterId": "6",
+        "chapter": "第六章 理财规划计算工具与方法",
+        "count": 2
+      },
+      {
+        "name": "理财规划方案的内容",
+        "chapterId": "7",
+        "chapter": "第七章 理财师的工作流程和方法",
+        "count": 21
+      },
+      {
+        "name": "客户信息的内容",
+        "chapterId": "7",
+        "chapter": "第七章 理财师的工作流程和方法",
+        "count": 6
+      },
+      {
+        "name": "实施方案跟踪和评估服务",
+        "chapterId": "7",
+        "chapter": "第七章 理财师的工作流程和方法",
+        "count": 6
+      },
+      {
+        "name": "理财目标的内容",
+        "chapterId": "7",
+        "chapter": "第七章 理财师的工作流程和方法",
+        "count": 5
+      },
+      {
+        "name": "执行理财规划方案的原则",
+        "chapterId": "7",
+        "chapter": "第七章 理财师的工作流程和方法",
+        "count": 5
+      },
+      {
+        "name": "执行理财规划方案的注意因素",
+        "chapterId": "7",
+        "chapter": "第七章 理财师的工作流程和方法",
+        "count": 5
+      },
+      {
+        "name": "不定期评估和方案调整",
+        "chapterId": "7",
+        "chapter": "第七章 理财师的工作流程和方法",
+        "count": 4
+      },
+      {
+        "name": "概述",
+        "chapterId": "7",
+        "chapter": "第七章 理财师的工作流程和方法",
+        "count": 4
+      },
+      {
+        "name": "建立信任关系",
+        "chapterId": "7",
+        "chapter": "第七章 理财师的工作流程和方法",
+        "count": 4
+      },
+      {
+        "name": "客户信息的整理",
+        "chapterId": "7",
+        "chapter": "第七章 理财师的工作流程和方法",
+        "count": 4
+      },
+      {
+        "name": "收集客户信息的必要性和基本技巧",
+        "chapterId": "7",
+        "chapter": "第七章 理财师的工作流程和方法",
+        "count": 4
+      },
+      {
+        "name": "从跟踪服务到综合规划的螺旋式提升",
+        "chapterId": "7",
+        "chapter": "第七章 理财师的工作流程和方法",
+        "count": 3
+      },
+      {
+        "name": "理财目标确定的原则",
+        "chapterId": "7",
+        "chapter": "第七章 理财师的工作流程和方法",
+        "count": 3
+      },
+      {
+        "name": "制订和提交书面理财规划方案",
+        "chapterId": "7",
+        "chapter": "第七章 理财师的工作流程和方法",
+        "count": 3
+      },
+      {
+        "name": "分析客户财务现状",
+        "chapterId": "7",
+        "chapter": "第七章 理财师的工作流程和方法",
+        "count": 2
+      },
+      {
+        "name": "接触客户",
+        "chapterId": "7",
+        "chapter": "第七章 理财师的工作流程和方法",
+        "count": 2
+      },
+      {
+        "name": "明确理财服务的基本要求",
+        "chapterId": "7",
+        "chapter": "第七章 理财师的工作流程和方法",
+        "count": 2
+      },
+      {
+        "name": "确定理财目标的步骤",
+        "chapterId": "7",
+        "chapter": "第七章 理财师的工作流程和方法",
+        "count": 2
+      },
+      {
+        "name": "后续跟踪服务的必要性",
+        "chapterId": "7",
+        "chapter": "第七章 理财师的工作流程和方法",
+        "count": 1
+      },
+      {
+        "name": "客户档案管理",
+        "chapterId": "7",
+        "chapter": "第七章 理财师的工作流程和方法",
+        "count": 1
+      },
+      {
+        "name": "沟通技巧",
+        "chapterId": "8",
+        "chapter": "附录 理财师金融服务技巧",
+        "count": 5
+      },
+      {
+        "name": "会见客户的相关礼仪",
+        "chapterId": "8",
+        "chapter": "附录 理财师金融服务技巧",
+        "count": 5
+      },
+      {
+        "name": "理财师的仪表礼仪",
+        "chapterId": "8",
+        "chapter": "附录 理财师金融服务技巧",
+        "count": 5
+      },
+      {
+        "name": "理财师时间管理实践",
+        "chapterId": "8",
+        "chapter": "附录 理财师金融服务技巧",
+        "count": 4
+      },
+      {
+        "name": "时间管理的方法",
+        "chapterId": "8",
+        "chapter": "附录 理财师金融服务技巧",
+        "count": 4
+      },
+      {
+        "name": "一般电话礼仪",
+        "chapterId": "8",
+        "chapter": "附录 理财师金融服务技巧",
+        "count": 4
+      },
+      {
+        "name": "时间管理的重要性",
+        "chapterId": "8",
+        "chapter": "附录 理财师金融服务技巧",
+        "count": 2
+      },
+      {
+        "name": "外拨电话的步骤和注意事项",
+        "chapterId": "8",
+        "chapter": "附录 理财师金融服务技巧",
+        "count": 2
+      },
+      {
+        "name": "产品服务推荐的流程",
+        "chapterId": "8",
+        "chapter": "附录 理财师金融服务技巧",
+        "count": 1
+      },
+      {
+        "name": "产品卖点总结方法",
+        "chapterId": "8",
+        "chapter": "附录 理财师金融服务技巧",
+        "count": 1
+      }
+    ],
+    "updatedAt": {
+      "$date": "2026-08-21T00:00:00.000Z"
+    }
+  }
+]

@@ -1,0 +1,27 @@
+[
+  {
+    "IndexName": "user_subject_time",
+    "MgoKeySchema": {
+      "MgoIndexKeys": [
+        { "Name": "userId", "Direction": "1", "Type": "varchar" },
+        { "Name": "subjectId", "Direction": "1", "Type": "varchar" },
+        { "Name": "occurredAt", "Direction": "-1", "Type": "date" }
+      ],
+      "MgoIsUnique": false,
+      "MgoIsSparse": false
+    }
+  },
+  {
+    "IndexName": "user_subject_question_time",
+    "MgoKeySchema": {
+      "MgoIndexKeys": [
+        { "Name": "userId", "Direction": "1", "Type": "varchar" },
+        { "Name": "subjectId", "Direction": "1", "Type": "varchar" },
+        { "Name": "questionId", "Direction": "1", "Type": "varchar" },
+        { "Name": "occurredAt", "Direction": "-1", "Type": "date" }
+      ],
+      "MgoIsUnique": false,
+      "MgoIsSparse": false
+    }
+  }
+]

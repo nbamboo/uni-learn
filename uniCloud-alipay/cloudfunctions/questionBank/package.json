@@ -1,0 +1,10 @@
+{
+  "name": "questionBank",
+  "version": "1.0.0",
+  "description": "题库目录、练习分页、搜索、按ID回取与判题云函数",
+  "main": "index.js",
+  "scripts": {
+    "test": "node test.js"
+  },
+  "dependencies": {}
+}

@@ -1,0 +1,54 @@
+[
+  {
+    "IndexName": "uniq_user_subject_question",
+    "MgoKeySchema": {
+      "MgoIndexKeys": [
+        { "Name": "userId", "Direction": "1", "Type": "varchar" },
+        { "Name": "subjectId", "Direction": "1", "Type": "varchar" },
+        { "Name": "questionId", "Direction": "1", "Type": "varchar" }
+      ],
+      "MgoIsUnique": true,
+      "MgoIsSparse": false
+    }
+  },
+  {
+    "IndexName": "user_subject_history",
+    "MgoKeySchema": {
+      "MgoIndexKeys": [
+        { "Name": "userId", "Direction": "1", "Type": "varchar" },
+        { "Name": "subjectId", "Direction": "1", "Type": "varchar" },
+        { "Name": "attempted", "Direction": "1", "Type": "bool" },
+        { "Name": "lastAnsweredAt", "Direction": "-1", "Type": "date" }
+      ],
+      "MgoIsUnique": false,
+      "MgoIsSparse": false
+    }
+  },
+  {
+    "IndexName": "user_subject_wrong",
+    "MgoKeySchema": {
+      "MgoIndexKeys": [
+        { "Name": "userId", "Direction": "1", "Type": "varchar" },
+        { "Name": "subjectId", "Direction": "1", "Type": "varchar" },
+        { "Name": "attempted", "Direction": "1", "Type": "bool" },
+        { "Name": "lastCorrect", "Direction": "1", "Type": "bool" },
+        { "Name": "lastAnsweredAt", "Direction": "-1", "Type": "date" }
+      ],
+      "MgoIsUnique": false,
+      "MgoIsSparse": false
+    }
+  },
+  {
+    "IndexName": "user_subject_favorite",
+    "MgoKeySchema": {
+      "MgoIndexKeys": [
+        { "Name": "userId", "Direction": "1", "Type": "varchar" },
+        { "Name": "subjectId", "Direction": "1", "Type": "varchar" },
+        { "Name": "favorite", "Direction": "1", "Type": "bool" },
+        { "Name": "favoriteUpdatedAt", "Direction": "-1", "Type": "date" }
+      ],
+      "MgoIsUnique": false,
+      "MgoIsSparse": false
+    }
+  }
+]

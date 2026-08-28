@@ -20,6 +20,12 @@
 			<uni-load-more status="loading"></uni-load-more>
 		</view>
 
+		<view class="empty-state error-state" v-else-if="loadError">
+			<uni-icons type="refreshempty" size="38" color="#d34d4d"></uni-icons>
+			<text>{{ loadError }}</text>
+			<button @tap="retryLoad">重新加载</button>
+		</view>
+
 		<view class="catalog-list" v-else-if="filteredItems.length">
 			<view class="catalog-item" v-for="(item, index) in filteredItems" :key="item.id" @tap="startItem(item)">
 				<view class="item-index">{{ index + 1 }}</view>
@@ -41,7 +47,7 @@
 
 		<view class="empty-state" v-else>
 			<uni-icons type="search" size="38" color="#a3a8af"></uni-icons>
-			<text>没有找到相关知识点</text>
+			<text>{{ view === 'knowledge' ? '没有找到相关知识点' : '当前科目没有可用章节' }}</text>
 		</view>
 	</view>
 </template>
@@ -49,11 +55,11 @@
 <script>
 	import {
 		getChapterProgress,
-		getChaptersBySubject,
 		getPracticeState,
 		getSubjectById
 	} from '@/data/practice.js'
-	import { getKnowledgeGroups, getQuestionsBySubject } from '@/data/practice-questions.js'
+	import { getCatalog } from '@/services/question-bank.js'
+	import { getPracticeStateSnapshot } from '@/services/user-practice.js'
 
 	export default {
 		data() {
@@ -62,12 +68,17 @@
 				view: 'chapter',
 				keyword: '',
 				items: [],
-				loading: true
+				loading: true,
+				loadError: '',
+				catalogName: ''
 			}
 		},
 		computed: {
 			subject() {
-				return getSubjectById(this.subjectId)
+				const subject = getSubjectById(this.subjectId)
+				return Object.assign({}, subject, {
+					name: this.catalogName || subject.name
+				})
 			},
 			filteredItems() {
 				const keyword = this.keyword.trim().toLowerCase()
@@ -82,36 +93,80 @@
 			this.loadItems()
 		},
 		methods: {
-			async loadItems() {
+			async loadItems(forceRefresh) {
 				this.loading = true
-				if (this.view === 'chapter') {
-					this.items = getChaptersBySubject(this.subjectId).map(item => ({
-						...item,
-						progress: getChapterProgress(this.subjectId, item.id)
-					}))
-					this.loading = false
-					return
-				}
-
-				const state = getPracticeState()
-				const [questions, knowledgeGroups] = await Promise.all([
-					getQuestionsBySubject(this.subjectId),
-					getKnowledgeGroups(this.subjectId)
-				])
-				this.items = knowledgeGroups.map(item => {
-					const related = questions.filter(question => question.knowledge === item.name)
-					const attempted = related.filter(question => state.answers[question.id]).length
-					return {
-						...item,
-						id: item.name,
-						progress: {
-							attempted,
-							total: related.length,
-							percent: related.length ? Math.round(attempted / related.length * 100) : 0
-						}
+				this.loadError = ''
+				try {
+					const catalog = await getCatalog(this.subjectId, {
+						forceRefresh: Boolean(forceRefresh)
+					})
+					this.catalogName = catalog.name || ''
+					let cloudState = null
+					try {
+						cloudState = await getPracticeStateSnapshot(this.subjectId, {
+							localState: getPracticeState(),
+							forceRefresh: Boolean(forceRefresh)
+						})
+					} catch (syncError) {
+						cloudState = null
 					}
-				})
-				this.loading = false
+
+					if (this.view === 'chapter') {
+						const chapters = Array.isArray(catalog.chapters) ? catalog.chapters : []
+						this.items = chapters.map(item => {
+							const localProgress = getChapterProgress(this.subjectId, item.id, item.count)
+							const attempted = cloudState
+								? (cloudState.chapterAttempts[item.id] || 0)
+								: localProgress.attempted
+							return {
+								...item,
+								progress: Object.assign({}, localProgress, {
+									attempted,
+									percent: item.count ? Math.min(100, Math.round(attempted / item.count * 100)) : 0
+								})
+							}
+						})
+						return
+					}
+
+					const state = getPracticeState()
+					const attemptedByKnowledge = {}
+					Object.keys(state.answers).forEach(questionId => {
+						const answer = state.answers[questionId]
+						const isLegacyDefault = !answer.subjectId
+							&& this.subjectId === 'junior-personal-finance'
+							&& questionId.indexOf('ipf-') === 0
+						if (answer.subjectId !== this.subjectId && !isLegacyDefault) return
+						if (!answer.knowledge) return
+						attemptedByKnowledge[answer.knowledge] = (attemptedByKnowledge[answer.knowledge] || 0) + 1
+					})
+					const knowledgeGroups = Array.isArray(catalog.knowledgeGroups) ? catalog.knowledgeGroups : []
+					this.items = knowledgeGroups.map(item => {
+						const attempted = cloudState
+							? (cloudState.knowledgeAttempts[item.name] || 0)
+							: (attemptedByKnowledge[item.name] || 0)
+						const total = Number.isInteger(item.count) && item.count >= 0 ? item.count : 0
+						return {
+							...item,
+							id: `${item.chapterId}:${item.name}`,
+							progress: {
+								attempted,
+								total,
+								percent: total ? Math.min(100, Math.round(attempted / total * 100)) : 0
+							}
+						}
+					})
+				} catch (error) {
+					this.items = []
+					this.loadError = error && error.errCode === 'QUESTION_BANK_SUBJECT_NOT_FOUND'
+						? '该科目题库尚未发布'
+						: (error && (error.errMsg || error.message)) || '章节目录加载失败'
+				} finally {
+					this.loading = false
+				}
+			},
+			retryLoad() {
+				this.loadItems(true)
 			},
 			startItem(item) {
 				let url = `/practice-pages/practice/practice?subjectId=${this.subjectId}`
@@ -146,4 +201,7 @@
 	.empty-state { display: flex; align-items: center; flex-direction: column; padding: 160rpx 30rpx; color: #92979f; font-size: 27rpx; }
 	.loading-state { display: flex; align-items: center; justify-content: center; min-height: 45vh; }
 	.empty-state text { margin-top: 18rpx; }
+	.empty-state button { min-width: 220rpx; height: 76rpx; margin-top: 28rpx; border: 0; border-radius: 38rpx; background: #008cff; color: #ffffff; font-size: 27rpx; line-height: 76rpx; }
+	.empty-state button::after { border: 0; }
+	.error-state { color: #bd3f3f; }
 </style>

@@ -11,7 +11,7 @@
 
 		<view class="records-summary">
 			<view>
-				<text class="summary-value">{{ records.length }}</text>
+					<text class="summary-value">{{ total }}</text>
 				<text class="summary-label">{{ activeTab.unit }}</text>
 			</view>
 			<button v-if="records.length" @tap="startAll">开始练习</button>
@@ -19,6 +19,15 @@
 
 		<view class="loading-state" v-if="loading">
 			<uni-load-more status="loading"></uni-load-more>
+		</view>
+
+		<view class="empty-state error-state" v-else-if="loadError">
+			<view class="empty-icon">
+				<uni-icons type="cloud-download" size="42" color="#d34d4d"></uni-icons>
+			</view>
+			<text class="empty-title">云端记录加载失败</text>
+			<text class="empty-caption">{{ loadError }}</text>
+			<button @tap="retryLoad">重新加载</button>
 		</view>
 
 		<view class="record-list" v-else-if="records.length">
@@ -36,6 +45,12 @@
 				</view>
 				<uni-icons v-else type="star-filled" size="20" color="#e7a721"></uni-icons>
 			</view>
+			<uni-load-more
+				v-if="hasMore"
+				:status="loadingMore ? 'loading' : 'more'"
+				:content-text="{ contentdown: '加载更多', contentrefresh: '正在加载', contentnomore: '没有更多了' }"
+				@clickLoadMore="loadMore"
+			></uni-load-more>
 		</view>
 
 		<view class="empty-state" v-else>
@@ -50,20 +65,22 @@
 </template>
 
 <script>
-	import {
-		formatHistoryTime,
-		getPracticeState,
-		getSubjectById
-	} from '@/data/practice.js'
-	import { getQuestionsBySubject } from '@/data/practice-questions.js'
+		import { formatHistoryTime, getSubjectById } from '@/data/practice.js'
+		import { getPracticeRecords } from '@/services/user-practice.js'
 
 	export default {
 		data() {
 			return {
 				subjectId: '',
-				activeView: 'history',
-				records: [],
-				loading: true,
+					activeView: 'history',
+					records: [],
+					total: 0,
+					page: 1,
+					hasMore: false,
+					loading: true,
+					loadingMore: false,
+					loadError: '',
+					requestId: 0,
 				tabs: [
 					{ key: 'history', label: '做题记录', unit: '道已练习', icon: 'calendar', emptyTitle: '还没有做题记录', emptyCaption: '完成练习后，记录会自动保存在这里。' },
 					{ key: 'wrong', label: '错题集', unit: '道待巩固', icon: 'refresh', emptyTitle: '暂时没有错题', emptyCaption: '继续保持，答错的题目会自动加入这里。' },
@@ -86,54 +103,55 @@
 		onShow() {
 			this.loadRecords()
 		},
-		methods: {
-			switchView(view) {
-				this.activeView = view
-				this.loadRecords()
-			},
-			async loadRecords() {
-				this.loading = true
-				const state = getPracticeState()
-				const subjectQuestions = await getQuestionsBySubject(this.subjectId)
-				const questionMap = subjectQuestions.reduce((map, question) => {
-					map[question.id] = question
-					return map
-				}, {})
-
-				if (this.activeView === 'wrong') {
-					this.records = subjectQuestions
-						.filter(question => state.answers[question.id] && !state.answers[question.id].correct)
-						.map(question => this.toRecord(question, state.answers[question.id]))
-					this.loading = false
-					return
-				}
-
-				if (this.activeView === 'favorite') {
-					this.records = state.favorites
-						.map(id => questionMap[id])
-						.filter(question => question && question.subjectId === this.subjectId)
-						.map(question => this.toRecord(question, state.answers[question.id]))
-					this.loading = false
-					return
-				}
-
-				const ids = []
-				this.records = state.history
-					.filter(item => item.subjectId === this.subjectId && ids.indexOf(item.questionId) === -1 && ids.push(item.questionId))
-					.map(item => {
-						const question = questionMap[item.questionId]
-						return question ? this.toRecord(question, item) : null
-					})
-					.filter(Boolean)
-				this.loading = false
-			},
-			toRecord(question, answer) {
-				return {
-					question,
-					correct: answer ? answer.correct : false,
-					time: answer && answer.timestamp ? formatHistoryTime(answer.timestamp) : ''
-				}
-			},
+			methods: {
+				switchView(view) {
+					this.activeView = view
+					this.loadRecords(true)
+				},
+				async loadRecords(reset) {
+					const shouldReset = reset !== false
+					const requestId = ++this.requestId
+					if (shouldReset) {
+						this.loading = true
+						this.loadError = ''
+						this.records = []
+						this.total = 0
+						this.page = 1
+					} else {
+						this.loadingMore = true
+					}
+					try {
+						const result = await getPracticeRecords({
+							subjectId: this.subjectId,
+							type: this.activeView,
+							page: this.page,
+							pageSize: 20
+						})
+						if (requestId !== this.requestId) return
+						const items = (result.items || []).map(item => Object.assign({}, item, {
+							time: item.timestamp ? formatHistoryTime(item.timestamp) : ''
+						}))
+						this.records = shouldReset ? items : this.records.concat(items)
+						this.total = result.total || 0
+						this.hasMore = Boolean(result.hasMore)
+					} catch (error) {
+						if (requestId !== this.requestId) return
+						this.loadError = (error && (error.errMsg || error.message)) || '云端记录加载失败'
+					} finally {
+						if (requestId === this.requestId) {
+							this.loading = false
+							this.loadingMore = false
+						}
+					}
+				},
+				loadMore() {
+					if (!this.hasMore || this.loadingMore) return
+					this.page += 1
+					this.loadRecords(false)
+				},
+				retryLoad() {
+					this.loadRecords(true)
+				},
 			startAll() {
 				uni.navigateTo({ url: `/practice-pages/practice/practice?subjectId=${this.subjectId}&mode=${this.activeView}` })
 			},
@@ -178,4 +196,5 @@
 	.empty-title { margin-top: 26rpx; font-size: 31rpx; font-weight: 600; }
 	.empty-caption { margin-top: 12rpx; color: #8a9098; font-size: 25rpx; line-height: 1.6; }
 	.empty-state button { height: 76rpx; margin-top: 30rpx; padding: 0 42rpx; border-radius: 40rpx; background: #008cff; color: #ffffff; font-size: 27rpx; line-height: 76rpx; }
+	.error-state { color: #bd3f3f; }
 </style>

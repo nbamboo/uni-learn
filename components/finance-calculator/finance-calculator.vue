@@ -1,109 +1,144 @@
 <template>
-	<view class="finance-calculator">
+	<view class="finance-calculator" :class="{ 'finance-calculator--embedded': embedded }">
 		<view class="example">
 			<!-- 基础表单校验 -->
-			<uni-forms ref="valiForm" :rules="rules" :model="valiFormData" labelWidth="36%">
+			<uni-forms ref="valiForm" :rules="rules" :model="valiFormData" labelWidth="0">
 				<!-- 利率输入项 -->
 				<uni-forms-item name="rate">
-					<view class="cb1">
-						<text class="content_size">利率</text>
+					<view class="form-row">
+						<view class="field-label field-label--plain">
+							<text class="content_size">利率</text>
+						</view>
+						<view class="field-control">
+							<view class="custom-input" :class="{ 'has-value': valiFormData.rate, 'disabled': !inputItems.rate.enabled, 'focused': currentField === 'rate' && keyboardVisible }"
+								@click="openKeyboard('rate')">
+								<text class="input-value" v-if="inputItems.rate.enabled">{{ keyboardValue && currentField === 'rate' ? keyboardValue : valiFormData.rate }}</text>
+								<text class="input-value" v-else>{{ valiFormData.rate }}</text>
+								<view v-if="currentField === 'rate' && keyboardVisible" class="cursor"></view>
+								<uni-icons class="input-icon" custom-prefix="iconfont" type="icon-icon-" size="20"></uni-icons>
+							</view>
+							<text class="input-suffix">%</text>
+						</view>
 					</view>
-					<!-- 自定义输入框：点击打开键盘 -->
-					<view class="custom-input" :class="{ 'has-value': valiFormData.rate, 'disabled': !inputItems.rate.enabled, 'focused': currentField === 'rate' && keyboardVisible }"
-						@click="openKeyboard('rate')">
-						<text class="input-value" v-if="inputItems.rate.enabled">{{ keyboardValue && currentField === 'rate' ? keyboardValue : valiFormData.rate }}</text>
-						<text class="input-value" v-else>{{ valiFormData.rate }}</text>
-						<view v-if="currentField === 'rate' && keyboardVisible" class="cursor"></view>
-					</view>
-					<uni-icons class="tb" custom-prefix="iconfont" type="icon-icon-" size="20"></uni-icons>
-					<text class="bfb">%</text>
 				</uni-forms-item>
 
-				<checkbox-group @change="checkboxChange">
-					<!-- 期数输入项 -->
-					<uni-forms-item name="nper">
-						<view class="cb2">
-							<label class="content_size">
-								<checkbox value="nper" style="transform:scale(0.5)" :checked="parmitems[0].checked"
-									:disabled="parmitems[0].checkboxDisabledValue" />期数
-							</label>
-						</view>
-						<view class="custom-input" :class="{ 'has-value': valiFormData.nper, 'disabled': !inputItems.nper.enabled, 'focused': currentField === 'nper' && keyboardVisible }"
-							@click="openKeyboard('nper')">
-							<text class="input-value" v-if="inputItems.nper.enabled">{{ keyboardValue && currentField === 'nper' ? keyboardValue : valiFormData.nper }}</text>
-							<text class="input-value" v-else>{{ valiFormData.nper }}</text>
-							<view v-if="currentField === 'nper' && keyboardVisible" class="cursor"></view>
-						</view>
-						<uni-icons class="tb" custom-prefix="iconfont" type="icon-icon-" size="20"></uni-icons>
-					</uni-forms-item>
-
-					<!-- 现值输入项 -->
-					<uni-forms-item name="pv">
-						<view class="cb2">
-							<label class="content_size">
-								<checkbox value="pv" style="transform:scale(0.5)" :checked="parmitems[1].checked"
-									:disabled="parmitems[1].checkboxDisabledValue" />现值
-							</label>
-						</view>
-						<view class="custom-input" :class="{ 'has-value': valiFormData.pv, 'disabled': !inputItems.pv.enabled, 'focused': currentField === 'pv' && keyboardVisible }"
-							@click="openKeyboard('pv')">
-							<text class="input-value" v-if="inputItems.pv.enabled">{{ keyboardValue && currentField === 'pv' ? keyboardValue : valiFormData.pv }}</text>
-							<text class="input-value" v-else>{{ valiFormData.pv }}</text>
-							<view v-if="currentField === 'pv' && keyboardVisible" class="cursor"></view>
-						</view>
-						<uni-icons class="tb" custom-prefix="iconfont" type="icon-icon-" size="20"></uni-icons>
-					</uni-forms-item>
-
-					<!-- 终值输入项 -->
-					<uni-forms-item name="fv">
-						<view class="cb2">
-							<label class="content_size">
-								<checkbox value="fv" style="transform:scale(0.5)" :checked="parmitems[2].checked"
-									:disabled="parmitems[2].checkboxDisabledValue" />终值
-							</label>
-						</view>
-						<view class="custom-input" :class="{ 'has-value': valiFormData.fv, 'disabled': !inputItems.fv.enabled, 'focused': currentField === 'fv' && keyboardVisible }"
-							@click="openKeyboard('fv')">
-							<text class="input-value" v-if="inputItems.fv.enabled">{{ keyboardValue && currentField === 'fv' ? keyboardValue : valiFormData.fv }}</text>
-							<text class="input-value" v-else>{{ valiFormData.fv }}</text>
-							<view v-if="currentField === 'fv' && keyboardVisible" class="cursor"></view>
-						</view>
-						<uni-icons class="tb" custom-prefix="iconfont" type="icon-icon-" size="20"></uni-icons>
-					</uni-forms-item>
-
-					<!-- 每期付款额输入项 -->
-					<uni-forms-item name="pmt">
-						<view class="cb2">
-							<label class="content_size">
-								<checkbox value="pmt" style="transform:scale(0.5)" :checked="parmitems[3].checked"
-									:disabled="parmitems[3].checkboxDisabledValue" />每期付款额
-							</label>
-						</view>
-						<view class="custom-input" :class="{ 'has-value': valiFormData.pmt, 'disabled': !inputItems.pmt.enabled, 'focused': currentField === 'pmt' && keyboardVisible }"
-							@click="openKeyboard('pmt')">
-							<text class="input-value" v-if="inputItems.pmt.enabled">{{ keyboardValue && currentField === 'pmt' ? keyboardValue : valiFormData.pmt }}</text>
-							<text class="input-value" v-else>{{ valiFormData.pmt }}</text>
-							<view v-if="currentField === 'pmt' && keyboardVisible" class="cursor"></view>
-						</view>
-						<uni-icons class="tb" custom-prefix="iconfont" type="icon-icon-" size="20"></uni-icons>
-					</uni-forms-item>
-
-					<!-- 期初期末单选 -->
-					<uni-forms-item>
-						<view class="cb2">
-							<radio-group class="radio_flex" @change="radioChange">
-								<label class="radio_flex" v-for="(item, index) in items" :key="item.value"
-									style="padding-right: 135rpx;">
-									<view>
-										<radio :value="item.value" :checked="index === current"
-											style="transform:scale(0.5)" />
+				<!-- 期数输入项 -->
+				<uni-forms-item name="nper">
+					<view class="form-row">
+						<view class="field-label">
+							<checkbox-group class="field-checkbox-group" @change="checkboxChange($event, 'nper')">
+								<label class="checkbox-label content_size">
+									<view class="field-checkbox-wrap">
+										<checkbox class="field-checkbox" value="nper" :checked="parmitems[0].checked"
+											:disabled="parmitems[0].checkboxDisabledValue" />
 									</view>
-									<view class="content_size">{{item.name}}</view>
+									<text>期数</text>
 								</label>
-							</radio-group>
+							</checkbox-group>
 						</view>
-					</uni-forms-item>
-				</checkbox-group>
+						<view class="field-control">
+							<view class="custom-input" :class="{ 'has-value': valiFormData.nper, 'disabled': !inputItems.nper.enabled, 'focused': currentField === 'nper' && keyboardVisible }"
+								@click="openKeyboard('nper')">
+								<text class="input-value" v-if="inputItems.nper.enabled">{{ keyboardValue && currentField === 'nper' ? keyboardValue : valiFormData.nper }}</text>
+								<text class="input-value" v-else>{{ valiFormData.nper }}</text>
+								<view v-if="currentField === 'nper' && keyboardVisible" class="cursor"></view>
+								<uni-icons class="input-icon" custom-prefix="iconfont" type="icon-icon-" size="20"></uni-icons>
+							</view>
+						</view>
+					</view>
+				</uni-forms-item>
+
+				<!-- 现值输入项 -->
+				<uni-forms-item name="pv">
+					<view class="form-row">
+						<view class="field-label">
+							<checkbox-group class="field-checkbox-group" @change="checkboxChange($event, 'pv')">
+								<label class="checkbox-label content_size">
+									<view class="field-checkbox-wrap">
+										<checkbox class="field-checkbox" value="pv" :checked="parmitems[1].checked"
+											:disabled="parmitems[1].checkboxDisabledValue" />
+									</view>
+									<text>现值</text>
+								</label>
+							</checkbox-group>
+						</view>
+						<view class="field-control">
+							<view class="custom-input" :class="{ 'has-value': valiFormData.pv, 'disabled': !inputItems.pv.enabled, 'focused': currentField === 'pv' && keyboardVisible }"
+								@click="openKeyboard('pv')">
+								<text class="input-value" v-if="inputItems.pv.enabled">{{ keyboardValue && currentField === 'pv' ? keyboardValue : valiFormData.pv }}</text>
+								<text class="input-value" v-else>{{ valiFormData.pv }}</text>
+								<view v-if="currentField === 'pv' && keyboardVisible" class="cursor"></view>
+								<uni-icons class="input-icon" custom-prefix="iconfont" type="icon-icon-" size="20"></uni-icons>
+							</view>
+						</view>
+					</view>
+				</uni-forms-item>
+
+				<!-- 终值输入项 -->
+				<uni-forms-item name="fv">
+					<view class="form-row">
+						<view class="field-label">
+							<checkbox-group class="field-checkbox-group" @change="checkboxChange($event, 'fv')">
+								<label class="checkbox-label content_size">
+									<view class="field-checkbox-wrap">
+										<checkbox class="field-checkbox" value="fv" :checked="parmitems[2].checked"
+											:disabled="parmitems[2].checkboxDisabledValue" />
+									</view>
+									<text>终值</text>
+								</label>
+							</checkbox-group>
+						</view>
+						<view class="field-control">
+							<view class="custom-input" :class="{ 'has-value': valiFormData.fv, 'disabled': !inputItems.fv.enabled, 'focused': currentField === 'fv' && keyboardVisible }"
+								@click="openKeyboard('fv')">
+								<text class="input-value" v-if="inputItems.fv.enabled">{{ keyboardValue && currentField === 'fv' ? keyboardValue : valiFormData.fv }}</text>
+								<text class="input-value" v-else>{{ valiFormData.fv }}</text>
+								<view v-if="currentField === 'fv' && keyboardVisible" class="cursor"></view>
+								<uni-icons class="input-icon" custom-prefix="iconfont" type="icon-icon-" size="20"></uni-icons>
+							</view>
+						</view>
+					</view>
+				</uni-forms-item>
+
+				<!-- 每期付款额输入项 -->
+				<uni-forms-item name="pmt">
+					<view class="form-row">
+						<view class="field-label">
+							<checkbox-group class="field-checkbox-group" @change="checkboxChange($event, 'pmt')">
+								<label class="checkbox-label content_size">
+									<view class="field-checkbox-wrap">
+										<checkbox class="field-checkbox" value="pmt" :checked="parmitems[3].checked"
+											:disabled="parmitems[3].checkboxDisabledValue" />
+									</view>
+									<text>每期付款额</text>
+								</label>
+							</checkbox-group>
+						</view>
+						<view class="field-control">
+							<view class="custom-input" :class="{ 'has-value': valiFormData.pmt, 'disabled': !inputItems.pmt.enabled, 'focused': currentField === 'pmt' && keyboardVisible }"
+								@click="openKeyboard('pmt')">
+								<text class="input-value" v-if="inputItems.pmt.enabled">{{ keyboardValue && currentField === 'pmt' ? keyboardValue : valiFormData.pmt }}</text>
+								<text class="input-value" v-else>{{ valiFormData.pmt }}</text>
+								<view v-if="currentField === 'pmt' && keyboardVisible" class="cursor"></view>
+								<uni-icons class="input-icon" custom-prefix="iconfont" type="icon-icon-" size="20"></uni-icons>
+							</view>
+						</view>
+					</view>
+				</uni-forms-item>
+
+				<!-- 期初期末单选 -->
+				<uni-forms-item>
+					<view class="radio-row">
+						<radio-group class="radio-options" @change="radioChange">
+							<label class="radio-option" v-for="(item, index) in items" :key="item.value">
+								<view class="field-radio-wrap">
+									<radio class="field-radio" :value="item.value" :checked="index === current" />
+								</view>
+								<view class="content_size">{{item.name}}</view>
+							</label>
+						</radio-group>
+					</view>
+				</uni-forms-item>
 			</uni-forms>
 
 			<!-- 计算结果 -->
@@ -144,6 +179,10 @@
 			NumberInputKeyboard
 		},
 		props: {
+			embedded: {
+				type: Boolean,
+				default: false
+			},
 			dataResourceType: {
 				type: String,
 				default: 'inside',
@@ -402,36 +441,29 @@
 			 * 复选框变化事件
 			 * @param {Object} e - 事件对象
 			 */
-			checkboxChange: function(e) {
-				const values = e.detail.value;
-				const chooseNumber = values.length;
+			checkboxChange: function(e, fieldName) {
+				const index = this.parmitems.findIndex(item => item.value === fieldName)
+				if (index < 0) return
 
-				// 遍历每个选项，更新状态
-				for (let i = 0; i < this.parmitems.length; i++) {
-					const item = this.parmitems[i];
-					const isChecked = values.indexOf(item.value) > -1;
-					const wasChecked = item.checked;
+				const item = this.parmitems[index]
+				const isChecked = e.detail.value.indexOf(fieldName) > -1
+				const wasChecked = item.checked
 
-					// 更新选中状态
-					this.$set(this.parmitems[i], 'checked', isChecked);
-					this.$set(this.parmitems[i], 'inputDisabledValue', !isChecked);
+				this.$set(this.parmitems[index], 'checked', isChecked)
+				this.$set(this.parmitems[index], 'inputDisabledValue', !isChecked)
+				this.$set(this.inputItems[fieldName], 'enabled', isChecked)
 
-					// 更新禁用状态（当已选3个时，禁用其他未选项）
-					this.$set(this.parmitems[i], 'checkboxDisabledValue', !isChecked && chooseNumber === 3);
-
-					// 更新输入框启用状态
-					this.$set(this.inputItems[item.value], 'enabled', isChecked);
-
-					// 如果是取消勾选，清空值
-					if (wasChecked && !isChecked) {
-						// 使用 Vue.set 确保响应式更新
-						this.$set(this.valiFormData, item.value, '');
-						// 如果当前正在编辑该字段，同时清空键盘值
-						if (this.currentField === item.value) {
-							this.keyboardValue = '';
-						}
+				if (wasChecked && !isChecked) {
+					this.$set(this.valiFormData, fieldName, '')
+					if (this.currentField === fieldName) {
+						this.keyboardValue = ''
 					}
 				}
+
+				const chooseNumber = this.parmitems.filter(parm => parm.checked).length
+				this.parmitems.forEach((parm, parmIndex) => {
+					this.$set(this.parmitems[parmIndex], 'checkboxDisabledValue', !parm.checked && chooseNumber === 3)
+				})
 			},
 
 			/**
@@ -602,12 +634,20 @@
 				}
 			}
 		},
-		mounted() {
-			this.$watch(() => this.dataContent, (newVal, oldVal) => {
+		watch: {
+			dataContent(newVal, oldVal) {
 				if (newVal !== oldVal) {
-					this.handleChange();
+					this.handleChange()
 				}
-			});
+			},
+			keyboardVisible(visible) {
+				this.$emit('keyboard-change', visible)
+			}
+		},
+		beforeDestroy() {
+			if (this.keyboardVisible) {
+				this.$emit('keyboard-change', false)
+			}
 		}
 	}
 </script>
@@ -618,52 +658,149 @@
 		background-color: #fff;
 	}
 
+	.finance-calculator--embedded .example {
+		padding: 48rpx 48rpx 36rpx;
+	}
+
 	.content_size {
 		font-size: 16px;
 	}
 
-	.bfb {
-		position: absolute;
-		right: -10%;
-		top: 18%;
-		font-size: 16px;
-	}
-
-	.cb1 {
-		position: absolute;
-		left: -50%;
-		top: 18%;
-	}
-
-	.cb2 {
-		position: absolute;
-		left: -64%;
-		top: 18%;
-	}
-
-	.radio_flex {
+	.form-row {
 		display: flex;
-		justify-content: flex-start;
+		align-items: center;
+		width: 100%;
+	}
+
+	.field-label {
+		display: flex;
+		flex: 0 0 32%;
+		align-items: center;
+		min-width: 0;
+		min-height: 70rpx;
+		padding-left: 12rpx;
+		box-sizing: border-box;
+	}
+
+	.checkbox-label,
+	.radio-option,
+	.radio-options {
+		display: flex;
 		align-items: center;
 	}
 
-	.tb {
+	.checkbox-label {
+		position: relative;
+		width: 100%;
+		min-width: 0;
+		padding-left: 56rpx;
+		box-sizing: border-box;
+		white-space: nowrap;
+	}
+
+	.field-label--plain {
+		padding-left: 68rpx;
+	}
+
+	.field-checkbox-group {
+		width: 100%;
+	}
+
+	.field-checkbox-wrap {
 		position: absolute;
-		right: 4%;
-		top: 18%;
+		top: 50%;
+		left: 12rpx;
+		display: flex;
+		align-items: center;
+		justify-content: flex-start;
+		width: 48rpx;
+		height: 70rpx;
+		transform: translateY(-50%);
+	}
+
+	.field-checkbox {
+		transform: scale(0.5);
+		transform-origin: left center;
+	}
+
+	.field-control {
+		display: flex;
+		flex: 1;
+		align-items: center;
+		min-width: 0;
+		gap: 14rpx;
+	}
+
+	.radio-row {
+		width: 100%;
+	}
+
+	.radio-options {
+		width: 100%;
+	}
+
+	.radio-option:first-child {
+		flex: 0 0 32%;
+		padding-left: 24rpx;
+		box-sizing: border-box;
+	}
+
+	.radio-option:last-child {
+		flex: 1;
+		min-width: 0;
+	}
+
+	.field-radio-wrap {
+		display: flex;
+		flex: 0 0 48rpx;
+		align-items: center;
+		justify-content: flex-start;
+		width: 48rpx;
+		height: 70rpx;
+	}
+
+	.field-radio {
+		transform: scale(0.5);
+		transform-origin: left center;
+	}
+
+	@media screen and (max-width: 599px) {
+		.field-label,
+		.radio-option:first-child {
+			flex-basis: 140px;
+		}
 	}
 
 	/* 自定义输入框样式 */
 	.custom-input {
-		width: 90%;
+		position: relative;
+		width: calc(100% - 42rpx);
 		height: 70rpx;
 		border: 1rpx solid #d9d9d9;
 		border-radius: 8rpx;
 		padding: 0 20rpx;
+		box-sizing: border-box;
 		display: flex;
 		align-items: center;
 		background-color: #ffffff;
 		transition: all 0.2s;
+	}
+
+	.field-control .custom-input {
+		flex: 0 0 calc(100% - 42rpx);
+		min-width: 0;
+	}
+
+	.input-icon {
+		flex: 0 0 auto;
+		margin-left: auto;
+	}
+
+	.input-suffix {
+		flex: 0 0 auto;
+		min-width: 28rpx;
+		font-size: 16px;
+		color: #24272c;
 	}
 
 	.custom-input.disabled {
@@ -705,8 +842,12 @@
 	}
 
 	.input-value {
-		font-size: 28rpx;
+		min-width: 0;
+		overflow: hidden;
+		font-size: 16px;
 		color: #999;
+		text-overflow: ellipsis;
+		white-space: nowrap;
 	}
 
 	.result-wrapper {
@@ -722,7 +863,7 @@
 
 	.result {
 		font-weight: 600;
-		font-size: 30px;
+		font-size: 24px;
 		color: #333;
 	}
 
@@ -732,14 +873,14 @@
 
 	.pmt-btn-clear {
 		margin-right: 10rpx;
-		font-size: 18px;
+		font-size: 16px;
 	}
 
 	.pmt-btn-cal {
 		background-color: #008cff!important;
 		color: #ffffff !important;
 		margin-right: 10rpx;
-		font-size: 18px;
+		font-size: 16px;
 	}
 
 	.btn-hover {

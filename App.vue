@@ -1,4 +1,7 @@
 <script>
+	import { getPracticeState } from '@/data/practice.js'
+	import { schedulePracticeSync } from '@/services/user-practice.js'
+
 	export default {
 		globalData: {
 			inputType: 'text'
@@ -12,9 +15,11 @@
 					this.globalData.inputType = e.osName == "ios" ? "text" : "text";
 				}
 			})
+			schedulePracticeSync({ localState: getPracticeState() })
 		},
 		onShow: function() {
 			console.log('App Show')
+			schedulePracticeSync({ localState: getPracticeState() })
 		},
 		onHide: function() {
 			console.log('App Hide')

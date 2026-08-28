@@ -26,13 +26,13 @@
 			<view class="overview-content">
 				<view class="progress-ring">
 					<view class="progress-ring-inner">
-						<text class="progress-value">{{ stats.completion }}%</text>
+						<text class="progress-value">{{ completionText }}</text>
 						<text class="progress-caption">题库进度</text>
 					</view>
 				</view>
 				<view class="stat-grid">
 					<view class="stat-item">
-						<text class="stat-value">{{ stats.total }}</text>
+						<text class="stat-value">{{ questionTotalText }}</text>
 						<text class="stat-label">总题数</text>
 					</view>
 					<view class="stat-item">
@@ -50,9 +50,6 @@
 				</view>
 			</view>
 
-			<view class="daily-progress">
-				<view class="daily-progress-fill" :style="{ width: today.percent + '%' }"></view>
-			</view>
 		</view>
 
 		<view class="primary-actions">
@@ -89,10 +86,25 @@
 			</view>
 		</view>
 
-		<view class="bank-note" v-if="!stats.total">
-			<uni-icons type="info" size="18" color="#7a7e83"></uni-icons>
-			<text>该科目题库正在整理，可先切换到初级个人理财。</text>
+		<view class="bank-note" v-if="currentCatalogPending">
+			<uni-icons type="spinner-cycle" size="18" color="#7a7e83"></uni-icons>
+			<text>正在从云端加载题库数据...</text>
 		</view>
+
+			<view class="bank-note error" v-else-if="currentCatalogError" @tap="retryCatalog">
+			<uni-icons type="refreshempty" size="18" color="#d34d4d"></uni-icons>
+			<text>{{ currentCatalogError }}，点击重试</text>
+		</view>
+
+			<view class="bank-note" v-else-if="!stats.total">
+				<uni-icons type="info" size="18" color="#7a7e83"></uni-icons>
+				<text>该科目题库正在整理，可先切换到初级个人理财。</text>
+			</view>
+
+			<view class="bank-note error" v-if="userDataError" @tap="retryUserData">
+				<uni-icons type="cloud-download" size="18" color="#d34d4d"></uni-icons>
+				<text>做题记录暂存本机，点击重试云同步</text>
+			</view>
 
 		<uni-popup
 			ref="subjectPopup"
@@ -122,13 +134,13 @@
 								@tap="changeSubject(subject.id)"
 							>
 								<text>{{ subject.name }}</text>
-								<text class="subject-status">{{ subjectQuestionCount(subject.id) ? subjectQuestionCount(subject.id) + '题' : '待导入' }}</text>
+								<text class="subject-status">{{ subjectCatalogStatusText(subject.id) }}</text>
 							</view>
 						</view>
 					</view>
 				</scroll-view>
 			</view>
-		</uni-popup>
+			</uni-popup>
 	</view>
 </template>
 
@@ -136,18 +148,24 @@
 	import {
 		getPracticeState,
 		getSubjectById,
-		getSubjectQuestionCount,
 		getSubjectStats,
 		getTodayProgress,
 		selectSubject,
 		subjectGroups
 	} from '@/data/practice.js'
+	import { getCatalog } from '@/services/question-bank.js'
+	import { getPracticeSummary } from '@/services/user-practice.js'
 
 	export default {
 		data() {
 			return {
 				currentSubjectId: '',
 				subjectGroups,
+				catalogStates: {},
+				catalogRequestIds: {},
+				nextCatalogRequestId: 0,
+				nextUserDataRequestId: 0,
+				userDataError: '',
 				stats: {
 					total: 0,
 					attempted: 0,
@@ -171,17 +189,133 @@
 		computed: {
 			currentSubject() {
 				return getSubjectById(this.currentSubjectId)
+			},
+			currentCatalogState() {
+				return this.catalogStates[this.currentSubjectId] || {
+					loading: false,
+					loaded: false,
+					questionCount: 0,
+					error: ''
+				}
+			},
+			currentCatalogPending() {
+				return this.currentCatalogState.loading && !this.currentCatalogState.loaded
+			},
+			currentCatalogError() {
+				return this.currentCatalogState.error || ''
+			},
+			completionText() {
+				return this.currentCatalogPending ? '--' : `${this.stats.completion}%`
+			},
+			questionTotalText() {
+				return this.currentCatalogPending ? '--' : this.stats.total
 			}
 		},
 		onShow() {
 			const state = getPracticeState()
 			this.currentSubjectId = state.currentSubjectId
-			this.refreshStats()
+			this.refreshStats(this.subjectQuestionCount(this.currentSubjectId))
+			this.loadCatalog(this.currentSubjectId)
+			this.loadCloudStats(this.currentSubjectId)
 		},
 		methods: {
-			refreshStats() {
-				this.stats = getSubjectStats(this.currentSubjectId)
+			refreshStats(questionCount) {
+				const activityStats = getSubjectStats(this.currentSubjectId)
+				const total = Number.isInteger(questionCount) && questionCount >= 0 ? questionCount : 0
+				this.stats = Object.assign({}, activityStats, {
+					total,
+					completion: total
+						? Math.min(100, Math.round(activityStats.attempted / total * 100))
+						: 0
+				})
 				this.today = getTodayProgress(this.currentSubjectId)
+			},
+			async loadCloudStats(subjectId) {
+				const requestId = ++this.nextUserDataRequestId
+				this.userDataError = ''
+				try {
+					const summary = await getPracticeSummary(subjectId, {
+						localState: getPracticeState()
+					})
+					if (requestId !== this.nextUserDataRequestId || subjectId !== this.currentSubjectId) return
+					const total = this.stats.total
+					this.stats = Object.assign({}, this.stats, summary, {
+						total,
+						completion: total
+							? Math.min(100, Math.round(summary.attempted / total * 100))
+							: 0
+					})
+					this.today = Object.assign({}, this.today, {
+						attempts: summary.todayAttempts,
+						percent: Math.min(100, Math.round(summary.todayAttempts / this.today.goal * 100))
+					})
+				} catch (error) {
+					if (requestId !== this.nextUserDataRequestId || subjectId !== this.currentSubjectId) return
+					this.userDataError = (error && (error.errMsg || error.message)) || '做题记录同步失败'
+				}
+			},
+			retryUserData() {
+				this.loadCloudStats(this.currentSubjectId)
+			},
+			async loadCatalog(subjectId, options) {
+				const previous = this.catalogStates[subjectId] || {
+					loaded: false,
+					questionCount: 0,
+					error: ''
+				}
+				const requestId = ++this.nextCatalogRequestId
+				this.catalogRequestIds = Object.assign({}, this.catalogRequestIds, {
+					[subjectId]: requestId
+				})
+				this.catalogStates = Object.assign({}, this.catalogStates, {
+					[subjectId]: Object.assign({}, previous, {
+						loading: true,
+						error: ''
+					})
+				})
+
+				try {
+					const catalog = await getCatalog(subjectId, options)
+					if (this.catalogRequestIds[subjectId] !== requestId) return
+					const parsedCount = Number(catalog && catalog.questionCount)
+					const questionCount = Number.isInteger(parsedCount) && parsedCount >= 0 ? parsedCount : 0
+					this.catalogStates = Object.assign({}, this.catalogStates, {
+						[subjectId]: {
+							loading: false,
+							loaded: true,
+							questionCount,
+							error: ''
+						}
+					})
+					if (this.currentSubjectId === subjectId) {
+						this.refreshStats(questionCount)
+						this.loadCloudStats(subjectId)
+					}
+				} catch (error) {
+					if (this.catalogRequestIds[subjectId] !== requestId) return
+					const unavailable = error && error.errCode === 'QUESTION_BANK_SUBJECT_NOT_FOUND'
+					const errorMessage = unavailable
+						? ''
+						: (error && (error.errMsg || error.message)) || '题库数据加载失败'
+					const questionCount = unavailable
+						? 0
+						: (previous.loaded ? previous.questionCount : 0)
+					this.catalogStates = Object.assign({}, this.catalogStates, {
+						[subjectId]: {
+							loading: false,
+							loaded: unavailable || previous.loaded,
+							questionCount,
+							error: errorMessage
+						}
+					})
+					if (this.currentSubjectId === subjectId) {
+						this.refreshStats(questionCount)
+						this.loadCloudStats(subjectId)
+					}
+				}
+			},
+			retryCatalog() {
+				this.loadCatalog(this.currentSubjectId, { forceRefresh: true })
 			},
 			openSubjectPicker() {
 				this.$refs.subjectPopup.open()
@@ -192,13 +326,31 @@
 			changeSubject(subjectId) {
 				this.currentSubjectId = subjectId
 				selectSubject(subjectId)
-				this.refreshStats()
+				this.refreshStats(this.subjectQuestionCount(subjectId))
 				this.closeSubjectPicker()
+				this.loadCatalog(subjectId)
+				this.loadCloudStats(subjectId)
 			},
 			subjectQuestionCount(subjectId) {
-				return getSubjectQuestionCount(subjectId)
+				const state = this.catalogStates[subjectId]
+				return state && state.loaded ? state.questionCount : 0
+			},
+			subjectCatalogStatusText(subjectId) {
+				const state = this.catalogStates[subjectId]
+				if (state && state.loading && !state.loaded) return '加载中'
+				if (state && state.error && !state.loaded) return '加载失败'
+				const questionCount = this.subjectQuestionCount(subjectId)
+				return questionCount ? `${questionCount}题` : '待导入'
 			},
 			ensureQuestions() {
+				if (this.currentCatalogPending) {
+					uni.showToast({ title: '题库数据正在加载', icon: 'none' })
+					return false
+				}
+				if (this.currentCatalogError && !this.currentCatalogState.loaded) {
+					uni.showToast({ title: '题库加载失败，请先重试', icon: 'none' })
+					return false
+				}
 				if (this.stats.total) return true
 				uni.showToast({ title: '该科目题库正在整理', icon: 'none' })
 				return false
@@ -261,8 +413,6 @@
 	.stat-item { display: flex; flex-direction: column; }
 	.stat-value { font-size: 32rpx; font-weight: 600; }
 	.stat-label { margin-top: 4rpx; font-size: 22rpx; color: rgba(255, 255, 255, 0.72); }
-	.daily-progress { height: 8rpx; margin-top: 30rpx; overflow: hidden; border-radius: 4rpx; background: rgba(255, 255, 255, 0.3); }
-	.daily-progress-fill { height: 100%; background: #ffffff; transition: width 0.2s ease; }
 	.primary-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20rpx; padding: 28rpx 32rpx 20rpx; }
 	.primary-actions button { display: flex; align-items: center; justify-content: center; gap: 12rpx; height: 84rpx; margin: 0; border-radius: 44rpx; font-size: 29rpx; font-weight: 600; line-height: 84rpx; }
 	.primary-actions button::after { border: 0; }
@@ -284,6 +434,7 @@
 	.feature-title { margin-top: 14rpx; font-size: 27rpx; font-weight: 500; }
 	.feature-desc { margin-top: 6rpx; font-size: 21rpx; color: #8c9199; white-space: nowrap; }
 	.bank-note { display: flex; align-items: center; gap: 10rpx; margin: 10rpx 32rpx 0; padding: 20rpx 22rpx; border-radius: 8rpx; background: #f5f6f8; font-size: 24rpx; color: #6f747d; }
+	.bank-note.error { background: #fff2f2; color: #bd3f3f; }
 	.subject-sheet { padding: 28rpx; border-radius: 16rpx 16rpx 0 0; background: #ffffff; }
 	.sheet-header { padding: 0 4rpx 24rpx; border-bottom: 1rpx solid #edf0f3; }
 	.sheet-title { font-size: 34rpx; font-weight: 600; }

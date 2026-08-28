@@ -1,0 +1,93 @@
+{
+  "bsonType": "object",
+  "description": "用户在每道题上的最新作答与收藏状态",
+  "required": [
+    "_id",
+    "userId",
+    "subjectId",
+    "questionId",
+    "attempted",
+    "attempts",
+    "favorite",
+    "createdAt",
+    "updatedAt"
+  ],
+  "permission": {
+    "read": false,
+    "create": false,
+    "update": false,
+    "delete": false,
+    "count": false
+  },
+  "properties": {
+    "_id": {
+      "bsonType": "string",
+      "description": "userId、subjectId、questionId 组成的稳定ID",
+      "minLength": 3,
+      "maxLength": 200
+    },
+    "userId": {
+      "bsonType": "string",
+      "description": "由 uni-id token 解析得到，禁止客户端传入",
+      "minLength": 1,
+      "maxLength": 64
+    },
+    "subjectId": {
+      "bsonType": "string",
+      "minLength": 1,
+      "maxLength": 64,
+      "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+    },
+    "questionId": {
+      "bsonType": "string",
+      "minLength": 1,
+      "maxLength": 64,
+      "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+    },
+    "chapterId": {
+      "bsonType": "string",
+      "maxLength": 32
+    },
+    "knowledge": {
+      "bsonType": "string",
+      "maxLength": 128
+    },
+    "attempted": {
+      "bsonType": "bool"
+    },
+    "lastCorrect": {
+      "bsonType": "bool"
+    },
+    "lastSelected": {
+      "bsonType": "array",
+      "arrayType": "string",
+      "maxLength": 6,
+      "items": {
+        "bsonType": "string",
+        "enum": ["A", "B", "C", "D", "E", "F"]
+      }
+    },
+    "attempts": {
+      "bsonType": "int",
+      "minimum": 0
+    },
+    "favorite": {
+      "bsonType": "bool"
+    },
+    "firstAnsweredAt": {
+      "bsonType": "date"
+    },
+    "lastAnsweredAt": {
+      "bsonType": "date"
+    },
+    "favoriteUpdatedAt": {
+      "bsonType": "date"
+    },
+    "createdAt": {
+      "bsonType": "date"
+    },
+    "updatedAt": {
+      "bsonType": "date"
+    }
+  }
+}

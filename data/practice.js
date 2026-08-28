@@ -1,4 +1,9 @@
 import { chapters, subjectQuestionCounts } from './question-bank/catalog.js'
+import {
+	createPracticeEventId,
+	queuePracticeAnswer,
+	queuePracticeFavorite
+} from '@/services/user-practice.js'
 
 export const DEFAULT_SUBJECT_ID = 'junior-personal-finance'
 export const PRACTICE_STATE_KEY = 'uni-learn-practice-state-v1'
@@ -35,6 +40,7 @@ function createDefaultState() {
 		answers: {},
 		favorites: [],
 		favoriteSubjects: {},
+		favoriteUpdatedAt: {},
 		history: []
 	}
 }
@@ -46,6 +52,7 @@ export function getPracticeState() {
 	state.answers = state.answers || {}
 	state.favorites = Array.isArray(state.favorites) ? state.favorites : []
 	state.favoriteSubjects = state.favoriteSubjects || {}
+	state.favoriteUpdatedAt = state.favoriteUpdatedAt || {}
 	state.history = Array.isArray(state.history) ? state.history : []
 	return state
 }
@@ -127,6 +134,7 @@ export function toggleFavorite(question) {
 	const questionId = typeof question === 'string' ? question : question.id
 	const subjectId = typeof question === 'string' ? '' : question.subjectId
 	const index = state.favorites.indexOf(questionId)
+	const timestamp = Date.now()
 	if (index > -1) {
 		state.favorites.splice(index, 1)
 		delete state.favoriteSubjects[questionId]
@@ -134,7 +142,11 @@ export function toggleFavorite(question) {
 		state.favorites.unshift(questionId)
 		if (subjectId) state.favoriteSubjects[questionId] = subjectId
 	}
+	state.favoriteUpdatedAt[questionId] = timestamp
 	savePracticeState(state)
+	if (typeof question !== 'string' && subjectId) {
+		queuePracticeFavorite(question, index === -1, { occurredAt: timestamp })
+	}
 	return index === -1
 }
 
@@ -149,6 +161,7 @@ export function recordAnswer(question, selected) {
 	const correct = isCorrectAnswer(selected, question.answer)
 	const previous = state.answers[question.id]
 	const timestamp = Date.now()
+	const eventId = createPracticeEventId('answer')
 
 	state.answers[question.id] = {
 		subjectId: question.subjectId,
@@ -160,6 +173,7 @@ export function recordAnswer(question, selected) {
 		timestamp
 	}
 	state.history.unshift({
+		eventId,
 		questionId: question.id,
 		subjectId: question.subjectId,
 		correct,
@@ -168,13 +182,16 @@ export function recordAnswer(question, selected) {
 	})
 	state.history = state.history.slice(0, 500)
 	savePracticeState(state)
+	queuePracticeAnswer(question, selected, { eventId, occurredAt: timestamp })
 	return correct
 }
 
-export function getChapterProgress(subjectId, chapterId) {
+export function getChapterProgress(subjectId, chapterId, questionCount) {
 	const state = getPracticeState()
 	const chapter = chapters.find(item => item.subjectId === subjectId && item.id === String(chapterId))
-	const total = chapter ? chapter.count : 0
+	const total = Number.isInteger(questionCount) && questionCount >= 0
+		? questionCount
+		: (chapter ? chapter.count : 0)
 	const attempted = Object.keys(state.answers).filter(questionId => {
 		const answer = state.answers[questionId]
 		return answer.subjectId === subjectId && answer.chapterId === String(chapterId)
@@ -182,7 +199,7 @@ export function getChapterProgress(subjectId, chapterId) {
 	return {
 		attempted,
 		total,
-		percent: total ? Math.round(attempted / total * 100) : 0
+		percent: total ? Math.min(100, Math.round(attempted / total * 100)) : 0
 	}
 }
 

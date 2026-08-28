@@ -1,0 +1,55 @@
+{
+  "bsonType": "object",
+  "description": "用户按科目的刷题汇总，用于低成本加载首页统计",
+  "required": [
+    "_id",
+    "userId",
+    "subjectId",
+    "attempted",
+    "correct",
+    "wrong",
+    "favorite",
+    "totalAttempts",
+    "todayKey",
+    "todayAttempts",
+    "createdAt",
+    "updatedAt"
+  ],
+  "permission": {
+    "read": false,
+    "create": false,
+    "update": false,
+    "delete": false,
+    "count": false
+  },
+  "properties": {
+    "_id": {
+      "bsonType": "string",
+      "minLength": 3,
+      "maxLength": 140
+    },
+    "userId": {
+      "bsonType": "string",
+      "minLength": 1,
+      "maxLength": 64
+    },
+    "subjectId": {
+      "bsonType": "string",
+      "minLength": 1,
+      "maxLength": 64,
+      "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+    },
+    "attempted": { "bsonType": "int", "minimum": 0 },
+    "correct": { "bsonType": "int", "minimum": 0 },
+    "wrong": { "bsonType": "int", "minimum": 0 },
+    "favorite": { "bsonType": "int", "minimum": 0 },
+    "totalAttempts": { "bsonType": "int", "minimum": 0 },
+    "todayKey": {
+      "bsonType": "string",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+    },
+    "todayAttempts": { "bsonType": "int", "minimum": 0 },
+    "createdAt": { "bsonType": "date" },
+    "updatedAt": { "bsonType": "date" }
+  }
+}

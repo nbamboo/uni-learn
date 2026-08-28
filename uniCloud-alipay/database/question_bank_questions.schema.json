@@ -1,0 +1,186 @@
+{
+  "bsonType": "object",
+  "description": "题库题目数据，支持按科目、版本、章节和知识点查询",
+  "required": [
+    "_id",
+    "questionId",
+    "subjectId",
+    "version",
+    "chapterId",
+    "chapter",
+    "section",
+    "knowledge",
+    "type",
+    "title",
+    "options",
+    "answer",
+    "explanation",
+    "sortOrder",
+    "status",
+    "updatedAt"
+  ],
+  "permission": {
+    "read": false,
+    "create": false,
+    "update": false,
+    "delete": false,
+    "count": false
+  },
+  "properties": {
+    "_id": {
+      "bsonType": "string",
+      "title": "题目版本ID",
+      "description": "由题库版本和稳定题目ID组成，例如 2026-08-21:ipf-3199419",
+      "minLength": 3,
+      "maxLength": 128,
+      "trim": "both"
+    },
+    "questionId": {
+      "bsonType": "string",
+      "title": "稳定题目ID",
+      "description": "跨题库版本保持稳定，用于关联本地做题记录",
+      "minLength": 1,
+      "maxLength": 64,
+      "trim": "both",
+      "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+    },
+    "subjectId": {
+      "bsonType": "string",
+      "title": "科目ID",
+      "minLength": 1,
+      "maxLength": 64,
+      "trim": "both",
+      "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+    },
+    "version": {
+      "bsonType": "string",
+      "title": "题库版本",
+      "minLength": 1,
+      "maxLength": 64,
+      "trim": "both"
+    },
+    "chapterId": {
+      "bsonType": "string",
+      "title": "章节ID",
+      "minLength": 1,
+      "maxLength": 32,
+      "trim": "both"
+    },
+    "chapter": {
+      "bsonType": "string",
+      "title": "章节名称",
+      "minLength": 1,
+      "maxLength": 128,
+      "trim": "both"
+    },
+    "section": {
+      "bsonType": "string",
+      "title": "小节名称",
+      "minLength": 1,
+      "maxLength": 128,
+      "trim": "both"
+    },
+    "knowledge": {
+      "bsonType": "string",
+      "title": "知识点",
+      "minLength": 1,
+      "maxLength": 128,
+      "trim": "both"
+    },
+    "type": {
+      "bsonType": "string",
+      "title": "题型",
+      "enum": [
+        "single",
+        "multiple"
+      ]
+    },
+    "title": {
+      "bsonType": "string",
+      "title": "题干",
+      "minLength": 1,
+      "maxLength": 2048,
+      "trim": "both"
+    },
+    "options": {
+      "bsonType": "array",
+      "arrayType": "object",
+      "title": "选项",
+      "minLength": 2,
+      "maxLength": 6,
+      "items": {
+        "bsonType": "object",
+        "required": [
+          "alias",
+          "text"
+        ],
+        "properties": {
+          "alias": {
+            "bsonType": "string",
+            "title": "选项标识",
+            "enum": [
+              "A",
+              "B",
+              "C",
+              "D",
+              "E",
+              "F"
+            ]
+          },
+          "text": {
+            "bsonType": "string",
+            "title": "选项内容",
+            "minLength": 1,
+            "maxLength": 2048,
+            "trim": "both"
+          }
+        }
+      }
+    },
+    "answer": {
+      "bsonType": "array",
+      "arrayType": "string",
+      "title": "正确答案",
+      "minLength": 1,
+      "maxLength": 6,
+      "items": {
+        "bsonType": "string",
+        "enum": [
+          "A",
+          "B",
+          "C",
+          "D",
+          "E",
+          "F"
+        ]
+      }
+    },
+    "explanation": {
+      "bsonType": "string",
+      "title": "答案解析",
+      "minLength": 1,
+      "maxLength": 10000,
+      "trim": "both"
+    },
+    "sortOrder": {
+      "bsonType": "int",
+      "title": "全科排序序号",
+      "description": "同一科目及版本内从 1 开始递增",
+      "minimum": 1
+    },
+    "status": {
+      "bsonType": "int",
+      "title": "启用状态",
+      "description": "0 表示停用，1 表示启用",
+      "enum": [
+        0,
+        1
+      ]
+    },
+    "updatedAt": {
+      "bsonType": "date",
+      "title": "题目更新时间",
+      "description": "当前题库版本的发布时间"
+    }
+  }
+}
