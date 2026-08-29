@@ -122,6 +122,12 @@
 				"navigationBarTitleText": "搜索题目",
 				"enablePullDownRefresh": false
 			}
+		}, {
+			"path": "answer-settings/answer-settings",
+			"style": {
+				"navigationBarTitleText": "答题设置",
+				"enablePullDownRefresh": false
+			}
 		}]
 	}],
 	"globalStyle": {

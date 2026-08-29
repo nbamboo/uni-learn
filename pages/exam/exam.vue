@@ -176,9 +176,11 @@
 				},
 				today: { attempts: 0, goal: 20, percent: 0 },
 				features: [
-					{ key: 'wrong', title: '错题集', desc: '集中攻克薄弱项', icon: 'refresh', color: '#e65757', tone: 'red' },
-					{ key: 'favorite', title: '收藏夹', desc: '保存重点题目', icon: 'star', color: '#e7a721', tone: 'yellow' },
-					{ key: 'knowledge', title: '知识点', desc: '按考点专项练习', icon: 'map', color: '#37a172', tone: 'green' }
+					{ key: 'wrong', title: '错题集', desc: '集中攻克薄弱项', icon: 'refresh', color: '#008cff', tone: 'blue' },
+					{ key: 'favorite', title: '收藏夹', desc: '保存重点题目', icon: 'star', color: '#008cff', tone: 'blue' },
+					{ key: 'knowledge', title: '知识点', desc: '按考点专项练习', icon: 'map', color: '#008cff', tone: 'blue' },
+					{ key: 'settings', title: '答题设置', desc: '答题模式与夜间模式', icon: 'tune', color: '#008cff', tone: 'blue' },
+					{ key: 'coming-soon', title: '敬请期待', desc: '更多功能陆续上线', icon: 'more-filled', color: '#008cff', tone: 'blue' }
 				]
 			}
 		},
@@ -363,7 +365,18 @@
 				if (!this.ensureQuestions()) return
 				uni.navigateTo({ url: `/practice-pages/question-search/question-search?subjectId=${this.currentSubjectId}` })
 			},
+			goAnswerSettings() {
+				uni.navigateTo({ url: '/practice-pages/answer-settings/answer-settings' })
+			},
 			handleFeature(item) {
+				if (item.key === 'coming-soon') {
+					uni.showToast({ title: '更多功能敬请期待', icon: 'none' })
+					return
+				}
+				if (item.key === 'settings') {
+					this.goAnswerSettings()
+					return
+				}
 				if (item.key === 'knowledge') {
 					this.goChapter(item.key)
 					return
@@ -416,9 +429,6 @@
 	.feature-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); padding: 0 16rpx; }
 	.feature-item { display: flex; align-items: center; flex-direction: column; min-height: 196rpx; padding: 18rpx 8rpx; box-sizing: border-box; text-align: center; }
 	.feature-icon { position: relative; display: flex; align-items: center; justify-content: center; width: 72rpx; height: 72rpx; border-radius: 8rpx; background: #eaf5ff; }
-	.feature-icon.red { background: #fff0f0; }
-	.feature-icon.yellow { background: #fff8e8; }
-	.feature-icon.green { background: #ecf8f2; }
 	.feature-badge { position: absolute; top: -10rpx; right: -14rpx; min-width: 34rpx; height: 34rpx; padding: 0 8rpx; border: 3rpx solid #ffffff; border-radius: 18rpx; box-sizing: border-box; background: #e65757; color: #ffffff; font-size: 19rpx; line-height: 31rpx; }
 	.feature-title { margin-top: 14rpx; font-size: 27rpx; font-weight: 500; }
 	.feature-desc { margin-top: 6rpx; font-size: 21rpx; color: #8c9199; white-space: nowrap; }
