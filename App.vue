@@ -1,6 +1,6 @@
 <script>
 	import { getPracticeState } from '@/data/practice.js'
-	import { schedulePracticeSync } from '@/services/user-practice.js'
+	import { flushPracticeEvents, schedulePracticeSync } from '@/services/user-practice.js'
 
 	export default {
 		globalData: {
@@ -23,6 +23,9 @@
 		},
 		onHide: function() {
 			console.log('App Hide')
+			flushPracticeEvents({ localState: getPracticeState() }).catch(() => {
+				// 待同步内容保留在本机，下次前台启动继续重试。
+			})
 		}
 	}
 </script>

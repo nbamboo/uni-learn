@@ -31,8 +31,7 @@ async function loadRecordedQuestions(subjectId, mode, localState) {
 	const snapshot = await getPracticeStateSnapshot(subjectId, { localState })
 	const idField = {
 		wrong: 'wrongQuestionIds',
-		favorite: 'favoriteQuestionIds',
-		history: 'answeredQuestionIds'
+		favorite: 'favoriteQuestionIds'
 	}[mode]
 	const questionIds = snapshot[idField] || []
 	if (!questionIds.length) return []
@@ -47,7 +46,7 @@ export async function buildPracticeQuestions(options) {
 	const localState = getPracticeState()
 	let list = []
 
-	if (mode === 'wrong' || mode === 'favorite' || mode === 'history') {
+	if (mode === 'wrong' || mode === 'favorite') {
 		list = await loadRecordedQuestions(subjectId, mode, localState)
 	} else if (mode === 'smart') {
 		const snapshot = await getPracticeStateSnapshot(subjectId, { localState })

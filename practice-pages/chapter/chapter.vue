@@ -5,7 +5,6 @@
 				<text class="summary-label">{{ view === 'knowledge' ? '专项考点' : '教材目录' }}</text>
 				<text class="summary-title">{{ subject.name }}</text>
 			</view>
-			<text class="summary-count">{{ filteredItems.length }} 项</text>
 		</view>
 
 		<view class="catalog-search" v-if="view === 'knowledge'">
@@ -59,7 +58,7 @@
 		getSubjectById
 	} from '@/data/practice.js'
 	import { getCatalog } from '@/services/question-bank.js'
-	import { getPracticeStateSnapshot } from '@/services/user-practice.js'
+	import { getChapterPracticePosition, getPracticeStateSnapshot } from '@/services/user-practice.js'
 
 	export default {
 		data() {
@@ -86,13 +85,28 @@
 				return this.items.filter(item => `${item.name} ${item.chapter || ''}`.toLowerCase().indexOf(keyword) > -1)
 			}
 		},
-		onLoad(options) {
+			onLoad(options) {
 			this.subjectId = options.subjectId
 			this.view = options.view === 'knowledge' ? 'knowledge' : 'chapter'
 			uni.setNavigationBarTitle({ title: this.view === 'knowledge' ? '知识点练习' : '章节练习' })
 			this.loadItems()
 		},
+		onShow() {
+			if (this.view === 'chapter' && this.items.length) this.refreshChapterProgress()
+		},
 		methods: {
+			refreshChapterProgress() {
+				this.items = this.items.map(item => {
+					const localProgress = getChapterProgress(this.subjectId, item.id, item.count)
+					const attempted = Math.max(item.progress.attempted, localProgress.attempted)
+					return Object.assign({}, item, {
+						progress: Object.assign({}, item.progress, {
+							attempted,
+							percent: item.count ? Math.min(100, Math.round(attempted / item.count * 100)) : 0
+						})
+					})
+				})
+			},
 			async loadItems(forceRefresh) {
 				this.loading = true
 				this.loadError = ''
@@ -171,7 +185,15 @@
 			startItem(item) {
 				let url = `/practice-pages/practice/practice?subjectId=${this.subjectId}`
 				if (this.view === 'knowledge') url += `&mode=knowledge&knowledge=${encodeURIComponent(item.name)}`
-				else url += `&mode=chapter&chapterId=${item.id}`
+				else {
+					url += `&mode=chapter&chapterId=${item.id}`
+					const savedPosition = getChapterPracticePosition(this.subjectId, item.id)
+					if (savedPosition) {
+						url += `&startId=${encodeURIComponent(savedPosition.questionId)}`
+					} else if (item.progress.attempted > 0) {
+						url += `&startNumber=${Math.min(item.progress.attempted, item.progress.total)}`
+					}
+				}
 				uni.navigateTo({ url })
 			}
 		}
@@ -185,7 +207,6 @@
 	.catalog-summary > view { display: flex; flex-direction: column; }
 	.summary-label { font-size: 23rpx; color: rgba(255, 255, 255, 0.76); }
 	.summary-title { margin-top: 7rpx; font-size: 34rpx; font-weight: 600; }
-	.summary-count { font-size: 27rpx; }
 	.catalog-search { display: flex; align-items: center; height: 78rpx; margin: 24rpx 24rpx 0; padding: 0 22rpx; border: 1rpx solid #dfe3e8; border-radius: 8rpx; box-sizing: border-box; background: #ffffff; }
 	.catalog-search input { flex: 1; height: 100%; margin-left: 12rpx; font-size: 27rpx; }
 	.catalog-list { padding: 20rpx 24rpx 0; }

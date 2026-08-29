@@ -1,0 +1,22 @@
+{
+  "dcloudAppid": "__UNI__6D9FCF0",
+  "passwordSecret": [
+    {
+      "type": "hmac-sha256",
+      "version": 1
+    }
+  ],
+  "tokenSecret": "",
+  "tokenExpiresIn": 7200,
+  "tokenExpiresThreshold": 1200,
+  "mp-weixin": {
+    "tokenExpiresIn": 259200,
+    "tokenExpiresThreshold": 86400,
+    "oauth": {
+      "weixin": {
+        "appid": "wxea609870c354d0bb",
+        "appsecret": ""
+      }
+    }
+  }
+}

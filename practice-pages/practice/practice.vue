@@ -169,9 +169,19 @@
 
 <script>
 	import { buildPracticeQuestions } from '@/data/practice-questions.js'
-	import { getPracticeState, isFavorite, recordAnswer, toggleFavorite } from '@/data/practice.js'
+	import {
+		getPracticeState,
+		isCorrectAnswer,
+		isFavorite,
+		recordAnswer,
+		toggleFavorite
+	} from '@/data/practice.js'
 	import { getAllPracticeQuestions } from '@/services/question-bank.js'
-	import { getPracticeStateSnapshot } from '@/services/user-practice.js'
+	import {
+		flushPracticeEvents,
+		getPracticeStateSnapshot,
+		savePracticeProgress
+	} from '@/services/user-practice.js'
 	import FinanceCalculator from '@/components/finance-calculator/finance-calculator.vue'
 
 	export default {
@@ -200,7 +210,8 @@
 				mode: 'sequence',
 				loading: true,
 				loadError: '',
-				favoriteQuestionIds: []
+				favoriteQuestionIds: [],
+				progressSavedOnLeave: false
 			}
 		},
 		computed: {
@@ -240,10 +251,20 @@
 				knowledge: options.knowledge ? decodeURIComponent(options.knowledge) : '',
 				keyword: options.keyword ? decodeURIComponent(options.keyword) : '',
 				startId: options.startId,
+				startNumber: Number(options.startNumber) || 0,
 				limit: options.limit
 			}
 			this.setNavigationTitle()
 			this.loadQuestions()
+		},
+		onShow() {
+			this.progressSavedOnLeave = false
+		},
+		onHide() {
+			this.syncCurrentProgress()
+		},
+		onUnload() {
+			this.syncCurrentProgress()
 		},
 		methods: {
 			async loadQuestions(forceRefresh) {
@@ -262,16 +283,25 @@
 					} else {
 						this.questionList = await buildPracticeQuestions(this.practiceConfig)
 					}
+					let snapshot = null
 					try {
-						const snapshot = await getPracticeStateSnapshot(this.practiceConfig.subjectId, {
+						snapshot = await getPracticeStateSnapshot(this.practiceConfig.subjectId, {
 							localState: getPracticeState()
 						})
 						this.favoriteQuestionIds = snapshot.favoriteQuestionIds || []
 					} catch (syncError) {
 						this.favoriteQuestionIds = []
 					}
+					this.restoreSessionAnswers(snapshot)
 					if (this.questionList.length) {
-						this.loadQuestion(0)
+						const savedStartIndex = this.practiceConfig.startId
+							? this.questionList.findIndex(item => item.id === this.practiceConfig.startId)
+							: -1
+						const numberedStartIndex = this.practiceConfig.startNumber > 0
+							? Math.min(this.practiceConfig.startNumber - 1, this.questionList.length - 1)
+							: -1
+						const startIndex = savedStartIndex > -1 ? savedStartIndex : numberedStartIndex
+						this.loadQuestion(startIndex > -1 ? startIndex : 0)
 						this.resetCardPosition(false)
 					}
 				} catch (error) {
@@ -290,22 +320,66 @@
 					smart: '智能练习',
 					wrong: '错题强化',
 					favorite: '收藏练习',
-					history: '做题回顾',
 					chapter: '章节练习',
 					knowledge: '知识点练习',
 					search: '题目练习'
 				}
 				uni.setNavigationBarTitle({ title: titles[this.mode] || '顺序练习' })
 			},
+			restoreSessionAnswers(snapshot) {
+				const questionById = {}
+				this.questionList.forEach(question => {
+					questionById[question.id] = question
+				})
+				const restored = {}
+				const cloudSelections = snapshot && snapshot.answerSelections || {}
+				Object.keys(cloudSelections).forEach(questionId => {
+					const question = questionById[questionId]
+					const selected = cloudSelections[questionId]
+					if (!question || !Array.isArray(selected) || !selected.length) return
+					restored[questionId] = {
+						selected: selected.slice(),
+						correct: isCorrectAnswer(selected, question.answer)
+					}
+				})
+
+				const localAnswers = getPracticeState().answers
+				Object.keys(localAnswers).forEach(questionId => {
+					const question = questionById[questionId]
+					const answer = localAnswers[questionId]
+					if (!question || !answer || !Array.isArray(answer.selected) || !answer.selected.length) return
+					restored[questionId] = {
+						selected: answer.selected.slice(),
+						correct: isCorrectAnswer(answer.selected, question.answer)
+					}
+				})
+
+				this.sessionAnswers = restored
+				const answers = Object.keys(restored).map(questionId => restored[questionId])
+				this.correctCount = answers.filter(answer => answer.correct).length
+				this.wrongCount = answers.length - this.correctCount
+			},
 			loadQuestion(index) {
 				this.currentIndex = index
 				const question = this.questionList[index]
+				if (!question) return
 				const saved = this.sessionAnswers[question.id]
 				this.selectedAnswers = saved ? saved.selected.slice() : []
 				this.submitted = Boolean(saved)
 				this.lastResult = saved ? saved.correct : false
 				this.favorite = this.favoriteQuestionIds.indexOf(question.id) > -1 || isFavorite(question.id)
 				this.scrollTop = this.scrollTop === 0 ? 1 : 0
+				savePracticeProgress(question, { chapterId: this.practiceConfig.chapterId })
+			},
+			syncCurrentProgress() {
+				if (this.progressSavedOnLeave || !this.currentQuestion) return
+				this.progressSavedOnLeave = true
+				savePracticeProgress(this.currentQuestion, {
+					chapterId: this.practiceConfig.chapterId
+				})
+				flushPracticeEvents().catch(() => {
+					// 进度已持久化在本机，下次启动会自动重试。
+				})
 			},
 			handleCardPositionChange(event) {
 				const position = Number(event.detail && event.detail.x)

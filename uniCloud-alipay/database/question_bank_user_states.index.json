@@ -12,19 +12,6 @@
     }
   },
   {
-    "IndexName": "user_subject_history",
-    "MgoKeySchema": {
-      "MgoIndexKeys": [
-        { "Name": "userId", "Direction": "1", "Type": "varchar" },
-        { "Name": "subjectId", "Direction": "1", "Type": "varchar" },
-        { "Name": "attempted", "Direction": "1", "Type": "bool" },
-        { "Name": "lastAnsweredAt", "Direction": "-1", "Type": "date" }
-      ],
-      "MgoIsUnique": false,
-      "MgoIsSparse": false
-    }
-  },
-  {
     "IndexName": "user_subject_wrong",
     "MgoKeySchema": {
       "MgoIndexKeys": [

@@ -2,9 +2,10 @@
 
 const CATALOG_COLLECTION = 'question_bank_catalogs'
 const QUESTION_COLLECTION = 'question_bank_questions'
+const USER_COLLECTION = 'uni-id-users'
 const STATE_COLLECTION = 'question_bank_user_states'
-const ATTEMPT_COLLECTION = 'question_bank_user_attempts'
 const STATS_COLLECTION = 'question_bank_user_stats'
+const PROGRESS_COLLECTION = 'question_bank_user_progress'
 const MAX_SYNC_EVENTS = 50
 const MAX_STATE_ROWS = 2000
 const DEFAULT_PAGE_SIZE = 20
@@ -13,7 +14,7 @@ const SUBJECT_ID_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/
 const QUESTION_ID_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/
 const EVENT_ID_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/
 const ANSWER_ALIASES = ['A', 'B', 'C', 'D', 'E', 'F']
-const RECORD_TYPES = ['history', 'wrong', 'favorite']
+const RECORD_TYPES = ['wrong', 'favorite']
 const CHINA_OFFSET_MS = 8 * 60 * 60 * 1000
 const MIN_EVENT_TIME = new Date('2020-01-01T00:00:00.000Z').getTime()
 const MAX_FUTURE_TIME = 5 * 60 * 1000
@@ -148,6 +149,19 @@ function getDateValue(value) {
 	return Number.isFinite(timestamp) ? timestamp : 0
 }
 
+function getAvatarUrl(user) {
+	if (!user) return ''
+	if (typeof user.avatar === 'string') return user.avatar
+	if (user.avatar_file && typeof user.avatar_file.url === 'string') return user.avatar_file.url
+	return ''
+}
+
+function hasWeixinAccount(user) {
+	if (!user) return false
+	if (typeof user.wx_unionid === 'string' && user.wx_unionid) return true
+	return isPlainObject(user.wx_openid) && Object.keys(user.wx_openid).some(key => Boolean(user.wx_openid[key]))
+}
+
 function chinaDayKey(value) {
 	const date = value instanceof Date ? value : new Date(value)
 	return new Date(date.getTime() + CHINA_OFFSET_MS).toISOString().slice(0, 10)
@@ -157,12 +171,12 @@ function stateDocumentId(userId, subjectId, questionId) {
 	return `${userId}|${subjectId}|${questionId}`
 }
 
-function attemptDocumentId(userId, eventId) {
-	return `${userId}|${eventId}`
-}
-
 function statsDocumentId(userId, subjectId) {
 	return `${userId}|${subjectId}`
+}
+
+function progressDocumentId(userId) {
+	return userId
 }
 
 function emptyState(userId, subjectId, questionId, timestamp) {
@@ -231,6 +245,20 @@ function readSyncEvent(rawEvent, currentTime, index) {
 		result.favorite = event.favorite
 	}
 	return result
+}
+
+function readProgress(rawProgress, currentTime) {
+	const progress = requireObject(rawProgress, 'progress')
+	return {
+		progressId: readEventId(progress.progressId),
+		subjectId: readSubjectId(progress.subjectId),
+		chapterId: readString(progress.chapterId, 'progress.chapterId', {
+			required: true,
+			maxLength: 32
+		}),
+		questionId: readQuestionId(progress.questionId),
+		occurredAt: readOccurredAt(progress.occurredAt, currentTime)
+	}
 }
 
 async function getDocument(store, collectionName, documentId) {
@@ -360,19 +388,22 @@ function createQuestionBankUserService(db, options) {
 	const serverDate = () => typeof db.serverDate === 'function' ? db.serverDate() : now()
 
 	async function syncEvents(event, userId) {
-		if (!Array.isArray(event.events) || event.events.length === 0) {
-			invalidArgument('events必须是非空数组')
-		}
-		if (event.events.length > MAX_SYNC_EVENTS) {
+		const rawEvents = event.events === undefined ? [] : event.events
+		if (!Array.isArray(rawEvents)) invalidArgument('events必须是数组')
+		if (rawEvents.length > MAX_SYNC_EVENTS) {
 			invalidArgument(`events最多包含${MAX_SYNC_EVENTS}条记录`)
 		}
 		const currentTime = now()
-		const events = event.events.map((item, index) => readSyncEvent(item, currentTime, index))
+		const progress = event.progress === undefined || event.progress === null
+			? null
+			: readProgress(event.progress, currentTime)
+		if (!rawEvents.length && !progress) invalidArgument('events和progress不能同时为空')
+		const events = rawEvents.map((item, index) => readSyncEvent(item, currentTime, index))
 		events.sort((left, right) => {
 			const timeDiff = left.occurredAt.getTime() - right.occurredAt.getTime()
 			return timeDiff || left.originalIndex - right.originalIndex
 		})
-		const loaded = await loadQuestionsForEvents(db, events)
+		const loaded = await loadQuestionsForEvents(db, progress ? events.concat([progress]) : events)
 		const todayKey = chinaDayKey(currentTime)
 
 		return withTransaction(db, async store => {
@@ -402,39 +433,38 @@ function createQuestionBankUserService(db, options) {
 
 			for (const item of events) {
 				if (item.type === 'answer') {
-					const attemptId = attemptDocumentId(userId, item.eventId)
-					const duplicate = await getDocument(store, ATTEMPT_COLLECTION, attemptId)
-					if (duplicate) {
-						duplicateEventIds.push(item.eventId)
-						answerResults.push({ eventId: item.eventId, correct: Boolean(duplicate.correct) })
-						continue
-					}
 					const question = loaded.questions.get(`${item.subjectId}|${item.questionId}`)
 					const correct = answerIsCorrect(item.selected, question.answer)
 					const state = await getState(item.subjectId, item.questionId)
-					const stats = await getStats(item.subjectId)
 					const wasAttempted = Boolean(state.attempted)
 					const wasCorrect = Boolean(state.lastCorrect)
 					const latestTime = getDateValue(state.lastAnsweredAt)
-					const isLatest = !latestTime || item.occurredAt.getTime() >= latestTime
+					const eventTime = item.occurredAt.getTime()
+					const duplicate = state.lastAnswerEventId === item.eventId
+						|| (wasAttempted && latestTime >= eventTime)
+					if (duplicate) {
+						duplicateEventIds.push(item.eventId)
+						answerResults.push({ eventId: item.eventId, correct })
+						continue
+					}
+					const stats = await getStats(item.subjectId)
 
 					state.chapterId = question.chapterId
 					state.knowledge = question.knowledge
 					state.attempted = true
 					state.attempts = (Number(state.attempts) || 0) + 1
 					state.firstAnsweredAt = state.firstAnsweredAt || item.occurredAt
-					if (isLatest) {
-						state.lastCorrect = correct
-						state.lastSelected = item.selected
-						state.lastAnsweredAt = item.occurredAt
-					}
+					state.lastAnswerEventId = item.eventId
+					state.lastCorrect = correct
+					state.lastSelected = item.selected
+					state.lastAnsweredAt = item.occurredAt
 					state.updatedAt = serverDate()
 
 					if (!wasAttempted) {
 						stats.attempted += 1
 						if (correct) stats.correct += 1
 						else stats.wrong += 1
-					} else if (isLatest && wasCorrect !== correct) {
+					} else if (wasCorrect !== correct) {
 						if (correct) {
 							stats.correct += 1
 							stats.wrong = Math.max(0, stats.wrong - 1)
@@ -447,17 +477,6 @@ function createQuestionBankUserService(db, options) {
 					if (chinaDayKey(item.occurredAt) === todayKey) stats.todayAttempts += 1
 					stats.updatedAt = serverDate()
 
-					await setDocument(store, ATTEMPT_COLLECTION, attemptId, {
-						_id: attemptId,
-						eventId: item.eventId,
-						userId,
-						subjectId: item.subjectId,
-						questionId: item.questionId,
-						selected: item.selected,
-						correct,
-						occurredAt: item.occurredAt,
-						createdAt: serverDate()
-					})
 					acceptedEventIds.push(item.eventId)
 					answerResults.push({ eventId: item.eventId, correct })
 					continue
@@ -479,6 +498,34 @@ function createQuestionBankUserService(db, options) {
 				acceptedEventIds.push(item.eventId)
 			}
 
+			let progressResult = null
+			if (progress) {
+				const question = loaded.questions.get(`${progress.subjectId}|${progress.questionId}`)
+				if (String(question.chapterId) !== progress.chapterId) {
+					invalidArgument('progress中的章节与题目不匹配')
+				}
+				const id = progressDocumentId(userId)
+				const saved = await getDocument(store, PROGRESS_COLLECTION, id)
+				const savedTime = getDateValue(saved && saved.progressAt)
+				if (!saved || progress.occurredAt.getTime() >= savedTime) {
+					await setDocument(store, PROGRESS_COLLECTION, id, {
+						_id: id,
+						userId,
+						subjectId: progress.subjectId,
+						chapterId: progress.chapterId,
+						questionId: progress.questionId,
+						progressId: progress.progressId,
+						progressAt: progress.occurredAt,
+						createdAt: saved && saved.createdAt || serverDate(),
+						updatedAt: serverDate()
+					})
+				}
+				progressResult = {
+					progressId: progress.progressId,
+					saved: true
+				}
+			}
+
 			for (const state of stateCache.values()) {
 				await setDocument(store, STATE_COLLECTION, state._id, state)
 			}
@@ -489,7 +536,8 @@ function createQuestionBankUserService(db, options) {
 			return {
 				acceptedEventIds,
 				duplicateEventIds,
-				answerResults
+				answerResults,
+				progress: progressResult
 			}
 		})
 	}
@@ -513,6 +561,21 @@ function createQuestionBankUserService(db, options) {
 		}
 	}
 
+	async function getUserProfile(event, userId) {
+		const user = await getDocument(db, USER_COLLECTION, userId)
+		if (!user) {
+			throw new QuestionBankUserError('QUESTION_BANK_USER_NOT_FOUND', '当前登录用户不存在')
+		}
+		return {
+			uid: userId,
+			nickname: typeof user.nickname === 'string' ? user.nickname : '',
+			avatar: getAvatarUrl(user),
+			weixinBound: hasWeixinAccount(user),
+			registeredAt: getDateValue(user.register_date),
+			lastLoginAt: getDateValue(user.last_login_date)
+		}
+	}
+
 	async function getStateSnapshot(event, userId) {
 		const subjectId = readSubjectId(event.subjectId)
 		const response = await db.collection(STATE_COLLECTION)
@@ -522,6 +585,7 @@ function createQuestionBankUserService(db, options) {
 				chapterId: true,
 				knowledge: true,
 				attempted: true,
+				lastSelected: true,
 				lastCorrect: true,
 				lastAnsweredAt: true,
 				favorite: true,
@@ -540,13 +604,18 @@ function createQuestionBankUserService(db, options) {
 			.sort((left, right) => getDateValue(right.favoriteUpdatedAt) - getDateValue(left.favoriteUpdatedAt))
 		const chapterAttempts = {}
 		const knowledgeAttempts = {}
+		const answerSelections = {}
 		answeredRows.forEach(item => {
 			if (item.chapterId) chapterAttempts[item.chapterId] = (chapterAttempts[item.chapterId] || 0) + 1
 			if (item.knowledge) knowledgeAttempts[item.knowledge] = (knowledgeAttempts[item.knowledge] || 0) + 1
+			if (Array.isArray(item.lastSelected) && item.lastSelected.length) {
+				answerSelections[item.questionId] = item.lastSelected
+			}
 		})
 		return {
 			subjectId,
 			answeredQuestionIds: answeredRows.map(item => item.questionId),
+			answerSelections,
 			wrongQuestionIds: wrongRows.map(item => item.questionId),
 			favoriteQuestionIds: favoriteRows.map(item => item.questionId),
 			chapterAttempts,
@@ -554,10 +623,34 @@ function createQuestionBankUserService(db, options) {
 		}
 	}
 
+	async function getProgress(event, userId) {
+		const saved = await getDocument(db, PROGRESS_COLLECTION, progressDocumentId(userId))
+		if (!saved) return null
+		const catalog = await loadCatalog(db, saved.subjectId)
+		const response = await db.collection(QUESTION_COLLECTION)
+			.where({
+				subjectId: saved.subjectId,
+				version: catalog.activeVersion,
+				status: 1,
+				questionId: saved.questionId,
+				chapterId: saved.chapterId
+			})
+			.field({ questionId: true })
+			.limit(1)
+			.get()
+		if (!getRows(response).length) return null
+		return {
+			subjectId: saved.subjectId,
+			chapterId: saved.chapterId,
+			questionId: saved.questionId,
+			progressAt: getDateValue(saved.progressAt)
+		}
+	}
+
 	async function getRecords(event, userId) {
 		const subjectId = readSubjectId(event.subjectId)
 		const type = readString(event.type, 'type', {
-			defaultValue: 'history',
+			defaultValue: 'wrong',
 			values: RECORD_TYPES
 		})
 		const page = readInteger(event.page, 'page', {
@@ -593,6 +686,7 @@ function createQuestionBankUserService(db, options) {
 			const question = questionMap.get(state.questionId)
 			if (!question) return null
 			return {
+				recordId: `${type}-${state.questionId}`,
 				question,
 				correct: Boolean(state.lastCorrect),
 				timestamp: getDateValue(type === 'favorite' ? state.favoriteUpdatedAt : state.lastAnsweredAt)
@@ -609,7 +703,7 @@ function createQuestionBankUserService(db, options) {
 		}
 	}
 
-	const handlers = { syncEvents, getSummary, getStateSnapshot, getRecords }
+	const handlers = { syncEvents, getSummary, getStateSnapshot, getProgress, getRecords, getUserProfile }
 
 	async function execute(rawEvent, userId) {
 		const event = requireObject(rawEvent, '请求参数')
@@ -630,6 +724,6 @@ module.exports = {
 	createQuestionBankUserService,
 	chinaDayKey,
 	stateDocumentId,
-	attemptDocumentId,
+	progressDocumentId,
 	statsDocumentId
 }

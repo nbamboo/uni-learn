@@ -1,17 +1,24 @@
 const CLOUD_FUNCTION_NAME = 'questionBankUser'
 const OUTBOX_STORAGE_KEY = 'uni-learn-practice-cloud-outbox-v1'
+const PROGRESS_STORAGE_KEY = 'uni-learn-practice-cloud-progress-v1'
+const CHAPTER_POSITION_STORAGE_KEY = 'uni-learn-practice-chapter-position-v1'
 const MIGRATION_KEY_PREFIX = 'uni-learn-practice-cloud-migration-v1:'
+const UNI_ID_STORAGE_KEYS = ['uni_id_token', 'uni_id_token_expired', 'uniIdToken', 'uniIdTokenExpired']
 const MAX_OUTBOX_EVENTS = 2000
 const SYNC_BATCH_SIZE = 50
 const SNAPSHOT_CACHE_TTL = 2 * 60 * 1000
 const SUMMARY_CACHE_TTL = 30 * 1000
+const PROFILE_CACHE_TTL = 5 * 60 * 1000
 const RETRY_DELAY = 180
+const MAX_CHAPTER_POSITIONS = 100
 
 const snapshotCache = new Map()
 const summaryCache = new Map()
+const userProfileCache = new Map()
 let loginRequest = null
 let flushRequest = null
 let scheduledFlush = null
+let progressFlushRequested = false
 let eventSequence = 0
 
 export class UserPracticeServiceError extends Error {
@@ -48,6 +55,30 @@ function setStorage(key, value) {
 	} catch (error) {
 		return false
 	}
+}
+
+function removeStorage(key) {
+	if (typeof uni === 'undefined' || typeof uni.removeStorageSync !== 'function') return false
+	try {
+		uni.removeStorageSync(key)
+		return true
+	} catch (error) {
+		return false
+	}
+}
+
+function clearPracticeLogin() {
+	UNI_ID_STORAGE_KEYS.forEach(removeStorage)
+	loginRequest = null
+	userProfileCache.clear()
+}
+
+function loginRequiredError(errCode) {
+	return [
+		'QUESTION_BANK_LOGIN_REQUIRED',
+		'uni-id-token-expired',
+		'uni-id-check-token-failed'
+	].indexOf(errCode) > -1
 }
 
 function isObject(value) {
@@ -96,6 +127,45 @@ function saveOutbox(events) {
 	})
 }
 
+function readPendingProgress() {
+	const saved = getStorage(PROGRESS_STORAGE_KEY)
+	if (!saved || saved.version !== 1 || !isObject(saved.progress)) return null
+	return cloneValue(saved.progress)
+}
+
+function savePendingProgress(progress) {
+	if (!progress) {
+		removeStorage(PROGRESS_STORAGE_KEY)
+		return setStorage(PROGRESS_STORAGE_KEY, null)
+	}
+	return setStorage(PROGRESS_STORAGE_KEY, {
+		version: 1,
+		progress: cloneValue(progress)
+	})
+}
+
+function readChapterPositions() {
+	const saved = getStorage(CHAPTER_POSITION_STORAGE_KEY)
+	if (!saved || saved.version !== 1 || !isObject(saved.positions)) return {}
+	return cloneValue(saved.positions)
+}
+
+function saveChapterPosition(progress) {
+	const positions = readChapterPositions()
+	const positionKey = `${progress.subjectId}|${progress.chapterId}`
+	positions[positionKey] = {
+		subjectId: progress.subjectId,
+		chapterId: progress.chapterId,
+		questionId: progress.questionId,
+		updatedAt: progress.occurredAt
+	}
+	const positionKeys = Object.keys(positions).sort((left, right) => {
+		return Number(positions[right].updatedAt) - Number(positions[left].updatedAt)
+	})
+	positionKeys.slice(MAX_CHAPTER_POSITIONS).forEach(key => delete positions[key])
+	setStorage(CHAPTER_POSITION_STORAGE_KEY, { version: 1, positions })
+}
+
 function enqueueEvent(event) {
 	const events = readOutbox()
 	const duplicateIndex = events.findIndex(item => item.eventId === event.eventId)
@@ -112,7 +182,7 @@ function enqueueEvent(event) {
 	}
 	events.push(cloneValue(event))
 	saveOutbox(events)
-	schedulePracticeSync()
+	schedulePracticeSync({ includeProgress: false })
 	return event.eventId
 }
 
@@ -142,6 +212,31 @@ export function queuePracticeFavorite(question, favorite, options) {
 	}
 	invalidateUserPracticeCache(event.subjectId)
 	return enqueueEvent(event)
+}
+
+export function savePracticeProgress(question, options) {
+	const config = options || {}
+	const subjectId = question && question.subjectId
+	const chapterId = question && (question.chapterId || config.chapterId)
+	const questionId = question && (question.questionId || question.id)
+	if (!subjectId || chapterId === undefined || chapterId === null || !questionId) return null
+	const progress = {
+		progressId: config.progressId || createPracticeEventId('progress'),
+		subjectId,
+		chapterId: String(chapterId),
+		questionId,
+		occurredAt: Number(config.occurredAt) || Date.now()
+	}
+	saveChapterPosition(progress)
+	savePendingProgress(progress)
+	return progress.progressId
+}
+
+export function getChapterPracticePosition(subjectId, chapterId) {
+	if (!subjectId || chapterId === undefined || chapterId === null) return null
+	const positions = readChapterPositions()
+	const position = positions[`${subjectId}|${String(chapterId)}`]
+	return position && position.questionId ? cloneValue(position) : null
 }
 
 export function getCurrentPracticeUser() {
@@ -220,6 +315,7 @@ async function loginByWeixin() {
 	if (!user.uid) {
 		throw new UserPracticeServiceError('QUESTION_BANK_WEIXIN_LOGIN_FAILED', '登录成功但未取得用户身份')
 	}
+	userProfileCache.clear()
 	return user
 }
 
@@ -255,6 +351,11 @@ async function executeCloudCall(action, payload, options) {
 				throw new UserPracticeServiceError('QUESTION_BANK_USER_INVALID_RESPONSE', '用户题库服务返回格式不正确')
 			}
 			if (result.errCode !== 0) {
+				if (loginRequiredError(result.errCode) && attempt < retries) {
+					clearPracticeLogin()
+					await ensurePracticeUser()
+					continue
+				}
 				throw new UserPracticeServiceError(
 					result.errCode || 'QUESTION_BANK_USER_CLOUD_ERROR',
 					result.errMsg || '用户题库服务请求失败',
@@ -275,46 +376,20 @@ async function executeCloudCall(action, payload, options) {
 	)
 }
 
-function legacyAnswerEvent(item, index) {
-	const timestamp = Number(item.timestamp) || Date.now()
-	const stablePart = hashString(`${item.subjectId}|${item.questionId}|${timestamp}|${index}`)
-	return {
-		type: 'answer',
-		eventId: item.eventId || `legacy-answer-${timestamp.toString(36)}-${stablePart}`,
-		subjectId: item.subjectId,
-		questionId: item.questionId,
-		selected: Array.isArray(item.selected) ? item.selected.slice() : [],
-		occurredAt: timestamp
-	}
-}
-
 function prepareLegacyMigration(userId, localState) {
 	if (!localState || !isObject(localState)) return
 	const migrationKey = `${MIGRATION_KEY_PREFIX}${userId}`
 	const migration = getStorage(migrationKey)
 	if (migration && (migration.prepared || migration.complete)) return
 	const state = localState
-	const history = Array.isArray(state.history) ? state.history.slice().reverse() : []
 	const events = readOutbox()
 	const eventIds = new Set(events.map(item => item.eventId))
-	const migratedQuestionIds = new Set()
-
-	history.forEach((item, index) => {
-		if (!item || !item.subjectId || !item.questionId || !Array.isArray(item.selected) || !item.selected.length) return
-		const event = legacyAnswerEvent(item, index)
-		migratedQuestionIds.add(`${item.subjectId}|${item.questionId}`)
-		if (!eventIds.has(event.eventId)) {
-			events.push(event)
-			eventIds.add(event.eventId)
-		}
-	})
 
 	const answers = isObject(state.answers) ? state.answers : {}
 	Object.keys(answers).forEach(questionId => {
 		const answer = answers[questionId]
 		if (!answer || !answer.subjectId || !Array.isArray(answer.selected) || !answer.selected.length) return
 		const answerKey = `${answer.subjectId}|${questionId}`
-		if (migratedQuestionIds.has(answerKey)) return
 		const timestamp = Number(answer.timestamp) || Date.now()
 		const event = {
 			type: 'answer',
@@ -372,20 +447,34 @@ function markMigrationComplete(userId, remainingEvents) {
 
 export async function flushPracticeEvents(options) {
 	const config = options || {}
+	if (config.includeProgress !== false) progressFlushRequested = true
 	if (flushRequest) return flushRequest
 	flushRequest = (async () => {
 		const user = await ensurePracticeUser()
 		if (config.localState) prepareLegacyMigration(user.uid, config.localState)
 		let events = readOutbox()
-		while (events.length) {
+		while (events.length || (progressFlushRequested && readPendingProgress())) {
+			const progress = progressFlushRequested ? readPendingProgress() : null
 			const batch = events.slice(0, SYNC_BATCH_SIZE)
-			const result = await executeCloudCall('syncEvents', { events: batch })
+			const payload = { events: batch }
+			if (progress) payload.progress = progress
+			const result = await executeCloudCall('syncEvents', payload)
 			const completedIds = new Set([].concat(
 				result && result.acceptedEventIds || [],
 				result && result.duplicateEventIds || []
 			))
-			if (!completedIds.size) {
+			if (batch.length && !completedIds.size) {
 				throw new UserPracticeServiceError('QUESTION_BANK_USER_INVALID_RESPONSE', '同步服务未确认任何记录')
+			}
+			if (progress) {
+				const progressResult = result && result.progress
+				if (!progressResult || progressResult.progressId !== progress.progressId || !progressResult.saved) {
+					throw new UserPracticeServiceError('QUESTION_BANK_USER_INVALID_RESPONSE', '同步服务未确认学习进度')
+				}
+				const currentProgress = readPendingProgress()
+				if (currentProgress && currentProgress.progressId === progress.progressId) {
+					savePendingProgress(null)
+				}
 			}
 			events = readOutbox().filter(item => !completedIds.has(item.eventId))
 			saveOutbox(events)
@@ -394,6 +483,7 @@ export async function flushPracticeEvents(options) {
 		markMigrationComplete(user.uid, events)
 		return { synced: true, pending: 0 }
 	})().then(result => {
+		progressFlushRequested = false
 		flushRequest = null
 		return result
 	}, error => {
@@ -463,28 +553,48 @@ export async function getPracticeStateSnapshot(subjectId, options) {
 
 export async function getPracticeRecords(params) {
 	const input = params || {}
-	await ensurePracticeUser()
+	await flushPracticeEvents()
 	return executeCloudCall('getRecords', {
 		subjectId: input.subjectId,
-		type: input.type || 'history',
+		type: input.type || 'wrong',
 		page: input.page || 1,
 		pageSize: input.pageSize || 20
 	})
 }
 
+export async function getPracticeProgress() {
+	await flushPracticeEvents()
+	return executeCloudCall('getProgress')
+}
+
+export async function getPracticeUserProfile(options) {
+	const config = options || {}
+	const user = await ensurePracticeUser()
+	if (!config.forceRefresh) {
+		const cached = getCached(userProfileCache, user.uid)
+		if (cached) return cached
+	}
+	const profile = await executeCloudCall('getUserProfile')
+	return setCached(userProfileCache, user.uid, profile, PROFILE_CACHE_TTL)
+}
+
 export function pendingPracticeEventCount() {
-	return readOutbox().length
+	return readOutbox().length + (readPendingProgress() ? 1 : 0)
 }
 
 export default {
 	ensurePracticeUser,
 	flushPracticeEvents,
+	getChapterPracticePosition,
 	getCurrentPracticeUser,
+	getPracticeProgress,
 	getPracticeRecords,
 	getPracticeStateSnapshot,
 	getPracticeSummary,
+	getPracticeUserProfile,
 	pendingPracticeEventCount,
 	practiceUserLoggedIn,
 	queuePracticeAnswer,
-	queuePracticeFavorite
+	queuePracticeFavorite,
+	savePracticeProgress
 }

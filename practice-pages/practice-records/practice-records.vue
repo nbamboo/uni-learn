@@ -31,7 +31,7 @@
 		</view>
 
 		<view class="record-list" v-else-if="records.length">
-			<view class="record-item" v-for="(item, index) in records" :key="item.question.id" @tap="startFrom(item.question.id)">
+				<view class="record-item" v-for="(item, index) in records" :key="item.recordId" @tap="startFrom(item.question.id)">
 				<view class="record-index">{{ index + 1 }}</view>
 				<view class="record-content">
 					<text class="record-title">{{ item.question.title }}</text>
@@ -65,14 +65,20 @@
 </template>
 
 <script>
-		import { formatHistoryTime, getSubjectById } from '@/data/practice.js'
+		import { getSubjectById } from '@/data/practice.js'
 		import { getPracticeRecords } from '@/services/user-practice.js'
+
+	function formatRecordTime(timestamp) {
+		const date = new Date(timestamp)
+		const pad = value => value < 10 ? `0${value}` : value
+		return `${date.getMonth() + 1}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`
+	}
 
 	export default {
 		data() {
 			return {
 				subjectId: '',
-					activeView: 'history',
+					activeView: 'wrong',
 					records: [],
 					total: 0,
 					page: 1,
@@ -82,7 +88,6 @@
 					loadError: '',
 					requestId: 0,
 				tabs: [
-					{ key: 'history', label: '做题记录', unit: '道已练习', icon: 'calendar', emptyTitle: '还没有做题记录', emptyCaption: '完成练习后，记录会自动保存在这里。' },
 					{ key: 'wrong', label: '错题集', unit: '道待巩固', icon: 'refresh', emptyTitle: '暂时没有错题', emptyCaption: '继续保持，答错的题目会自动加入这里。' },
 					{ key: 'favorite', label: '收藏夹', unit: '道已收藏', icon: 'star', emptyTitle: '还没有收藏题目', emptyCaption: '刷题时点亮星标，重点题目会出现在这里。' }
 				]
@@ -98,7 +103,7 @@
 		},
 		onLoad(options) {
 			this.subjectId = options.subjectId
-			this.activeView = this.tabs.some(item => item.key === options.view) ? options.view : 'history'
+			this.activeView = this.tabs.some(item => item.key === options.view) ? options.view : 'wrong'
 		},
 		onShow() {
 			this.loadRecords()
@@ -129,7 +134,7 @@
 						})
 						if (requestId !== this.requestId) return
 						const items = (result.items || []).map(item => Object.assign({}, item, {
-							time: item.timestamp ? formatHistoryTime(item.timestamp) : ''
+							time: item.timestamp ? formatRecordTime(item.timestamp) : ''
 						}))
 						this.records = shouldReset ? items : this.records.concat(items)
 						this.total = result.total || 0
@@ -170,7 +175,7 @@
 	.records-page { min-height: 100vh; padding-bottom: 40rpx; }
 	.records-header { padding: 26rpx 24rpx 0; background: #ffffff; }
 	.subject-name { display: block; margin-bottom: 22rpx; padding-left: 8rpx; font-size: 25rpx; color: #7c828a; }
-	.record-tabs { display: grid; grid-template-columns: repeat(3, 1fr); height: 76rpx; }
+	.record-tabs { display: grid; grid-template-columns: repeat(2, 1fr); height: 76rpx; }
 	.record-tab { position: relative; display: flex; align-items: center; justify-content: center; color: #626871; font-size: 27rpx; }
 	.record-tab.active { color: #008cff; font-weight: 600; }
 	.record-tab.active::after { position: absolute; bottom: 0; left: 25%; width: 50%; height: 4rpx; border-radius: 2rpx; background: #008cff; content: ''; }

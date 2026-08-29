@@ -77,8 +77,7 @@
 		<view class="feature-grid">
 			<view class="feature-item" v-for="item in features" :key="item.key" @tap="handleFeature(item)">
 				<view class="feature-icon" :class="item.tone">
-					<uni-icons v-if="item.key === 'calculator'" custom-prefix="iconfont" type="icon-jisuanqi2" size="25" :color="item.color"></uni-icons>
-					<uni-icons v-else :type="item.icon" size="25" :color="item.color"></uni-icons>
+					<uni-icons :type="item.icon" size="25" :color="item.color"></uni-icons>
 					<view class="feature-badge" v-if="featureCount(item.key)">{{ featureCount(item.key) }}</view>
 				</view>
 				<text class="feature-title">{{ item.title }}</text>
@@ -103,7 +102,7 @@
 
 			<view class="bank-note error" v-if="userDataError" @tap="retryUserData">
 				<uni-icons type="cloud-download" size="18" color="#d34d4d"></uni-icons>
-				<text>做题记录暂存本机，点击重试云同步</text>
+				<text>做题状态暂存本机，点击重试云同步</text>
 			</view>
 
 		<uni-popup
@@ -177,12 +176,9 @@
 				},
 				today: { attempts: 0, goal: 20, percent: 0 },
 				features: [
-					{ key: 'history', title: '做题记录', desc: '回看练习轨迹', icon: 'calendar', color: '#008cff', tone: 'blue' },
 					{ key: 'wrong', title: '错题集', desc: '集中攻克薄弱项', icon: 'refresh', color: '#e65757', tone: 'red' },
 					{ key: 'favorite', title: '收藏夹', desc: '保存重点题目', icon: 'star', color: '#e7a721', tone: 'yellow' },
-					{ key: 'knowledge', title: '知识点', desc: '按考点专项练习', icon: 'map', color: '#37a172', tone: 'green' },
-					{ key: 'chapter', title: '章节练习', desc: '跟随教材顺序', icon: 'list', color: '#5966c9', tone: 'indigo' },
-					{ key: 'calculator', title: '理财计算器', desc: '做题随时验算', icon: '', color: '#59616d', tone: 'gray' }
+					{ key: 'knowledge', title: '知识点', desc: '按考点专项练习', icon: 'map', color: '#37a172', tone: 'green' }
 				]
 			}
 		},
@@ -368,11 +364,7 @@
 				uni.navigateTo({ url: `/practice-pages/question-search/question-search?subjectId=${this.currentSubjectId}` })
 			},
 			handleFeature(item) {
-				if (item.key === 'calculator') {
-					uni.navigateTo({ url: '/pages/lcjsq/lcjsq' })
-					return
-				}
-				if (item.key === 'chapter' || item.key === 'knowledge') {
+				if (item.key === 'knowledge') {
 					this.goChapter(item.key)
 					return
 				}
@@ -382,7 +374,6 @@
 			featureCount(key) {
 				if (key === 'wrong') return this.stats.wrong
 				if (key === 'favorite') return this.stats.favorite
-				if (key === 'history') return this.stats.attempted
 				return 0
 			}
 		}
@@ -428,8 +419,6 @@
 	.feature-icon.red { background: #fff0f0; }
 	.feature-icon.yellow { background: #fff8e8; }
 	.feature-icon.green { background: #ecf8f2; }
-	.feature-icon.indigo { background: #f0f1ff; }
-	.feature-icon.gray { background: #f1f3f5; }
 	.feature-badge { position: absolute; top: -10rpx; right: -14rpx; min-width: 34rpx; height: 34rpx; padding: 0 8rpx; border: 3rpx solid #ffffff; border-radius: 18rpx; box-sizing: border-box; background: #e65757; color: #ffffff; font-size: 19rpx; line-height: 31rpx; }
 	.feature-title { margin-top: 14rpx; font-size: 27rpx; font-weight: 500; }
 	.feature-desc { margin-top: 6rpx; font-size: 21rpx; color: #8c9199; white-space: nowrap; }

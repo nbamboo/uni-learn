@@ -67,6 +67,12 @@
         "enum": ["A", "B", "C", "D", "E", "F"]
       }
     },
+    "lastAnswerEventId": {
+      "bsonType": "string",
+      "minLength": 8,
+      "maxLength": 96,
+      "description": "最近一次已处理答题事件ID，用于无流水表情况下防止重试重复计数"
+    },
     "attempts": {
       "bsonType": "int",
       "minimum": 0

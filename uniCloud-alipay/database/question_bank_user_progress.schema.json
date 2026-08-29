@@ -1,0 +1,65 @@
+{
+  "bsonType": "object",
+  "description": "用户最近一次逗留的科目、章节和题目，每个用户固定只有一条",
+  "required": [
+    "_id",
+    "userId",
+    "subjectId",
+    "chapterId",
+    "questionId",
+    "progressId",
+    "progressAt",
+    "createdAt",
+    "updatedAt"
+  ],
+  "permission": {
+    "read": false,
+    "create": false,
+    "update": false,
+    "delete": false,
+    "count": false
+  },
+  "properties": {
+    "_id": {
+      "bsonType": "string",
+      "description": "直接使用 uni-id 用户ID，天然保证每个用户只有一条进度",
+      "minLength": 1,
+      "maxLength": 64
+    },
+    "userId": {
+      "bsonType": "string",
+      "description": "由 uni-id token 解析得到，禁止客户端指定其他用户",
+      "minLength": 1,
+      "maxLength": 64
+    },
+    "subjectId": {
+      "bsonType": "string",
+      "minLength": 1,
+      "maxLength": 64,
+      "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+    },
+    "chapterId": {
+      "bsonType": "string",
+      "minLength": 1,
+      "maxLength": 32
+    },
+    "questionId": {
+      "bsonType": "string",
+      "minLength": 1,
+      "maxLength": 64,
+      "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+    },
+    "progressId": {
+      "bsonType": "string",
+      "minLength": 8,
+      "maxLength": 96,
+      "description": "客户端本次进度更新ID"
+    },
+    "progressAt": {
+      "bsonType": "date",
+      "description": "用户实际逗留到该题目的时间"
+    },
+    "createdAt": { "bsonType": "date" },
+    "updatedAt": { "bsonType": "date" }
+  }
+}

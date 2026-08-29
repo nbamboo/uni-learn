@@ -41,8 +41,14 @@ function createDefaultState() {
 		favorites: [],
 		favoriteSubjects: {},
 		favoriteUpdatedAt: {},
-		history: []
+		dailyAttempts: {}
 	}
+}
+
+function localDayKey(timestamp) {
+	const date = timestamp ? new Date(timestamp) : new Date()
+	const pad = value => value < 10 ? `0${value}` : String(value)
+	return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`
 }
 
 export function getPracticeState() {
@@ -53,7 +59,20 @@ export function getPracticeState() {
 	state.favorites = Array.isArray(state.favorites) ? state.favorites : []
 	state.favoriteSubjects = state.favoriteSubjects || {}
 	state.favoriteUpdatedAt = state.favoriteUpdatedAt || {}
-	state.history = Array.isArray(state.history) ? state.history : []
+	state.dailyAttempts = state.dailyAttempts || {}
+	if (Array.isArray(state.history)) {
+		const todayKey = localDayKey()
+		state.history.forEach(item => {
+			if (!item || !item.subjectId || localDayKey(item.timestamp) !== todayKey) return
+			const savedDaily = state.dailyAttempts[item.subjectId]
+			if (!savedDaily || savedDaily.dayKey !== todayKey) {
+				state.dailyAttempts[item.subjectId] = { dayKey: todayKey, attempts: 0 }
+			}
+			state.dailyAttempts[item.subjectId].attempts += 1
+		})
+		delete state.history
+		uni.setStorageSync(PRACTICE_STATE_KEY, state)
+	}
 	return state
 }
 
@@ -115,9 +134,9 @@ export function getSubjectStats(subjectId) {
 
 export function getTodayProgress(subjectId) {
 	const state = getPracticeState()
-	const now = new Date()
-	const start = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime()
-	const attempts = state.history.filter(item => item.subjectId === subjectId && item.timestamp >= start).length
+	const todayKey = localDayKey()
+	const saved = state.dailyAttempts[subjectId]
+	const attempts = saved && saved.dayKey === todayKey ? Number(saved.attempts) || 0 : 0
 	return {
 		attempts,
 		goal: DAILY_GOAL,
@@ -172,15 +191,12 @@ export function recordAnswer(question, selected) {
 		attempts: previous ? previous.attempts + 1 : 1,
 		timestamp
 	}
-	state.history.unshift({
-		eventId,
-		questionId: question.id,
-		subjectId: question.subjectId,
-		correct,
-		selected: selected.slice(),
-		timestamp
-	})
-	state.history = state.history.slice(0, 500)
+	const todayKey = localDayKey(timestamp)
+	const daily = state.dailyAttempts[question.subjectId]
+	state.dailyAttempts[question.subjectId] = {
+		dayKey: todayKey,
+		attempts: daily && daily.dayKey === todayKey ? (Number(daily.attempts) || 0) + 1 : 1
+	}
 	savePracticeState(state)
 	queuePracticeAnswer(question, selected, { eventId, occurredAt: timestamp })
 	return correct
@@ -201,10 +217,4 @@ export function getChapterProgress(subjectId, chapterId, questionCount) {
 		total,
 		percent: total ? Math.min(100, Math.round(attempted / total * 100)) : 0
 	}
-}
-
-export function formatHistoryTime(timestamp) {
-	const date = new Date(timestamp)
-	const pad = value => value < 10 ? `0${value}` : value
-	return `${date.getMonth() + 1}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`
 }
