@@ -1,1 +1,13 @@
-[]
+[
+  {
+    "IndexName": "user_subject_progress",
+    "MgoKeySchema": {
+      "MgoIndexKeys": [
+        { "Name": "userId", "Direction": "1", "Type": "varchar" },
+        { "Name": "subjectId", "Direction": "1", "Type": "varchar" }
+      ],
+      "MgoIsUnique": false,
+      "MgoIsSparse": false
+    }
+  }
+]

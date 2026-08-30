@@ -1,0 +1,46 @@
+{
+  "bsonType": "object",
+  "description": "用户跨设备同步的答题与显示偏好，每名用户固定一条",
+  "required": [
+    "_id",
+    "userId",
+    "answerMode",
+    "nightMode",
+    "createdAt",
+    "updatedAt"
+  ],
+  "permission": {
+    "read": false,
+    "create": false,
+    "update": false,
+    "delete": false,
+    "count": false
+  },
+  "properties": {
+    "_id": {
+      "bsonType": "string",
+      "description": "与uni-id用户ID相同，确保每名用户只有一条偏好记录",
+      "minLength": 1,
+      "maxLength": 64
+    },
+    "userId": {
+      "bsonType": "string",
+      "description": "由uni-id token解析得到，客户端不能指定",
+      "minLength": 1,
+      "maxLength": 64
+    },
+    "answerMode": {
+      "bsonType": "string",
+      "enum": ["exam", "practice", "review"]
+    },
+    "nightMode": {
+      "bsonType": "bool"
+    },
+    "createdAt": {
+      "bsonType": "date"
+    },
+    "updatedAt": {
+      "bsonType": "date"
+    }
+  }
+}

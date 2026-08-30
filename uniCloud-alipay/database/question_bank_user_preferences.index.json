@@ -1,0 +1,12 @@
+[
+  {
+    "IndexName": "user_preferences_unique",
+    "MgoKeySchema": {
+      "MgoIndexKeys": [
+        { "Name": "userId", "Direction": "1", "Type": "varchar" }
+      ],
+      "MgoIsUnique": true,
+      "MgoIsSparse": false
+    }
+  }
+]

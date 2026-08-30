@@ -16,12 +16,6 @@ export async function getQuestionsBySubject(subjectId) {
 	return result.items
 }
 
-function rotateFromQuestion(list, startId) {
-	if (!startId) return list
-	const startIndex = list.findIndex(item => item.id === startId)
-	return startIndex > 0 ? list.slice(startIndex).concat(list.slice(0, startIndex)) : list
-}
-
 function applyLimit(list, limit) {
 	const value = Number(limit)
 	return value > 0 ? list.slice(0, value) : list
@@ -71,7 +65,6 @@ export async function buildPracticeQuestions(options) {
 		list = result.items
 	}
 
-	list = rotateFromQuestion(list, config.startId)
 	const defaultLimit = mode === 'smart' ? DAILY_GOAL : 0
 	return applyLimit(list, config.limit || defaultLimit)
 }

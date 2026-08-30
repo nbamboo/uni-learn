@@ -1,13 +1,17 @@
 'use strict'
 
+const crypto = require('crypto')
+
 const CATALOG_COLLECTION = 'question_bank_catalogs'
 const QUESTION_COLLECTION = 'question_bank_questions'
 const USER_COLLECTION = 'uni-id-users'
 const STATE_COLLECTION = 'question_bank_user_states'
 const STATS_COLLECTION = 'question_bank_user_stats'
 const PROGRESS_COLLECTION = 'question_bank_user_progress'
+const PREFERENCES_COLLECTION = 'question_bank_user_preferences'
 const MAX_SYNC_EVENTS = 50
 const MAX_STATE_ROWS = 2000
+const MAX_PROGRESS_ROWS = 500
 const DEFAULT_PAGE_SIZE = 20
 const MAX_PAGE_SIZE = 50
 const SUBJECT_ID_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/
@@ -15,6 +19,8 @@ const QUESTION_ID_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/
 const EVENT_ID_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/
 const ANSWER_ALIASES = ['A', 'B', 'C', 'D', 'E', 'F']
 const RECORD_TYPES = ['wrong', 'favorite']
+const PROGRESS_MODES = ['chapter', 'knowledge']
+const ANSWER_MODES = ['exam', 'practice', 'review']
 const CHINA_OFFSET_MS = 8 * 60 * 60 * 1000
 const MIN_EVENT_TIME = new Date('2020-01-01T00:00:00.000Z').getTime()
 const MAX_FUTURE_TIME = 5 * 60 * 1000
@@ -76,6 +82,11 @@ function readInteger(value, fieldName, options) {
 		invalidArgument(`${fieldName}不能大于${config.maximum}`)
 	}
 	return result
+}
+
+function readBoolean(value, fieldName) {
+	if (typeof value !== 'boolean') invalidArgument(`${fieldName}必须是布尔值`)
+	return value
 }
 
 function readSubjectId(value) {
@@ -175,8 +186,17 @@ function statsDocumentId(userId, subjectId) {
 	return `${userId}|${subjectId}`
 }
 
-function progressDocumentId(userId) {
-	return userId
+function progressDocumentId(userId, subjectId, mode, scopeKey) {
+	const scopeHash = crypto.createHash('sha256').update(scopeKey).digest('hex').slice(0, 24)
+	return `${userId}|${subjectId}|${mode}|${scopeHash}`
+}
+
+function defaultPreferences() {
+	return {
+		answerMode: 'practice',
+		nightMode: false,
+		updatedAt: 0
+	}
 }
 
 function emptyState(userId, subjectId, questionId, timestamp) {
@@ -249,13 +269,25 @@ function readSyncEvent(rawEvent, currentTime, index) {
 
 function readProgress(rawProgress, currentTime) {
 	const progress = requireObject(rawProgress, 'progress')
+	const mode = readString(progress.mode, 'progress.mode', {
+		required: true,
+		values: PROGRESS_MODES
+	})
+	const chapterId = readString(progress.chapterId, 'progress.chapterId', {
+		required: true,
+		maxLength: 32
+	})
+	const knowledge = readString(progress.knowledge, 'progress.knowledge', {
+		required: mode === 'knowledge',
+		maxLength: 128
+	})
 	return {
 		progressId: readEventId(progress.progressId),
 		subjectId: readSubjectId(progress.subjectId),
-		chapterId: readString(progress.chapterId, 'progress.chapterId', {
-			required: true,
-			maxLength: 32
-		}),
+		mode,
+		scopeKey: mode === 'chapter' ? chapterId : knowledge,
+		chapterId,
+		knowledge,
 		questionId: readQuestionId(progress.questionId),
 		occurredAt: readOccurredAt(progress.occurredAt, currentTime)
 	}
@@ -504,21 +536,33 @@ function createQuestionBankUserService(db, options) {
 				if (String(question.chapterId) !== progress.chapterId) {
 					invalidArgument('progress中的章节与题目不匹配')
 				}
-				const id = progressDocumentId(userId)
+				if (progress.mode === 'knowledge' && question.knowledge !== progress.knowledge) {
+					invalidArgument('progress中的知识点与题目不匹配')
+				}
+				const id = progressDocumentId(
+					userId,
+					progress.subjectId,
+					progress.mode,
+					progress.scopeKey
+				)
 				const saved = await getDocument(store, PROGRESS_COLLECTION, id)
 				const savedTime = getDateValue(saved && saved.progressAt)
 				if (!saved || progress.occurredAt.getTime() >= savedTime) {
-					await setDocument(store, PROGRESS_COLLECTION, id, {
+					const progressDocument = {
 						_id: id,
 						userId,
 						subjectId: progress.subjectId,
+						mode: progress.mode,
+						scopeKey: progress.scopeKey,
 						chapterId: progress.chapterId,
 						questionId: progress.questionId,
 						progressId: progress.progressId,
 						progressAt: progress.occurredAt,
 						createdAt: saved && saved.createdAt || serverDate(),
 						updatedAt: serverDate()
-					})
+					}
+					if (progress.knowledge) progressDocument.knowledge = progress.knowledge
+					await setDocument(store, PROGRESS_COLLECTION, id, progressDocument)
 				}
 				progressResult = {
 					progressId: progress.progressId,
@@ -576,26 +620,79 @@ function createQuestionBankUserService(db, options) {
 		}
 	}
 
+	async function getPreferences(event, userId) {
+		const saved = await getDocument(db, PREFERENCES_COLLECTION, userId)
+		if (!saved) return defaultPreferences()
+		return {
+			answerMode: ANSWER_MODES.indexOf(saved.answerMode) > -1
+				? saved.answerMode
+				: 'practice',
+			nightMode: Boolean(saved.nightMode),
+			updatedAt: getDateValue(saved.updatedAt)
+		}
+	}
+
+	async function updatePreferences(event, userId) {
+		const answerMode = readString(event.answerMode, 'answerMode', {
+			required: true,
+			values: ANSWER_MODES
+		})
+		const nightMode = readBoolean(event.nightMode, 'nightMode')
+		const currentTime = now()
+		const saved = await getDocument(db, PREFERENCES_COLLECTION, userId)
+		await setDocument(db, PREFERENCES_COLLECTION, userId, {
+			_id: userId,
+			userId,
+			answerMode,
+			nightMode,
+			createdAt: saved && saved.createdAt || serverDate(),
+			updatedAt: serverDate()
+		})
+		return {
+			answerMode,
+			nightMode,
+			updatedAt: currentTime.getTime()
+		}
+	}
+
 	async function getStateSnapshot(event, userId) {
 		const subjectId = readSubjectId(event.subjectId)
-		const response = await db.collection(STATE_COLLECTION)
-			.where({ userId, subjectId })
-			.field({
-				questionId: true,
-				chapterId: true,
-				knowledge: true,
-				attempted: true,
-				lastSelected: true,
-				lastCorrect: true,
-				lastAnsweredAt: true,
-				favorite: true,
-				favoriteUpdatedAt: true
-			})
-			.limit(MAX_STATE_ROWS + 1)
-			.get()
-		const rows = getRows(response)
+		const responses = await Promise.all([
+			db.collection(STATE_COLLECTION)
+				.where({ userId, subjectId })
+				.field({
+					questionId: true,
+					chapterId: true,
+					knowledge: true,
+					attempted: true,
+					lastSelected: true,
+					lastCorrect: true,
+					lastAnsweredAt: true,
+					favorite: true,
+					favoriteUpdatedAt: true
+				})
+				.limit(MAX_STATE_ROWS + 1)
+				.get(),
+			db.collection(PROGRESS_COLLECTION)
+				.where({ userId, subjectId })
+				.field({
+					mode: true,
+					scopeKey: true,
+					chapterId: true,
+					knowledge: true,
+					questionId: true,
+					progressAt: true
+				})
+				.limit(MAX_PROGRESS_ROWS + 1)
+				.get()
+		])
+		const rows = getRows(responses[0])
 		if (rows.length > MAX_STATE_ROWS) {
 			throw new QuestionBankUserError('QUESTION_BANK_USER_STATE_LIMIT', '用户题目状态超过处理上限')
+		}
+		const progressRows = getRows(responses[1])
+		if (progressRows.length > MAX_PROGRESS_ROWS) {
+			throw new QuestionBankUserError('QUESTION_BANK_USER_PROGRESS_LIMIT', '用户练习进度超过处理上限')
 		}
 		const answeredRows = rows.filter(item => item.attempted)
 			.sort((left, right) => getDateValue(right.lastAnsweredAt) - getDateValue(left.lastAnsweredAt))
@@ -605,6 +702,7 @@ function createQuestionBankUserService(db, options) {
 		const chapterAttempts = {}
 		const knowledgeAttempts = {}
 		const answerSelections = {}
+		const progressPositions = { chapter: {}, knowledge: {} }
 		answeredRows.forEach(item => {
 			if (item.chapterId) chapterAttempts[item.chapterId] = (chapterAttempts[item.chapterId] || 0) + 1
 			if (item.knowledge) knowledgeAttempts[item.knowledge] = (knowledgeAttempts[item.knowledge] || 0) + 1
@@ -612,6 +710,17 @@ function createQuestionBankUserService(db, options) {
 				answerSelections[item.questionId] = item.lastSelected
 			}
 		})
+		progressRows
+			.sort((left, right) => getDateValue(left.progressAt) - getDateValue(right.progressAt))
+			.forEach(item => {
+				if (item.mode === 'knowledge' && item.knowledge && item.questionId) {
+					progressPositions.knowledge[item.knowledge] = item.questionId
+					return
+				}
+				if ((!item.mode || item.mode === 'chapter') && item.chapterId && item.questionId) {
+					progressPositions.chapter[item.chapterId] = item.questionId
+				}
+			})
 		return {
 			subjectId,
 			answeredQuestionIds: answeredRows.map(item => item.questionId),
@@ -619,29 +728,48 @@ function createQuestionBankUserService(db, options) {
 			wrongQuestionIds: wrongRows.map(item => item.questionId),
 			favoriteQuestionIds: favoriteRows.map(item => item.questionId),
 			chapterAttempts,
-			knowledgeAttempts
+			knowledgeAttempts,
+			progressPositions
 		}
 	}
 
 	async function getProgress(event, userId) {
-		const saved = await getDocument(db, PROGRESS_COLLECTION, progressDocumentId(userId))
+		const subjectId = readSubjectId(event.subjectId)
+		const mode = readString(event.mode, 'mode', { required: true, values: PROGRESS_MODES })
+		const chapterId = readString(event.chapterId, 'chapterId', {
+			required: true,
+			maxLength: 32
+		})
+		const knowledge = readString(event.knowledge, 'knowledge', {
+			required: mode === 'knowledge',
+			maxLength: 128
+		})
+		const scopeKey = mode === 'chapter' ? chapterId : knowledge
+		const saved = await getDocument(
+			db,
+			PROGRESS_COLLECTION,
+			progressDocumentId(userId, subjectId, mode, scopeKey)
+		)
 		if (!saved) return null
-		const catalog = await loadCatalog(db, saved.subjectId)
+		const catalog = await loadCatalog(db, subjectId)
 		const response = await db.collection(QUESTION_COLLECTION)
 			.where({
-				subjectId: saved.subjectId,
+				subjectId,
 				version: catalog.activeVersion,
 				status: 1,
 				questionId: saved.questionId,
-				chapterId: saved.chapterId
+				chapterId,
+				...(mode === 'knowledge' ? { knowledge } : {})
 			})
 			.field({ questionId: true })
 			.limit(1)
 			.get()
 		if (!getRows(response).length) return null
 		return {
-			subjectId: saved.subjectId,
-			chapterId: saved.chapterId,
+			subjectId,
+			mode,
+			chapterId,
+			knowledge: mode === 'knowledge' ? knowledge : '',
 			questionId: saved.questionId,
 			progressAt: getDateValue(saved.progressAt)
 		}
@@ -703,7 +831,16 @@ function createQuestionBankUserService(db, options) {
 		}
 	}
 
-	const handlers = { syncEvents, getSummary, getStateSnapshot, getProgress, getRecords, getUserProfile }
+	const handlers = {
+		syncEvents,
+		getSummary,
+		getStateSnapshot,
+		getProgress,
+		getRecords,
+		getUserProfile,
+		getPreferences,
+		updatePreferences
+	}
 
 	async function execute(rawEvent, userId) {
 		const event = requireObject(rawEvent, '请求参数')

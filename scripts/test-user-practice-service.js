@@ -16,14 +16,18 @@ function loadService(environment) {
 		ensurePracticeUser,
 		flushPracticeEvents,
 		getChapterPracticePosition,
+		getKnowledgePracticePosition,
+		getLocalPracticePreferences,
 		getPracticeProgress,
+		getPracticePreferences,
 		getPracticeStateSnapshot,
 		getPracticeSummary,
 		getPracticeUserProfile,
 		pendingPracticeEventCount,
 		queuePracticeAnswer,
 		queuePracticeFavorite,
-		savePracticeProgress
+		savePracticeProgress,
+		updatePracticePreferences
 	}`
 	vm.createContext(environment)
 	vm.runInContext(source, environment, { filename: servicePath })
@@ -153,9 +157,73 @@ async function testServerTokenRecovery() {
 	assert.ok(removedKeys.indexOf('uni_id_token') > -1)
 }
 
+async function testPreferenceOfflineRetry() {
+	const storage = new Map()
+	const user = { uid: 'preference-user', tokenExpired: Date.now() + 60 * 60 * 1000 }
+	let cloudCalls = 0
+	const environment = {
+		uni: {
+			getStorageSync: key => storage.get(key),
+			setStorageSync: (key, value) => storage.set(key, value)
+		},
+		uniCloud: {
+			getCurrentUserInfo: () => user,
+			async callFunction(request) {
+				cloudCalls += 1
+				if (cloudCalls === 1) {
+					return {
+						result: {
+							errCode: 'QUESTION_BANK_USER_CLOUD_ERROR',
+							errMsg: 'temporary failure'
+						}
+					}
+				}
+				return {
+					result: {
+						errCode: 0,
+						data: {
+							answerMode: request.data.answerMode,
+							nightMode: request.data.nightMode,
+							updatedAt: Date.now()
+						}
+					}
+				}
+			}
+		},
+		console,
+		setTimeout,
+		clearTimeout,
+		Date,
+		Map,
+		Set,
+		Promise,
+		Math,
+		JSON,
+		Error,
+		Array,
+		Object,
+		Number,
+		String,
+		Boolean
+	}
+	const service = loadService(environment)
+	await assert.rejects(service.updatePracticePreferences({
+		answerMode: 'exam',
+		nightMode: true
+	}))
+	assert.equal(service.getLocalPracticePreferences().answerMode, 'exam')
+	assert.equal(service.getLocalPracticePreferences()._syncPending, true)
+	const retried = await service.getPracticePreferences()
+	assert.equal(retried.answerMode, 'exam')
+	assert.equal(retried.nightMode, true)
+	assert.equal(retried._syncPending, false)
+	assert.equal(cloudCalls, 2)
+}
+
 async function run() {
 	const storage = new Map()
 	const calls = []
+	let cloudPreferences = { answerMode: 'practice', nightMode: false, updatedAt: 0 }
 	const user = { uid: 'user-one', tokenExpired: Date.now() + 60 * 60 * 1000 }
 	const environment = {
 		uni: {
@@ -166,6 +234,17 @@ async function run() {
 			getCurrentUserInfo: () => user,
 			async callFunction(request) {
 				calls.push(request)
+				if (request.data.action === 'getPreferences') {
+					return { result: { errCode: 0, data: Object.assign({}, cloudPreferences) } }
+				}
+				if (request.data.action === 'updatePreferences') {
+					cloudPreferences = {
+						answerMode: request.data.answerMode,
+						nightMode: request.data.nightMode,
+						updatedAt: Date.now()
+					}
+					return { result: { errCode: 0, data: Object.assign({}, cloudPreferences) } }
+				}
 				if (request.data.action === 'syncEvents') {
 					return {
 						result: {
@@ -194,7 +273,11 @@ async function run() {
 								wrongQuestionIds: ['ipf-1'],
 								favoriteQuestionIds: ['ipf-1'],
 								chapterAttempts: { 1: 1 },
-									knowledgeAttempts: {}
+								knowledgeAttempts: { '个人理财基础': 1 },
+								progressPositions: {
+									chapter: { 1: 'ipf-1' },
+									knowledge: { '个人理财基础': 'ipf-1' }
+								}
 								}
 						}
 					}
@@ -218,7 +301,9 @@ async function run() {
 							errCode: 0,
 							data: {
 								subjectId: 'junior-personal-finance',
+								mode: request.data.mode,
 								chapterId: '1',
+								knowledge: request.data.knowledge || '',
 								questionId: 'ipf-1',
 								progressAt: Date.now()
 							}
@@ -245,10 +330,31 @@ async function run() {
 		Boolean
 	}
 	const service = loadService(environment)
+	assert.deepEqual(
+		JSON.parse(JSON.stringify(service.getLocalPracticePreferences())),
+		{ answerMode: 'practice', nightMode: false, updatedAt: 0, _syncPending: false }
+	)
+	const savedPreferences = await service.updatePracticePreferences({
+		answerMode: 'review',
+		nightMode: true
+	})
+	assert.equal(savedPreferences.answerMode, 'review')
+	assert.equal(savedPreferences.nightMode, true)
+	assert.equal(service.getLocalPracticePreferences()._syncPending, false)
+	user.uid = 'user-two'
+	assert.equal(service.getLocalPracticePreferences().answerMode, 'practice')
+	assert.equal(service.getLocalPracticePreferences().nightMode, false)
+	user.uid = 'user-one'
+	const cloudSavedPreferences = await service.getPracticePreferences()
+	assert.equal(cloudSavedPreferences.answerMode, 'review')
+	assert.equal(cloudSavedPreferences.nightMode, true)
+	assert.equal(calls.filter(item => item.data.action === 'updatePreferences').length, 1)
+	assert.equal(calls.filter(item => item.data.action === 'getPreferences').length, 1)
 	const question = {
 		id: 'ipf-1',
 		subjectId: 'junior-personal-finance',
-		chapterId: '1'
+		chapterId: '1',
+		knowledge: '个人理财基础'
 	}
 	service.savePracticeProgress(question, {
 		progressId: 'progress-event-one',
@@ -277,6 +383,51 @@ async function run() {
 	const progressCall = calls.filter(item => item.data.action === 'syncEvents')[1]
 	assert.equal(progressCall.data.events.length, 0)
 	assert.equal(progressCall.data.progress.questionId, 'ipf-1')
+	assert.equal(progressCall.data.progress.mode, 'chapter')
+
+	service.savePracticeProgress(question, {
+		mode: 'knowledge',
+		knowledge: question.knowledge,
+		progressId: 'progress-knowledge-one',
+		occurredAt: Date.now()
+	})
+	assert.equal(
+		service.getKnowledgePracticePosition(question.subjectId, question.knowledge).questionId,
+		question.id
+	)
+	await service.flushPracticeEvents()
+	const knowledgeProgressCall = calls.filter(item => item.data.action === 'syncEvents').slice(-1)[0]
+	assert.equal(knowledgeProgressCall.data.progress.mode, 'knowledge')
+	assert.equal(knowledgeProgressCall.data.progress.knowledge, question.knowledge)
+
+	const pendingProgressCallCount = calls.filter(item => item.data.action === 'syncEvents').length
+	service.savePracticeProgress(Object.assign({}, question, {
+		id: 'ipf-2',
+		knowledge: '理财业务分类'
+	}), {
+		mode: 'knowledge',
+		progressId: 'progress-knowledge-two',
+		occurredAt: Date.now() + 1
+	})
+	service.savePracticeProgress(Object.assign({}, question, {
+		id: 'ipf-3',
+		knowledge: '理财业务发展'
+	}), {
+		mode: 'knowledge',
+		progressId: 'progress-knowledge-three',
+		occurredAt: Date.now() + 2
+	})
+	assert.equal(service.pendingPracticeEventCount(), 2)
+	await service.flushPracticeEvents()
+	const multipleProgressCalls = calls
+		.filter(item => item.data.action === 'syncEvents')
+		.slice(pendingProgressCallCount)
+	assert.equal(multipleProgressCalls.length, 2)
+	assert.deepEqual(
+		multipleProgressCalls.map(item => item.data.progress.knowledge),
+		['理财业务分类', '理财业务发展']
+	)
+	assert.equal(service.pendingPracticeEventCount(), 0)
 
 	const legacyTimestamp = Date.now() - 1000
 	await service.flushPracticeEvents({
@@ -313,11 +464,18 @@ async function run() {
 	assert.equal(profile.nickname, '理财学员')
 	assert.equal(cachedProfile.weixinBound, true)
 	assert.equal(calls.filter(item => item.data.action === 'getUserProfile').length, 1)
-	const progress = await service.getPracticeProgress()
+	const progress = await service.getPracticeProgress({
+		subjectId: question.subjectId,
+		mode: 'chapter',
+		chapterId: question.chapterId
+	})
 	assert.equal(progress.chapterId, '1')
+	const progressReadCall = calls.filter(item => item.data.action === 'getProgress')[0]
+	assert.equal(progressReadCall.data.mode, 'chapter')
 	assert.equal(calls.filter(item => item.data.action === 'getProgress').length, 1)
 	await testWeixinLogin()
 	await testServerTokenRecovery()
+	await testPreferenceOfflineRetry()
 
 	console.log('user-practice service tests passed')
 }

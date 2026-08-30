@@ -2,6 +2,8 @@ const CLOUD_FUNCTION_NAME = 'questionBankUser'
 const OUTBOX_STORAGE_KEY = 'uni-learn-practice-cloud-outbox-v1'
 const PROGRESS_STORAGE_KEY = 'uni-learn-practice-cloud-progress-v1'
 const CHAPTER_POSITION_STORAGE_KEY = 'uni-learn-practice-chapter-position-v1'
+const KNOWLEDGE_POSITION_STORAGE_KEY = 'uni-learn-practice-knowledge-position-v1'
+const PREFERENCES_STORAGE_KEY = 'uni-learn-practice-preferences-v1'
 const MIGRATION_KEY_PREFIX = 'uni-learn-practice-cloud-migration-v1:'
 const UNI_ID_STORAGE_KEYS = ['uni_id_token', 'uni_id_token_expired', 'uniIdToken', 'uniIdTokenExpired']
 const MAX_OUTBOX_EVENTS = 2000
@@ -10,7 +12,9 @@ const SNAPSHOT_CACHE_TTL = 2 * 60 * 1000
 const SUMMARY_CACHE_TTL = 30 * 1000
 const PROFILE_CACHE_TTL = 5 * 60 * 1000
 const RETRY_DELAY = 180
-const MAX_CHAPTER_POSITIONS = 100
+const MAX_PRACTICE_POSITIONS = 200
+const MAX_PENDING_PROGRESS = 500
+const ANSWER_MODES = ['exam', 'practice', 'review']
 
 const snapshotCache = new Map()
 const summaryCache = new Map()
@@ -95,6 +99,55 @@ function cloneValue(value) {
 	return result
 }
 
+function normalizePracticePreferences(value) {
+	const source = isObject(value) ? value : {}
+	return {
+		answerMode: ANSWER_MODES.indexOf(source.answerMode) > -1
+			? source.answerMode
+			: 'practice',
+		nightMode: Boolean(source.nightMode),
+		updatedAt: Number(source.updatedAt) || 0
+	}
+}
+
+function preferencesStorageKey() {
+	if (typeof uniCloud === 'undefined' || typeof uniCloud.getCurrentUserInfo !== 'function') {
+		return PREFERENCES_STORAGE_KEY
+	}
+	const user = uniCloud.getCurrentUserInfo() || {}
+	return user.uid ? `${PREFERENCES_STORAGE_KEY}:${user.uid}` : PREFERENCES_STORAGE_KEY
+}
+
+function readPreferencesEntry() {
+	const storageKey = preferencesStorageKey()
+	let saved = getStorage(storageKey)
+	if ((!saved || saved.version !== 1) && storageKey !== PREFERENCES_STORAGE_KEY) {
+		saved = getStorage(PREFERENCES_STORAGE_KEY)
+	}
+	if (!saved || saved.version !== 1 || !isObject(saved.preferences)) {
+		return {
+			preferences: normalizePracticePreferences(),
+			dirty: false
+		}
+	}
+	return {
+		preferences: normalizePracticePreferences(saved.preferences),
+		dirty: Boolean(saved.dirty)
+	}
+}
+
+function savePreferencesEntry(preferences, dirty) {
+	const normalized = normalizePracticePreferences(preferences)
+	const storageKey = preferencesStorageKey()
+	setStorage(storageKey, {
+		version: 1,
+		preferences: normalized,
+		dirty: Boolean(dirty)
+	})
+	if (storageKey !== PREFERENCES_STORAGE_KEY) removeStorage(PREFERENCES_STORAGE_KEY)
+	return normalized
+}
+
 function hashString(value) {
 	let hash = 2166136261
 	for (let index = 0; index < value.length; index += 1) {
@@ -127,43 +180,96 @@ function saveOutbox(events) {
 	})
 }
 
-function readPendingProgress() {
-	const saved = getStorage(PROGRESS_STORAGE_KEY)
-	if (!saved || saved.version !== 1 || !isObject(saved.progress)) return null
-	return cloneValue(saved.progress)
+function progressScopeKey(progress) {
+	if (!progress || !progress.subjectId) return ''
+	const mode = progress.mode === 'knowledge' ? 'knowledge' : 'chapter'
+	const scope = mode === 'knowledge' ? progress.knowledge : progress.chapterId
+	return scope === undefined || scope === null || scope === ''
+		? ''
+		: `${progress.subjectId}|${mode}|${scope}`
 }
 
-function savePendingProgress(progress) {
-	if (!progress) {
-		removeStorage(PROGRESS_STORAGE_KEY)
+function readPendingProgresses() {
+	const saved = getStorage(PROGRESS_STORAGE_KEY)
+	if (!saved || (saved.version !== 1 && saved.version !== 2)) return []
+	const progresses = []
+	if (isObject(saved.progress)) progresses.push(saved.progress)
+	if (isObject(saved.progresses)) {
+		Object.keys(saved.progresses).forEach(key => {
+			if (isObject(saved.progresses[key])) progresses.push(saved.progresses[key])
+		})
+	}
+	const latestByScope = {}
+	progresses.forEach(progress => {
+		const key = progressScopeKey(progress)
+		if (!key) return
+		const savedProgress = latestByScope[key]
+		if (!savedProgress || Number(progress.occurredAt) >= Number(savedProgress.occurredAt)) {
+			latestByScope[key] = cloneValue(progress)
+		}
+	})
+	return Object.keys(latestByScope)
+		.map(key => latestByScope[key])
+		.sort((left, right) => Number(left.occurredAt) - Number(right.occurredAt))
+}
+
+function writePendingProgresses(progresses) {
+	const limited = progresses
+		.slice()
+		.sort((left, right) => Number(right.occurredAt) - Number(left.occurredAt))
+		.slice(0, MAX_PENDING_PROGRESS)
+	if (!limited.length) {
+		if (removeStorage(PROGRESS_STORAGE_KEY)) return true
 		return setStorage(PROGRESS_STORAGE_KEY, null)
 	}
+	const progressMap = {}
+	limited.forEach(progress => {
+		const key = progressScopeKey(progress)
+		if (key) progressMap[key] = cloneValue(progress)
+	})
 	return setStorage(PROGRESS_STORAGE_KEY, {
-		version: 1,
-		progress: cloneValue(progress)
+		version: 2,
+		progresses: progressMap
 	})
 }
 
-function readChapterPositions() {
-	const saved = getStorage(CHAPTER_POSITION_STORAGE_KEY)
+function savePendingProgress(progress) {
+	if (!progress) return writePendingProgresses([])
+	const key = progressScopeKey(progress)
+	if (!key) return false
+	const pending = readPendingProgresses().filter(item => progressScopeKey(item) !== key)
+	pending.push(progress)
+	return writePendingProgresses(pending)
+}
+
+function removePendingProgress(progress) {
+	const key = progressScopeKey(progress)
+	const remaining = readPendingProgresses().filter(item => {
+		return progressScopeKey(item) !== key || item.progressId !== progress.progressId
+	})
+	return writePendingProgresses(remaining)
+}
+
+function readPracticePositions(storageKey) {
+	const saved = getStorage(storageKey)
 	if (!saved || saved.version !== 1 || !isObject(saved.positions)) return {}
 	return cloneValue(saved.positions)
 }
 
-function saveChapterPosition(progress) {
-	const positions = readChapterPositions()
-	const positionKey = `${progress.subjectId}|${progress.chapterId}`
+function savePracticePosition(storageKey, positionKey, progress) {
+	const positions = readPracticePositions(storageKey)
 	positions[positionKey] = {
 		subjectId: progress.subjectId,
 		chapterId: progress.chapterId,
+		knowledge: progress.knowledge || '',
 		questionId: progress.questionId,
 		updatedAt: progress.occurredAt
 	}
 	const positionKeys = Object.keys(positions).sort((left, right) => {
 		return Number(positions[right].updatedAt) - Number(positions[left].updatedAt)
 	})
-	positionKeys.slice(MAX_CHAPTER_POSITIONS).forEach(key => delete positions[key])
-	setStorage(CHAPTER_POSITION_STORAGE_KEY, { version: 1, positions })
+	positionKeys.slice(MAX_PRACTICE_POSITIONS).forEach(key => delete positions[key])
+	setStorage(storageKey, { version: 1, positions })
 }
 
 function enqueueEvent(event) {
@@ -218,24 +324,48 @@ export function savePracticeProgress(question, options) {
 	const config = options || {}
 	const subjectId = question && question.subjectId
 	const chapterId = question && (question.chapterId || config.chapterId)
+	const knowledge = config.knowledge || question && question.knowledge || ''
+	const mode = config.mode === 'knowledge' ? 'knowledge' : 'chapter'
 	const questionId = question && (question.questionId || question.id)
 	if (!subjectId || chapterId === undefined || chapterId === null || !questionId) return null
+	if (mode === 'knowledge' && !knowledge) return null
 	const progress = {
 		progressId: config.progressId || createPracticeEventId('progress'),
 		subjectId,
+		mode,
 		chapterId: String(chapterId),
+		knowledge: mode === 'knowledge' ? knowledge : '',
 		questionId,
 		occurredAt: Number(config.occurredAt) || Date.now()
 	}
-	saveChapterPosition(progress)
+	if (mode === 'knowledge') {
+		savePracticePosition(
+			KNOWLEDGE_POSITION_STORAGE_KEY,
+			`${progress.subjectId}|${progress.knowledge}`,
+			progress
+		)
+	} else {
+		savePracticePosition(
+			CHAPTER_POSITION_STORAGE_KEY,
+			`${progress.subjectId}|${progress.chapterId}`,
+			progress
+		)
+	}
 	savePendingProgress(progress)
 	return progress.progressId
 }
 
 export function getChapterPracticePosition(subjectId, chapterId) {
 	if (!subjectId || chapterId === undefined || chapterId === null) return null
-	const positions = readChapterPositions()
+	const positions = readPracticePositions(CHAPTER_POSITION_STORAGE_KEY)
 	const position = positions[`${subjectId}|${String(chapterId)}`]
+	return position && position.questionId ? cloneValue(position) : null
+}
+
+export function getKnowledgePracticePosition(subjectId, knowledge) {
+	if (!subjectId || !knowledge) return null
+	const positions = readPracticePositions(KNOWLEDGE_POSITION_STORAGE_KEY)
+	const position = positions[`${subjectId}|${knowledge}`]
 	return position && position.questionId ? cloneValue(position) : null
 }
 
@@ -453,8 +583,8 @@ export async function flushPracticeEvents(options) {
 		const user = await ensurePracticeUser()
 		if (config.localState) prepareLegacyMigration(user.uid, config.localState)
 		let events = readOutbox()
-		while (events.length || (progressFlushRequested && readPendingProgress())) {
-			const progress = progressFlushRequested ? readPendingProgress() : null
+		while (events.length || (progressFlushRequested && readPendingProgresses().length)) {
+			const progress = progressFlushRequested ? readPendingProgresses()[0] : null
 			const batch = events.slice(0, SYNC_BATCH_SIZE)
 			const payload = { events: batch }
 			if (progress) payload.progress = progress
@@ -471,10 +601,8 @@ export async function flushPracticeEvents(options) {
 				if (!progressResult || progressResult.progressId !== progress.progressId || !progressResult.saved) {
 					throw new UserPracticeServiceError('QUESTION_BANK_USER_INVALID_RESPONSE', '同步服务未确认学习进度')
 				}
-				const currentProgress = readPendingProgress()
-				if (currentProgress && currentProgress.progressId === progress.progressId) {
-					savePendingProgress(null)
-				}
+				removePendingProgress(progress)
+				invalidateUserPracticeCache(progress.subjectId)
 			}
 			events = readOutbox().filter(item => !completedIds.has(item.eventId))
 			saveOutbox(events)
@@ -562,9 +690,15 @@ export async function getPracticeRecords(params) {
 	})
 }
 
-export async function getPracticeProgress() {
+export async function getPracticeProgress(options) {
+	const input = options || {}
 	await flushPracticeEvents()
-	return executeCloudCall('getProgress')
+	return executeCloudCall('getProgress', {
+		subjectId: input.subjectId,
+		mode: input.mode,
+		chapterId: input.chapterId,
+		knowledge: input.knowledge
+	})
 }
 
 export async function getPracticeUserProfile(options) {
@@ -578,23 +712,65 @@ export async function getPracticeUserProfile(options) {
 	return setCached(userProfileCache, user.uid, profile, PROFILE_CACHE_TTL)
 }
 
+export function getLocalPracticePreferences() {
+	const entry = readPreferencesEntry()
+	return Object.assign({}, entry.preferences, {
+		_syncPending: entry.dirty
+	})
+}
+
+export async function getPracticePreferences(options) {
+	const config = options || {}
+	const localEntry = readPreferencesEntry()
+	try {
+		const result = localEntry.dirty
+			? await executeCloudCall('updatePreferences', localEntry.preferences)
+			: await executeCloudCall('getPreferences')
+		const saved = savePreferencesEntry(result, false)
+		return Object.assign({}, saved, { _syncPending: false })
+	} catch (error) {
+		if (config.localFallback === false) throw error
+		return Object.assign({}, localEntry.preferences, {
+			_syncPending: localEntry.dirty,
+			_syncError: error && (error.errMsg || error.message) || '答题设置同步失败'
+		})
+	}
+}
+
+export async function updatePracticePreferences(preferences) {
+	const next = normalizePracticePreferences(Object.assign(
+		{},
+		readPreferencesEntry().preferences,
+		preferences,
+		{ updatedAt: Date.now() }
+	))
+	savePreferencesEntry(next, true)
+	const result = await executeCloudCall('updatePreferences', next)
+	const saved = savePreferencesEntry(result, false)
+	return Object.assign({}, saved, { _syncPending: false })
+}
+
 export function pendingPracticeEventCount() {
-	return readOutbox().length + (readPendingProgress() ? 1 : 0)
+	return readOutbox().length + readPendingProgresses().length
 }
 
 export default {
 	ensurePracticeUser,
 	flushPracticeEvents,
 	getChapterPracticePosition,
+	getKnowledgePracticePosition,
 	getCurrentPracticeUser,
 	getPracticeProgress,
+	getPracticePreferences,
 	getPracticeRecords,
 	getPracticeStateSnapshot,
 	getPracticeSummary,
 	getPracticeUserProfile,
+	getLocalPracticePreferences,
 	pendingPracticeEventCount,
 	practiceUserLoggedIn,
 	queuePracticeAnswer,
 	queuePracticeFavorite,
-	savePracticeProgress
+	savePracticeProgress,
+	updatePracticePreferences
 }

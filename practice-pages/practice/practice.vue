@@ -1,15 +1,15 @@
 <template>
-	<view class="loading-state" v-if="loading">
+	<view class="loading-state" :class="{ 'night-mode': nightMode }" v-if="loading">
 		<uni-load-more status="loading"></uni-load-more>
 	</view>
 
-	<view class="empty-state error-state" v-else-if="loadError">
+	<view class="empty-state error-state" :class="{ 'night-mode': nightMode }" v-else-if="loadError">
 		<uni-icons type="refreshempty" size="42" color="#d34d4d"></uni-icons>
 		<text>{{ loadError }}</text>
 		<button @tap="retryLoad">重新加载</button>
 	</view>
 
-	<view class="practice-page" v-else-if="currentQuestion">
+	<view class="practice-page" :class="{ 'night-mode': nightMode }" v-else-if="currentQuestion">
 		<view class="progress-track">
 			<view class="progress-fill" :style="{ width: progressPercent + '%' }"></view>
 		</view>
@@ -65,13 +65,20 @@
 								>
 									<view class="option-alias">{{ option.alias }}</view>
 									<text class="option-text">{{ option.text }}</text>
-									<uni-icons v-if="slide.submitted && slide.question.answer.indexOf(option.alias) > -1" type="checkmarkempty" size="21" color="#28a665"></uni-icons>
-									<uni-icons v-else-if="slide.submitted && slide.selected.indexOf(option.alias) > -1" type="closeempty" size="21" color="#e45151"></uni-icons>
+									<uni-icons v-if="slide.revealed && slide.question.answer.indexOf(option.alias) > -1" type="checkmarkempty" size="21" color="#28a665"></uni-icons>
+									<uni-icons v-else-if="slide.revealed && slide.selected.indexOf(option.alias) > -1" type="closeempty" size="21" color="#e45151"></uni-icons>
 								</view>
 							</view>
 
-							<view class="analysis-panel" v-if="slide.submitted">
-								<view class="result-line" :class="slide.correct ? 'correct-text' : 'wrong-text'">
+							<button
+								class="confirm-answer-button"
+								v-if="canConfirmSlide(slide)"
+								:disabled="!slide.selected.length"
+								@tap="confirmCurrentAnswer"
+							>确认答案</button>
+
+							<view class="analysis-panel" v-if="slide.revealed">
+								<view class="result-line" v-if="slide.submitted" :class="slide.correct ? 'correct-text' : 'wrong-text'">
 									<uni-icons :type="slide.correct ? 'checkmarkempty' : 'closeempty'" size="22" :color="slide.correct ? '#28a665' : '#e45151'"></uni-icons>
 									<text>{{ slide.correct ? '回答正确' : '回答错误' }}</text>
 								</view>
@@ -95,12 +102,20 @@
 			</movable-view>
 		</movable-area>
 
-		<view class="bottom-toolbar">
-			<view class="toolbar-stat correct-text">
+		<view class="bottom-toolbar" :class="{ 'exam-toolbar': examInProgress }">
+			<view class="toolbar-stat answered-text" v-if="examInProgress">
+				<text>已答</text>
+				<text>{{ answeredCount }}</text>
+			</view>
+			<view class="toolbar-stat unanswered-text" v-if="examInProgress">
+				<text>未答</text>
+				<text>{{ questionList.length - answeredCount }}</text>
+			</view>
+			<view class="toolbar-stat correct-text" v-if="!examInProgress">
 				<uni-icons type="checkmarkempty" size="22" color="#28a665"></uni-icons>
 				<text>{{ correctCount }}</text>
 			</view>
-			<view class="toolbar-stat wrong-text">
+			<view class="toolbar-stat wrong-text" v-if="!examInProgress">
 				<uni-icons type="closeempty" size="22" color="#e45151"></uni-icons>
 				<text>{{ wrongCount }}</text>
 			</view>
@@ -111,6 +126,9 @@
 			<view class="toolbar-command" @tap="favoriteCurrent">
 				<uni-icons :type="favorite ? 'star-filled' : 'star'" size="24" :color="favorite ? '#e7a721' : '#69707a'"></uni-icons>
 				<text>{{ favorite ? '已收藏' : '收藏' }}</text>
+			</view>
+			<view class="toolbar-submit" v-if="examInProgress" @tap="submitExam">
+				<text>交卷</text>
 			</view>
 		</view>
 
@@ -160,7 +178,7 @@
 		</uni-popup>
 	</view>
 
-	<view class="empty-state" v-else>
+	<view class="empty-state" :class="{ 'night-mode': nightMode }" v-else>
 		<uni-icons type="info" size="42" color="#a2a8b0"></uni-icons>
 		<text>当前练习没有可用题目</text>
 		<button @tap="goBack">返回刷题首页</button>
@@ -179,6 +197,8 @@
 	import { getAllPracticeQuestions } from '@/services/question-bank.js'
 	import {
 		flushPracticeEvents,
+		getLocalPracticePreferences,
+		getPracticePreferences,
 		getPracticeStateSnapshot,
 		savePracticeProgress
 	} from '@/services/user-practice.js'
@@ -189,6 +209,7 @@
 			FinanceCalculator
 		},
 		data() {
+			const localPreferences = getLocalPracticePreferences()
 			return {
 				questionList: [],
 				practiceConfig: null,
@@ -198,6 +219,10 @@
 				lastResult: false,
 				favorite: false,
 				sessionAnswers: {},
+				draftAnswers: {},
+				answerMode: localPreferences.answerMode,
+				nightMode: localPreferences.nightMode,
+				examSubmitted: false,
 				correctCount: 0,
 				wrongCount: 0,
 				scrollTop: 0,
@@ -224,14 +249,18 @@
 					const index = this.currentIndex + offset
 					const question = this.questionList[index] || null
 					const answer = question ? this.sessionAnswers[question.id] : null
+					const draft = question ? this.draftAnswers[question.id] : null
 					return {
 						slot: slots[slotIndex],
 						offset,
 						index,
 						question,
 						submitted: Boolean(answer),
-						selected: answer ? answer.selected : [],
-						correct: answer ? answer.correct : false
+						selected: answer ? answer.selected : (draft || []),
+						correct: answer ? answer.correct : false,
+						revealed: this.answerMode === 'review'
+							|| (this.answerMode === 'exam' && this.examSubmitted)
+							|| Boolean(answer)
 					}
 				})
 			},
@@ -239,7 +268,14 @@
 				return this.questionList.length ? Math.round((this.currentIndex + 1) / this.questionList.length * 100) : 0
 			},
 			answeredCount() {
+				if (this.examInProgress) {
+					return Object.keys(this.draftAnswers)
+						.filter(questionId => this.draftAnswers[questionId].length).length
+				}
 				return Object.keys(this.sessionAnswers).length
+			},
+			examInProgress() {
+				return this.answerMode === 'exam' && !this.examSubmitted
 			}
 		},
 		onLoad(options) {
@@ -255,6 +291,7 @@
 				limit: options.limit
 			}
 			this.setNavigationTitle()
+			this.applyNavigationTheme()
 			this.loadQuestions()
 		},
 		onShow() {
@@ -267,12 +304,27 @@
 			this.syncCurrentProgress()
 		},
 		methods: {
+			async loadAnswerPreferences() {
+				const preferences = await getPracticePreferences()
+				this.answerMode = preferences.answerMode
+				this.nightMode = Boolean(preferences.nightMode)
+				this.applyNavigationTheme()
+			},
+			applyNavigationTheme() {
+				uni.setNavigationBarColor({
+					frontColor: this.nightMode ? '#ffffff' : '#000000',
+					backgroundColor: this.nightMode ? '#171c22' : '#ffffff'
+				})
+			},
 			async loadQuestions(forceRefresh) {
 				this.loading = true
 				this.loadError = ''
 				this.questionList = []
 				this.currentIndex = 0
+				this.draftAnswers = {}
+				this.examSubmitted = false
 				try {
+					await this.loadAnswerPreferences()
 					if (this.mode === 'chapter') {
 						const result = await getAllPracticeQuestions(Object.assign({}, this.practiceConfig, {
 							pageSize: 50
@@ -327,6 +379,12 @@
 				uni.setNavigationBarTitle({ title: titles[this.mode] || '顺序练习' })
 			},
 			restoreSessionAnswers(snapshot) {
+				if (this.answerMode !== 'practice') {
+					this.sessionAnswers = {}
+					this.correctCount = 0
+					this.wrongCount = 0
+					return
+				}
 				const questionById = {}
 				this.questionList.forEach(question => {
 					questionById[question.id] = question
@@ -364,19 +422,28 @@
 				const question = this.questionList[index]
 				if (!question) return
 				const saved = this.sessionAnswers[question.id]
-				this.selectedAnswers = saved ? saved.selected.slice() : []
+				const draft = this.draftAnswers[question.id]
+				this.selectedAnswers = saved
+					? saved.selected.slice()
+					: (draft ? draft.slice() : [])
 				this.submitted = Boolean(saved)
 				this.lastResult = saved ? saved.correct : false
 				this.favorite = this.favoriteQuestionIds.indexOf(question.id) > -1 || isFavorite(question.id)
 				this.scrollTop = this.scrollTop === 0 ? 1 : 0
-				savePracticeProgress(question, { chapterId: this.practiceConfig.chapterId })
+				this.saveCurrentQuestionProgress(question)
+			},
+			saveCurrentQuestionProgress(question) {
+				if (!question || ['chapter', 'knowledge'].indexOf(this.mode) === -1) return null
+				return savePracticeProgress(question, {
+					mode: this.mode,
+					chapterId: this.practiceConfig.chapterId,
+					knowledge: this.practiceConfig.knowledge
+				})
 			},
 			syncCurrentProgress() {
-				if (this.progressSavedOnLeave || !this.currentQuestion) return
+				if (this.progressSavedOnLeave) return
 				this.progressSavedOnLeave = true
-				savePracticeProgress(this.currentQuestion, {
-					chapterId: this.practiceConfig.chapterId
-				})
+				this.saveCurrentQuestionProgress(this.currentQuestion)
 				flushPracticeEvents().catch(() => {
 					// 进度已持久化在本机，下次启动会自动重试。
 				})
@@ -435,7 +502,10 @@
 					return
 				}
 				this.settleCard()
-				uni.showToast({ title: '已经是最后一题', icon: 'none' })
+				uni.showToast({
+					title: this.examInProgress ? '已到最后一题，可点击交卷' : '已经是最后一题',
+					icon: 'none'
+				})
 			},
 			swipeToPreviousQuestion() {
 				if (this.currentIndex > 0) {
@@ -500,20 +570,54 @@
 				return systemInfo.windowWidth || 375
 			},
 			chooseOption(alias) {
-				if (this.submitted) return
-				this.selectedAnswers = [alias]
-				this.submitAnswer()
+				if (this.submitted || this.answerMode === 'review'
+					|| (this.answerMode === 'exam' && this.examSubmitted)) return
+				if (this.currentQuestion.type === 'multiple') {
+					const selected = this.selectedAnswers.slice()
+					const index = selected.indexOf(alias)
+					if (index > -1) selected.splice(index, 1)
+					else selected.push(alias)
+					this.selectedAnswers = selected
+				} else {
+					this.selectedAnswers = [alias]
+				}
+				this.saveCurrentDraft()
+				if (this.answerMode === 'practice' && this.currentQuestion.type !== 'multiple') {
+					this.submitAnswer()
+				}
+			},
+			saveCurrentDraft() {
+				if (!this.currentQuestion) return
+				if (this.selectedAnswers.length) {
+					this.$set(this.draftAnswers, this.currentQuestion.id, this.selectedAnswers.slice())
+				} else {
+					this.$delete(this.draftAnswers, this.currentQuestion.id)
+				}
 			},
 			chooseSlideOption(slide, alias) {
 				if (slide.offset === 0) this.chooseOption(alias)
 			},
 			optionClass(slide, alias) {
-				if (!slide.submitted) return ''
+				if (!slide.revealed) return slide.selected.indexOf(alias) > -1 ? 'selected' : ''
 				if (slide.question.answer.indexOf(alias) > -1) return 'correct'
 				if (slide.selected.indexOf(alias) > -1) return 'wrong'
 				return 'disabled'
 			},
+			canConfirmSlide(slide) {
+				return slide.offset === 0
+					&& this.answerMode === 'practice'
+					&& slide.question.type === 'multiple'
+					&& !slide.submitted
+			},
+			confirmCurrentAnswer() {
+				if (!this.selectedAnswers.length) {
+					uni.showToast({ title: '请至少选择一个选项', icon: 'none' })
+					return
+				}
+				this.submitAnswer()
+			},
 			submitAnswer() {
+				if (!this.currentQuestion || !this.selectedAnswers.length || this.submitted) return
 				const correct = recordAnswer(this.currentQuestion, this.selectedAnswers)
 				this.$set(this.sessionAnswers, this.currentQuestion.id, {
 					selected: this.selectedAnswers.slice(),
@@ -521,8 +625,46 @@
 				})
 				this.lastResult = correct
 				this.submitted = true
+				this.$delete(this.draftAnswers, this.currentQuestion.id)
 				if (correct) this.correctCount += 1
 				else this.wrongCount += 1
+			},
+			submitExam() {
+				if (!this.examInProgress) return
+				const unanswered = this.questionList.length - this.answeredCount
+				uni.showModal({
+					title: '确认交卷',
+					content: unanswered > 0
+						? `还有 ${unanswered} 道题未作答，确认现在交卷吗？`
+						: '所有题目均已作答，确认提交试卷吗？',
+					confirmText: '确认交卷',
+					success: result => {
+						if (result.confirm) this.finalizeExam()
+					}
+				})
+			},
+			finalizeExam() {
+				let correctCount = 0
+				let wrongCount = 0
+				this.questionList.forEach(question => {
+					const selected = this.draftAnswers[question.id]
+					if (!selected || !selected.length) return
+					const correct = recordAnswer(question, selected)
+					this.$set(this.sessionAnswers, question.id, {
+						selected: selected.slice(),
+						correct
+					})
+					if (correct) correctCount += 1
+					else wrongCount += 1
+				})
+				this.correctCount = correctCount
+				this.wrongCount = wrongCount
+				this.examSubmitted = true
+				this.loadQuestion(this.currentIndex)
+				flushPracticeEvents({ includeProgress: false }).catch(() => {
+					// 答题事件已保存在本机队列，下次进入时继续同步。
+				})
+				uni.showToast({ title: '交卷成功', icon: 'success' })
 			},
 			previousQuestion() {
 				if (this.currentIndex > 0) this.animateToQuestion(this.currentIndex - 1, 1)
@@ -532,9 +674,13 @@
 					this.animateToQuestion(this.currentIndex + 1, -1)
 					return
 				}
+				const isReview = this.answerMode === 'review'
+				const unanswered = this.questionList.length - this.answeredCount
 				uni.showModal({
-					title: '本组练习完成',
-					content: `答对 ${this.correctCount} 题，答错 ${this.wrongCount} 题`,
+					title: isReview ? '本组背题完成' : '本组练习完成',
+					content: isReview
+						? `已浏览 ${this.questionList.length} 道题`
+						: `答对 ${this.correctCount} 题，答错 ${this.wrongCount} 题${unanswered ? `，未答 ${unanswered} 题` : ''}`,
 					showCancel: false,
 					confirmText: '返回首页',
 					success: () => uni.navigateBack()
@@ -562,8 +708,10 @@
 			answerNumberClass(index) {
 				const question = this.questionList[index]
 				const answer = this.sessionAnswers[question.id]
+				const draft = this.draftAnswers[question.id]
 				return {
 					current: index === this.currentIndex,
+					answered: !answer && draft && draft.length,
 					correct: answer && answer.correct,
 					wrong: answer && !answer.correct
 				}
@@ -623,7 +771,9 @@
 	.correct .option-alias { border-color: #28a665; background: #28a665; color: #ffffff; }
 	.wrong .option-alias { border-color: #e45151; background: #e45151; color: #ffffff; }
 	.option-text { flex: 1; font-size: 30rpx; line-height: 1.6; }
-	.question-nav button::after, .empty-state button::after { border: 0; }
+	.question-nav button::after, .confirm-answer-button::after, .empty-state button::after { border: 0; }
+	.confirm-answer-button { height: 82rpx; margin: 30rpx 0 0; border: 0; border-radius: 8rpx; background: #008cff; color: #ffffff; font-size: 28rpx; line-height: 82rpx; }
+	.confirm-answer-button[disabled] { background: #c9d0d8; color: #ffffff; }
 	.analysis-panel { margin-top: 36rpx; padding-top: 28rpx; border-top: 1rpx solid #e6e9ed; }
 	.result-line { display: flex; align-items: center; gap: 8rpx; font-size: 30rpx; font-weight: 600; }
 	.correct-text { color: #28a665; }
@@ -638,8 +788,12 @@
 	.previous-button { border: 2rpx solid #cfd3d8; background: #ffffff; color: #5f6570; }
 	.next-button { background: #008cff; color: #ffffff; }
 	.bottom-toolbar { position: fixed; right: 0; bottom: 0; left: 0; z-index: 20; display: grid; grid-template-columns: 0.75fr 0.75fr 1.2fr 1.2fr; height: calc(100rpx + env(safe-area-inset-bottom)); padding: 0 12rpx env(safe-area-inset-bottom); border-top: 1rpx solid #e0e3e7; box-sizing: border-box; background: #ffffff; }
+	.bottom-toolbar.exam-toolbar { grid-template-columns: 0.8fr 0.8fr 1fr 1fr 1fr; }
 	.toolbar-stat, .toolbar-command { display: flex; align-items: center; justify-content: center; gap: 8rpx; font-size: 26rpx; }
 	.toolbar-command { color: #4f555d; }
+	.answered-text { color: #008cff; }
+	.unanswered-text { color: #7c838c; }
+	.toolbar-submit { display: flex; align-items: center; justify-content: center; align-self: center; height: 66rpx; border-radius: 34rpx; background: #008cff; color: #ffffff; font-size: 27rpx; font-weight: 600; }
 	.answer-sheet { padding: 28rpx 28rpx calc(28rpx + env(safe-area-inset-bottom)); border-radius: 16rpx 16rpx 0 0; background: #ffffff; }
 	.answer-sheet-header { padding-bottom: 24rpx; border-bottom: 1rpx solid #edf0f3; }
 	.answer-sheet-header > view:first-child { display: flex; flex-direction: column; }
@@ -650,6 +804,7 @@
 	.answer-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 20rpx; padding: 28rpx 4rpx 12rpx; }
 	.answer-number { display: flex; align-items: center; justify-content: center; width: 80rpx; height: 80rpx; border: 2rpx solid #d5d9de; border-radius: 50%; box-sizing: border-box; color: #5e646d; font-size: 26rpx; }
 	.answer-number.current { border-color: #008cff; color: #008cff; box-shadow: 0 0 0 4rpx #eaf5ff; }
+	.answer-number.answered { border-color: #008cff; background: #eef7ff; color: #0074d4; }
 	.answer-number.correct { border-color: #28a665; background: #eff9f4; color: #218a54; }
 	.answer-number.wrong { border-color: #e45151; background: #fff2f2; color: #c94242; }
 	.calculator-sheet { height: 68vh; overflow: hidden; border-radius: 16rpx 16rpx 0 0; background: #ffffff; }
@@ -662,4 +817,40 @@
 	.empty-state text { margin-top: 20rpx; }
 	.empty-state button { margin-top: 30rpx; border-radius: 40rpx; background: #008cff; color: #ffffff; font-size: 28rpx; }
 	.error-state { color: #bd3f3f; }
+	.loading-state.night-mode,
+	.empty-state.night-mode { min-height: 100vh; background: #12171d; color: #aeb7c1; box-sizing: border-box; }
+
+	.practice-page.night-mode { background: #12171d; color: #e6e9ed; }
+	.night-mode .progress-track { background: #303943; }
+	.night-mode .question-shell,
+	.night-mode .bottom-toolbar,
+	.night-mode .answer-sheet,
+	.night-mode .calculator-sheet { background: #1b222a; }
+	.night-mode .question-shell.is-dragging { box-shadow: 0 16rpx 36rpx rgba(0, 0, 0, 0.36); }
+	.night-mode .type-badge { background: #17364d; color: #65baff; }
+	.night-mode .question-count,
+	.night-mode .chapter-name,
+	.night-mode .toolbar-command { color: #b6bec8; }
+	.night-mode .knowledge-name,
+	.night-mode .answer-sheet-caption { color: #89939e; }
+	.night-mode .question-meta,
+	.night-mode .analysis-panel,
+	.night-mode .answer-sheet-header,
+	.night-mode .calculator-sheet-header { border-color: #303943; }
+	.night-mode .calculator-button { border-color: #29506e; background: #172e40; }
+	.night-mode .option-item { border-color: #3a444f; background: #202832; }
+	.night-mode .option-item.selected { border-color: #168ee5; background: #17364d; }
+	.night-mode .option-item.correct { border-color: #3c9266; background: #183328; }
+	.night-mode .option-item.wrong { border-color: #b85b5b; background: #3b2327; }
+	.night-mode .option-item.disabled { color: #929ca7; }
+	.night-mode .option-alias { border-color: #596470; color: #cbd2da; }
+	.night-mode .analysis-label,
+	.night-mode .calculator-sheet-title { color: #e4e8ed; }
+	.night-mode .explanation-text { color: #bec6cf; }
+	.night-mode .previous-button { border-color: #4a5561; background: #202832; color: #c7ced6; }
+	.night-mode .bottom-toolbar { border-color: #303943; }
+	.night-mode .unanswered-text { color: #9aa4af; }
+	.night-mode .answer-number { border-color: #4b5662; color: #bbc3cc; }
+	.night-mode .answer-number.current { border-color: #269df0; color: #63b9f6; box-shadow: 0 0 0 4rpx #17364d; }
+	.night-mode .answer-number.answered { border-color: #269df0; background: #17364d; color: #63b9f6; }
 </style>

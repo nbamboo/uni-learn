@@ -1,10 +1,12 @@
 {
   "bsonType": "object",
-  "description": "用户最近一次逗留的科目、章节和题目，每个用户固定只有一条",
+  "description": "用户按章节或知识点保存的最后停留题目，每个练习范围固定一条",
   "required": [
     "_id",
     "userId",
     "subjectId",
+    "mode",
+    "scopeKey",
     "chapterId",
     "questionId",
     "progressId",
@@ -22,9 +24,9 @@
   "properties": {
     "_id": {
       "bsonType": "string",
-      "description": "直接使用 uni-id 用户ID，天然保证每个用户只有一条进度",
-      "minLength": 1,
-      "maxLength": 64
+      "description": "userId、subjectId、mode和scopeKey哈希组成的稳定ID",
+      "minLength": 8,
+      "maxLength": 192
     },
     "userId": {
       "bsonType": "string",
@@ -38,10 +40,26 @@
       "maxLength": 64,
       "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
     },
+    "mode": {
+      "bsonType": "string",
+      "enum": ["chapter", "knowledge"],
+      "description": "进度所属的练习范围类型"
+    },
+    "scopeKey": {
+      "bsonType": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "description": "章节模式为chapterId，知识点模式为knowledge"
+    },
     "chapterId": {
       "bsonType": "string",
       "minLength": 1,
       "maxLength": 32
+    },
+    "knowledge": {
+      "bsonType": "string",
+      "minLength": 1,
+      "maxLength": 128
     },
     "questionId": {
       "bsonType": "string",

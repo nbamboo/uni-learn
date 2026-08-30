@@ -163,7 +163,8 @@ function loadSeed() {
 		}],
 		question_bank_user_states: [],
 		question_bank_user_stats: [],
-		question_bank_user_progress: []
+		question_bank_user_progress: [],
+		question_bank_user_preferences: []
 	}
 }
 
@@ -176,6 +177,40 @@ async function run() {
 	const userId = 'user-one'
 	const wrongAlias = question.options.map(item => item.alias)
 		.find(alias => question.answer.indexOf(alias) === -1)
+
+	const defaultPreferences = await service.execute({ action: 'getPreferences' }, userId)
+	assert.deepEqual(defaultPreferences, {
+		answerMode: 'practice',
+		nightMode: false,
+		updatedAt: 0
+	})
+	const updatedPreferences = await service.execute({
+		action: 'updatePreferences',
+		answerMode: 'exam',
+		nightMode: true
+	}, userId)
+	assert.deepEqual(updatedPreferences, {
+		answerMode: 'exam',
+		nightMode: true,
+		updatedAt: currentTime.getTime()
+	})
+	assert.equal(environment.collections.question_bank_user_preferences.size, 1)
+	assert.deepEqual(
+		await service.execute({ action: 'getPreferences' }, userId),
+		updatedPreferences
+	)
+	assert.deepEqual(
+		await service.execute({ action: 'getPreferences' }, 'user-two'),
+		{ answerMode: 'practice', nightMode: false, updatedAt: 0 }
+	)
+	await assert.rejects(
+		service.execute({
+			action: 'updatePreferences',
+			answerMode: 'unsupported',
+			nightMode: true
+		}, userId),
+		error => error && error.errCode === 'QUESTION_BANK_USER_INVALID_ARGUMENT'
+	)
 
 	const profile = await service.execute({ action: 'getUserProfile' }, userId)
 	assert.deepEqual(profile, {
@@ -200,6 +235,7 @@ async function run() {
 		progress: {
 			progressId: 'progress-event-one',
 			subjectId,
+			mode: 'chapter',
 			chapterId: question.chapterId,
 			questionId: question.questionId,
 			occurredAt: currentTime.getTime()
@@ -267,11 +303,19 @@ async function run() {
 	assert.deepEqual(snapshot.wrongQuestionIds, [])
 	assert.deepEqual(snapshot.favoriteQuestionIds, [question.questionId])
 	assert.equal(snapshot.chapterAttempts[question.chapterId], 1)
+	assert.equal(snapshot.progressPositions.chapter[question.chapterId], question.questionId)
 
-	const savedProgress = await service.execute({ action: 'getProgress' }, userId)
+	const savedProgress = await service.execute({
+		action: 'getProgress',
+		subjectId,
+		mode: 'chapter',
+		chapterId: question.chapterId
+	}, userId)
 	assert.deepEqual(savedProgress, {
 		subjectId,
+		mode: 'chapter',
 		chapterId: question.chapterId,
+		knowledge: '',
 		questionId: question.questionId,
 		progressAt: currentTime.getTime()
 	})
@@ -279,21 +323,55 @@ async function run() {
 	assert.equal(environment.collections.question_bank_user_attempts, undefined)
 
 	const nextQuestion = Array.from(environment.collections.question_bank_questions.values())
-		.find(item => item.subjectId === subjectId && item.questionId !== question.questionId)
+		.find(item => item.subjectId === subjectId
+			&& item.chapterId === question.chapterId
+			&& item.questionId !== question.questionId)
 	await service.execute({
 		action: 'syncEvents',
 		events: [],
 		progress: {
 			progressId: 'progress-event-two',
 			subjectId,
+			mode: 'chapter',
 			chapterId: nextQuestion.chapterId,
 			questionId: nextQuestion.questionId,
 			occurredAt: currentTime.getTime() + 3000
 		}
 	}, userId)
-	const replacedProgress = await service.execute({ action: 'getProgress' }, userId)
+	const replacedProgress = await service.execute({
+		action: 'getProgress',
+		subjectId,
+		mode: 'chapter',
+		chapterId: nextQuestion.chapterId
+	}, userId)
 	assert.equal(replacedProgress.questionId, nextQuestion.questionId)
 	assert.equal(environment.collections.question_bank_user_progress.size, 1)
+
+	await service.execute({
+		action: 'syncEvents',
+		events: [],
+		progress: {
+			progressId: 'progress-knowledge-one',
+			subjectId,
+			mode: 'knowledge',
+			chapterId: question.chapterId,
+			knowledge: question.knowledge,
+			questionId: question.questionId,
+			occurredAt: currentTime.getTime() + 4000
+		}
+	}, userId)
+	const knowledgeProgress = await service.execute({
+		action: 'getProgress',
+		subjectId,
+		mode: 'knowledge',
+		chapterId: question.chapterId,
+		knowledge: question.knowledge
+	}, userId)
+	assert.equal(knowledgeProgress.questionId, question.questionId)
+	assert.equal(environment.collections.question_bank_user_progress.size, 2)
+	const scopedSnapshot = await service.execute({ action: 'getStateSnapshot', subjectId }, userId)
+	assert.equal(scopedSnapshot.progressPositions.chapter[question.chapterId], nextQuestion.questionId)
+	assert.equal(scopedSnapshot.progressPositions.knowledge[question.knowledge], question.questionId)
 
 	const wrongRecords = await service.execute({
 		action: 'getRecords', subjectId, type: 'wrong', page: 1, pageSize: 20

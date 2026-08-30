@@ -58,7 +58,11 @@
 		getSubjectById
 	} from '@/data/practice.js'
 	import { getCatalog } from '@/services/question-bank.js'
-	import { getChapterPracticePosition, getPracticeStateSnapshot } from '@/services/user-practice.js'
+	import {
+		getChapterPracticePosition,
+		getKnowledgePracticePosition,
+		getPracticeStateSnapshot
+	} from '@/services/user-practice.js'
 
 	export default {
 		data() {
@@ -127,6 +131,8 @@
 
 					if (this.view === 'chapter') {
 						const chapters = Array.isArray(catalog.chapters) ? catalog.chapters : []
+							? cloudState.progressPositions.chapter || {}
+							: {}
 						this.items = chapters.map(item => {
 							const localProgress = getChapterProgress(this.subjectId, item.id, item.count)
 							const attempted = cloudState
@@ -136,7 +142,8 @@
 								...item,
 								progress: Object.assign({}, localProgress, {
 									attempted,
-									percent: item.count ? Math.min(100, Math.round(attempted / item.count * 100)) : 0
+									percent: item.count ? Math.min(100, Math.round(attempted / item.count * 100)) : 0,
+									positionQuestionId: chapterPositions[item.id] || ''
 								})
 							}
 						})
@@ -155,6 +162,9 @@
 						attemptedByKnowledge[answer.knowledge] = (attemptedByKnowledge[answer.knowledge] || 0) + 1
 					})
 					const knowledgeGroups = Array.isArray(catalog.knowledgeGroups) ? catalog.knowledgeGroups : []
+					const knowledgePositions = cloudState && cloudState.progressPositions
+						? cloudState.progressPositions.knowledge || {}
+						: {}
 					this.items = knowledgeGroups.map(item => {
 						const attempted = cloudState
 							? (cloudState.knowledgeAttempts[item.name] || 0)
@@ -166,7 +176,8 @@
 							progress: {
 								attempted,
 								total,
-								percent: total ? Math.min(100, Math.round(attempted / total * 100)) : 0
+								percent: total ? Math.min(100, Math.round(attempted / total * 100)) : 0,
+								positionQuestionId: knowledgePositions[item.name] || ''
 							}
 						}
 					})
@@ -184,12 +195,23 @@
 			},
 			startItem(item) {
 				let url = `/practice-pages/practice/practice?subjectId=${this.subjectId}`
-				if (this.view === 'knowledge') url += `&mode=knowledge&knowledge=${encodeURIComponent(item.name)}`
-				else {
+				if (this.view === 'knowledge') {
+					url += `&mode=knowledge&knowledge=${encodeURIComponent(item.name)}`
+					const savedPosition = getKnowledgePracticePosition(this.subjectId, item.name)
+					const startId = savedPosition && savedPosition.questionId
+						|| item.progress.positionQuestionId
+					if (startId) {
+						url += `&startId=${encodeURIComponent(startId)}`
+					} else if (item.progress.attempted > 0) {
+						url += `&startNumber=${Math.min(item.progress.attempted, item.progress.total)}`
+					}
+				} else {
 					url += `&mode=chapter&chapterId=${item.id}`
 					const savedPosition = getChapterPracticePosition(this.subjectId, item.id)
-					if (savedPosition) {
-						url += `&startId=${encodeURIComponent(savedPosition.questionId)}`
+					const startId = savedPosition && savedPosition.questionId
+						|| item.progress.positionQuestionId
+					if (startId) {
+						url += `&startId=${encodeURIComponent(startId)}`
 					} else if (item.progress.attempted > 0) {
 						url += `&startNumber=${Math.min(item.progress.attempted, item.progress.total)}`
 					}

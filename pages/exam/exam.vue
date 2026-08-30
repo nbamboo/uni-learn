@@ -1,5 +1,5 @@
 <template>
-	<view class="practice-home">
+	<view class="practice-home" :class="{ 'night-mode': nightMode }">
 		<view class="subject-bar" @tap="openSubjectPicker">
 			<view class="subject-symbol">
 				<uni-icons type="wallet" size="24" color="#008cff"></uni-icons>
@@ -108,7 +108,7 @@
 		<uni-popup
 			ref="subjectPopup"
 			type="bottom"
-			background-color="#ffffff"
+			:background-color="nightMode ? '#1b222a' : '#ffffff'"
 		>
 			<view class="subject-sheet">
 				<view class="sheet-header">
@@ -117,7 +117,7 @@
 						<text class="sheet-caption">练习记录会按科目分别保存</text>
 					</view>
 					<view class="sheet-close" @tap="closeSubjectPicker">
-						<uni-icons type="closeempty" size="24" color="#5f6570"></uni-icons>
+						<uni-icons type="closeempty" size="24" :color="nightMode ? '#b6bec8' : '#5f6570'"></uni-icons>
 					</view>
 				</view>
 
@@ -153,11 +153,17 @@
 		subjectGroups
 	} from '@/data/practice.js'
 	import { getCatalog } from '@/services/question-bank.js'
-	import { getPracticeSummary } from '@/services/user-practice.js'
+	import {
+		getLocalPracticePreferences,
+		getPracticePreferences,
+		getPracticeSummary
+	} from '@/services/user-practice.js'
 
 	export default {
 		data() {
+			const localPreferences = getLocalPracticePreferences()
 			return {
+				nightMode: Boolean(localPreferences.nightMode),
 				currentSubjectId: '',
 				subjectGroups,
 				catalogStates: {},
@@ -210,13 +216,38 @@
 			}
 		},
 		onShow() {
+			this.refreshNightMode()
 			const state = getPracticeState()
 			this.currentSubjectId = state.currentSubjectId
 			this.refreshStats(this.subjectQuestionCount(this.currentSubjectId))
 			this.loadCatalog(this.currentSubjectId)
 			this.loadCloudStats(this.currentSubjectId)
 		},
+		onHide() {
+			this.applyTabBarTheme(false)
+		},
 		methods: {
+			applyNightMode(preferences) {
+				this.nightMode = Boolean(preferences && preferences.nightMode)
+				uni.setNavigationBarColor({
+					frontColor: this.nightMode ? '#ffffff' : '#000000',
+					backgroundColor: this.nightMode ? '#171c22' : '#ffffff'
+				})
+				this.applyTabBarTheme(this.nightMode)
+			},
+			applyTabBarTheme(nightMode) {
+				uni.setTabBarStyle({
+					color: nightMode ? '#8f99a5' : '#7A7E83',
+					selectedColor: '#008cff',
+					backgroundColor: nightMode ? '#171c22' : '#ffffff',
+					borderStyle: 'black'
+				})
+			},
+			async refreshNightMode() {
+				this.applyNightMode(getLocalPracticePreferences())
+				const preferences = await getPracticePreferences()
+				this.applyNightMode(preferences)
+			},
 			refreshStats(questionCount) {
 				const activityStats = getSubjectStats(this.currentSubjectId)
 				const total = Number.isInteger(questionCount) && questionCount >= 0 ? questionCount : 0
@@ -447,4 +478,25 @@
 	.subject-option.active { border-color: #008cff; background: #eaf5ff; color: #0074d4; }
 	.subject-option.unavailable:not(.active) { color: #7d828a; }
 	.subject-status { margin-top: 4rpx; font-size: 20rpx; color: #979ca5; }
+
+	.practice-home.night-mode { background: #12171d; color: #e6e9ed; }
+	.night-mode .subject-bar { border-color: #303943; background: #171c22; }
+	.night-mode .subject-symbol,
+	.night-mode .feature-icon { background: #17364d; }
+	.night-mode .subject-label,
+	.night-mode .section-caption,
+	.night-mode .feature-desc,
+	.night-mode .sheet-caption { color: #8f99a5; }
+	.night-mode .overview-band { background: #086cae; }
+	.night-mode .secondary-button { border-color: #168ee5; background: #1b222a; color: #63b9f6; }
+	.night-mode .search-entry { border-color: #39434e; background: #1b222a; color: #9ca6b1; }
+	.night-mode .feature-badge { border-color: #12171d; }
+	.night-mode .bank-note { background: #1b222a; color: #aeb7c1; }
+	.night-mode .bank-note.error { background: #3b2327; color: #ef9a9a; }
+	.night-mode .subject-sheet { background: #1b222a; color: #e6e9ed; }
+	.night-mode .sheet-header { border-color: #303943; }
+	.night-mode .subject-option { background: #242c35; color: #c9d0d8; }
+	.night-mode .subject-option.active { border-color: #269df0; background: #17364d; color: #63b9f6; }
+	.night-mode .subject-option.unavailable:not(.active) { color: #8d97a2; }
+	.night-mode .subject-status { color: #818c98; }
 </style>
