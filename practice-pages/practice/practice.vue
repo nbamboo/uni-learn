@@ -6,7 +6,73 @@
 	<view class="empty-state error-state" :class="{ 'night-mode': nightMode }" v-else-if="loadError">
 		<uni-icons type="refreshempty" size="42" color="#d34d4d"></uni-icons>
 		<text>{{ loadError }}</text>
-		<button @tap="retryLoad">重新加载</button>
+		<button v-if="isSharedExamResult" @tap="goToPracticeHome">去刷题</button>
+		<button v-else @tap="retryLoad">重新加载</button>
+	</view>
+
+	<view class="exam-result-page" :class="{ 'night-mode': nightMode }" v-else-if="showExamResult && examResult">
+		<scroll-view class="exam-result-scroll" scroll-y>
+			<view class="result-hero">
+				<view class="result-meta-list">
+					<view class="result-meta-row">
+						<view class="result-meta-icon">章</view>
+						<text>章节名称：{{ examResult.chapterName }}</text>
+					</view>
+				</view>
+			</view>
+
+			<view class="result-summary-card">
+				<view class="accuracy-ring" :style="accuracyRingStyle">
+					<view class="accuracy-ring-inner">
+						<view class="accuracy-value-line">
+							<text class="accuracy-value">{{ examResult.accuracyText }}</text>
+							<text class="accuracy-unit">%</text>
+						</view>
+						<text class="accuracy-label">正确率</text>
+					</view>
+				</view>
+
+				<view class="result-stats-grid">
+					<view class="result-stat-item correct-stat">
+						<text class="result-stat-value">{{ examResult.correctCount }}</text>
+						<text class="result-stat-label">答对题数</text>
+					</view>
+					<view class="result-stat-item wrong-stat">
+						<text class="result-stat-value">{{ examResult.wrongCount }}</text>
+						<text class="result-stat-label">答错题数</text>
+					</view>
+					<view class="result-stat-item total-stat">
+						<text class="result-stat-value">{{ examResult.totalCount }}</text>
+						<text class="result-stat-label">总题数</text>
+					</view>
+				</view>
+
+				<view class="result-unanswered-note" v-if="examResult.unansweredCount">
+					还有 {{ examResult.unansweredCount }} 道题未作答
+				</view>
+			</view>
+
+			<view class="result-actions" :class="{ 'shared-result-actions': isSharedExamResult }">
+				<button class="result-back-button" v-if="!isSharedExamResult" @tap="goToPracticeHome">返回刷题首页</button>
+				<button class="result-retry-button" v-if="!isSharedExamResult" @tap="restartExam">重新测试</button>
+				<button
+					class="result-share-button"
+					open-type="share"
+				>分享成绩</button>
+				<button class="result-retry-button" v-if="isSharedExamResult" @tap="goToPracticeHome">去刷题</button>
+			</view>
+
+			<!-- #ifdef MP-WEIXIN -->
+			<view class="result-ad-container">
+				<ad-custom
+					unit-id="adunit-085cc7635227d1e5"
+					@load="adLoad"
+					@error="adError"
+					@close="adClose"
+				></ad-custom>
+			</view>
+			<!-- #endif -->
+		</scroll-view>
 	</view>
 
 	<view class="practice-page" :class="{ 'night-mode': nightMode }" v-else-if="currentQuestion">
@@ -147,6 +213,7 @@
 						>{{ index + 1 }}</view>
 					</view>
 				</scroll-view>
+				<button class="answer-sheet-submit" v-if="examInProgress" @tap="submitExam">交卷并查看成绩</button>
 			</view>
 		</uni-popup>
 
@@ -213,9 +280,13 @@
 				favorite: false,
 				sessionAnswers: {},
 				draftAnswers: {},
+				visitedQuestionIds: [],
 				answerMode: localPreferences.answerMode,
 				nightMode: localPreferences.nightMode,
 				examSubmitted: false,
+				showExamResult: false,
+				examResult: null,
+				isSharedExamResult: false,
 				correctCount: 0,
 				wrongCount: 0,
 				scrollTop: 0,
@@ -266,6 +337,7 @@
 					return Object.keys(this.draftAnswers)
 						.filter(questionId => this.draftAnswers[questionId].length).length
 				}
+				if (this.answerMode === 'review') return this.visitedQuestionIds.length
 				return Object.keys(this.sessionAnswers).length
 			},
 			examInProgress() {
@@ -273,9 +345,21 @@
 			},
 			swiperTouchDisabled() {
 				return this.questionList.length < 2
+			},
+			accuracyRingStyle() {
+				const accuracy = this.examResult ? this.examResult.accuracy : 0
+				const percent = Math.max(0, Math.min(100, accuracy))
+				const trackColor = this.nightMode ? '#313943' : '#edf0f3'
+				return {
+					background: `conic-gradient(from -90deg, #008cff 0%, #008cff ${percent}%, ${trackColor} ${percent}%, ${trackColor} 100%)`
+				}
 			}
 		},
 		onLoad(options) {
+			if (options.sharedResult) {
+				this.openSharedExamResult(options.sharedResult)
+				return
+			}
 			this.mode = options.mode || 'sequence'
 			this.practiceConfig = {
 				subjectId: options.subjectId,
@@ -299,8 +383,118 @@
 		},
 		onUnload() {
 			this.syncCurrentProgress()
+			this.destroyExamSession()
+		},
+		onShareAppMessage() {
+			if (this.showExamResult && this.examResult) {
+				return this.createExamResultShareOptions()
+			}
+			return {
+				title: '一起来刷题吧',
+				path: '/pages/exam/exam'
+			}
 		},
 		methods: {
+			parseSharedExamResult(payload) {
+				const serialized = String(payload || '')
+				const candidates = [serialized]
+				try {
+					const decoded = decodeURIComponent(serialized)
+					if (decoded !== serialized) candidates.push(decoded)
+				} catch (error) {
+					// 非法 URL 编码会在后续校验中作为无效分享处理。
+				}
+				let shared = null
+				for (let index = 0; index < candidates.length; index += 1) {
+					try {
+						shared = JSON.parse(candidates[index])
+						break
+					} catch (error) {
+						shared = null
+					}
+				}
+				if (!shared || shared.v !== 1) return null
+				const counts = ['c', 'w', 'u', 't'].map(key => Number(shared[key]))
+				if (counts.some(count => !Number.isInteger(count) || count < 0 || count > 9999)) return null
+				const [correctCount, wrongCount, unansweredCount, totalCount] = counts
+				if (!totalCount || correctCount + wrongCount + unansweredCount !== totalCount) return null
+				const answeredCount = correctCount + wrongCount
+				const accuracy = answeredCount ? correctCount / answeredCount * 100 : 0
+				const chapterName = String(shared.n || '').trim().slice(0, 60) || '当前测试'
+				return {
+					chapterName,
+					accuracy,
+					accuracyText: accuracy.toFixed(2),
+					correctCount,
+					wrongCount,
+					partialCount: 0,
+					answeredCount,
+					unansweredCount,
+					totalCount
+				}
+			},
+			openSharedExamResult(payload) {
+				this.isSharedExamResult = true
+				this.loading = false
+				this.loadError = ''
+				const result = this.parseSharedExamResult(payload)
+				if (!result) {
+					this.loadError = '分享的考试结果无效或已损坏'
+					uni.setNavigationBarTitle({ title: '测试结果' })
+					this.applyNavigationTheme()
+					return false
+				}
+				this.answerMode = 'exam'
+				this.examSubmitted = true
+				this.examResult = result
+				this.showExamResult = true
+				uni.setNavigationBarTitle({ title: '测试结果' })
+				this.applyNavigationTheme()
+				getPracticePreferences().then(preferences => {
+					this.nightMode = Boolean(preferences.nightMode)
+					this.applyNavigationTheme()
+				}).catch(() => {
+					// 本地主题已在 data 中恢复，云端偏好失败不影响查看分享结果。
+				})
+				return true
+			},
+			createExamResultShareOptions() {
+				if (!this.examResult) {
+					return {
+						title: '一起来刷题吧',
+						path: '/pages/exam/exam'
+					}
+				}
+				const result = this.examResult
+				const payload = encodeURIComponent(JSON.stringify({
+					v: 1,
+					n: result.chapterName,
+					c: result.correctCount,
+					w: result.wrongCount,
+					u: result.unansweredCount,
+					t: result.totalCount
+				}))
+				return {
+					title: `我在${result.chapterName}测试中答对 ${result.correctCount} 题，正确率 ${result.accuracyText}%`,
+					path: `/practice-pages/practice/practice?sharedResult=${payload}`
+				}
+			},
+			canResumePracticeProgress() {
+				return this.answerMode !== 'exam'
+					|| ['chapter', 'knowledge'].indexOf(this.mode) === -1
+			},
+			resolveInitialQuestionIndex() {
+				if (!this.canResumePracticeProgress()) return 0
+				const savedStartIndex = this.practiceConfig.startId
+					? this.questionList.findIndex(item => item.id === this.practiceConfig.startId)
+					: -1
+				const numberedStartIndex = this.practiceConfig.startNumber > 0
+					? Math.min(this.practiceConfig.startNumber - 1, this.questionList.length - 1)
+					: -1
+				return savedStartIndex > -1
+					? savedStartIndex
+					: (numberedStartIndex > -1 ? numberedStartIndex : 0)
+			},
 			async loadAnswerPreferences() {
 				const preferences = await getPracticePreferences()
 				this.answerMode = preferences.answerMode
@@ -319,7 +513,11 @@
 				this.questionList = []
 				this.currentIndex = 0
 				this.draftAnswers = {}
+				this.visitedQuestionIds = []
 				this.examSubmitted = false
+				this.showExamResult = false
+				this.examResult = null
+				this.isSharedExamResult = false
 				this.resetSwiperPosition()
 				try {
 					await this.loadAnswerPreferences()
@@ -344,14 +542,7 @@
 					}
 					this.restoreSessionAnswers(snapshot)
 					if (this.questionList.length) {
-						const savedStartIndex = this.practiceConfig.startId
-							? this.questionList.findIndex(item => item.id === this.practiceConfig.startId)
-							: -1
-						const numberedStartIndex = this.practiceConfig.startNumber > 0
-							? Math.min(this.practiceConfig.startNumber - 1, this.questionList.length - 1)
-							: -1
-						const startIndex = savedStartIndex > -1 ? savedStartIndex : numberedStartIndex
-						this.loadQuestion(startIndex > -1 ? startIndex : 0)
+						this.loadQuestion(this.resolveInitialQuestionIndex())
 					}
 				} catch (error) {
 					this.loadError = error && error.errCode === 'QUESTION_BANK_SUBJECT_NOT_FOUND'
@@ -418,6 +609,9 @@
 				this.currentIndex = index
 				const question = this.questionList[index]
 				if (!question) return
+				if (this.answerMode === 'review' && this.visitedQuestionIds.indexOf(question.id) === -1) {
+					this.visitedQuestionIds.push(question.id)
+				}
 				const saved = this.sessionAnswers[question.id]
 				const draft = this.draftAnswers[question.id]
 				this.selectedAnswers = saved
@@ -430,7 +624,9 @@
 				this.saveCurrentQuestionProgress(question)
 			},
 			saveCurrentQuestionProgress(question) {
-				if (!question || ['chapter', 'knowledge'].indexOf(this.mode) === -1) return null
+				if (this.answerMode === 'exam'
+					|| !question
+					|| ['chapter', 'knowledge'].indexOf(this.mode) === -1) return null
 				return savePracticeProgress(question, {
 					mode: this.mode,
 					chapterId: this.practiceConfig.chapterId,
@@ -440,6 +636,7 @@
 			syncCurrentProgress() {
 				if (this.progressSavedOnLeave) return
 				this.progressSavedOnLeave = true
+				if (this.answerMode === 'exam' || this.isSharedExamResult) return
 				this.saveCurrentQuestionProgress(this.currentQuestion)
 				flushPracticeEvents().catch(() => {
 					// 进度已持久化在本机，下次启动会自动重试。
@@ -566,32 +763,108 @@
 						: '所有题目均已作答，确认提交试卷吗？',
 					confirmText: '确认交卷',
 					success: result => {
-						if (result.confirm) this.finalizeExam()
+						if (result.confirm) {
+							if (this.$refs.answerSheet) this.$refs.answerSheet.close()
+							this.finalizeExam()
+						}
 					}
 				})
 			},
 			finalizeExam() {
 				let correctCount = 0
 				let wrongCount = 0
+				let partialCount = 0
+				let answeredCount = 0
+				const sessionAnswers = {}
 				this.questionList.forEach(question => {
 					const selected = this.draftAnswers[question.id]
 					if (!selected || !selected.length) return
-					const correct = recordAnswer(question, selected)
-					this.$set(this.sessionAnswers, question.id, {
+					answeredCount += 1
+					const correct = isCorrectAnswer(selected, question.answer)
+					const partial = !correct && this.isPartialExamAnswer(question, selected)
+					sessionAnswers[question.id] = {
 						selected: selected.slice(),
-						correct
-					})
+						correct,
+						partial
+					}
 					if (correct) correctCount += 1
+					else if (partial) partialCount += 1
 					else wrongCount += 1
 				})
+				const totalCount = this.questionList.length
+				const accuracy = answeredCount ? correctCount / answeredCount * 100 : 0
+				this.sessionAnswers = sessionAnswers
 				this.correctCount = correctCount
-				this.wrongCount = wrongCount
+				this.wrongCount = wrongCount + partialCount
 				this.examSubmitted = true
-				this.loadQuestion(this.currentIndex)
-				flushPracticeEvents({ includeProgress: false }).catch(() => {
-					// 答题事件已保存在本机队列，下次进入时继续同步。
+				this.examResult = {
+					chapterName: this.resolveExamChapterName(),
+					accuracy,
+					accuracyText: accuracy.toFixed(2),
+					correctCount,
+					wrongCount: wrongCount + partialCount,
+					partialCount,
+					answeredCount,
+					unansweredCount: totalCount - answeredCount,
+					totalCount
+				}
+				this.showExamResult = true
+				uni.setNavigationBarTitle({ title: '测试结果' })
+			},
+			isPartialExamAnswer(question, selected) {
+				if (!question || question.type !== 'multiple' || !selected.length) return false
+				return selected.length < question.answer.length
+					&& selected.every(alias => question.answer.indexOf(alias) > -1)
+			},
+			resolveExamChapterName() {
+				const chapterNames = []
+				this.questionList.forEach(question => {
+					if (question.chapter && chapterNames.indexOf(question.chapter) === -1) {
+						chapterNames.push(question.chapter)
+					}
 				})
-				uni.showToast({ title: '交卷成功', icon: 'success' })
+				if (chapterNames.length === 1) return chapterNames[0]
+				return chapterNames.length ? '综合测试' : '当前测试'
+			},
+			restartExam() {
+				this.showExamResult = false
+				this.examResult = null
+				this.examSubmitted = false
+				this.sessionAnswers = {}
+				this.draftAnswers = {}
+				this.visitedQuestionIds = []
+				this.selectedAnswers = []
+				this.submitted = false
+				this.lastResult = false
+				this.correctCount = 0
+				this.wrongCount = 0
+				this.currentIndex = 0
+				this.resetSwiperPosition()
+				if (this.questionList.length) this.loadQuestion(0)
+				this.setNavigationTitle()
+				this.applyNavigationTheme()
+			},
+			goToPracticeHome() {
+				this.destroyExamSession()
+				uni.switchTab({ url: '/pages/exam/exam' })
+			},
+			destroyExamSession() {
+				this.showExamResult = false
+				this.examResult = null
+				this.sessionAnswers = {}
+				this.draftAnswers = {}
+				this.visitedQuestionIds = []
+				this.selectedAnswers = []
+				this.isSharedExamResult = false
+			},
+			adLoad() {
+				console.log('原生模板广告加载成功')
+			},
+			adError(error) {
+				console.error('原生模板广告加载失败', error)
+			},
+			adClose() {
+				console.log('原生模板广告关闭')
 			},
 			previousQuestion() {
 				if (this.currentIndex > 0) this.animateToQuestion(this.currentIndex - 1)
@@ -635,12 +908,13 @@
 				const question = this.questionList[index]
 				const answer = this.sessionAnswers[question.id]
 				const draft = this.draftAnswers[question.id]
-				return {
-					current: index === this.currentIndex,
-					answered: !answer && draft && draft.length,
-					correct: answer && answer.correct,
-					wrong: answer && !answer.correct
-				}
+				const answered = this.answerMode === 'review'
+					? this.visitedQuestionIds.indexOf(question.id) > -1
+					: Boolean(answer || draft && draft.length)
+				const classNames = []
+				if (index === this.currentIndex) classNames.push('current')
+				if (answered) classNames.push('answered')
+				return classNames.join(' ')
 			},
 			goCalculator() {
 				this.$refs.financeCalculatorPopup.open()
@@ -727,14 +1001,43 @@
 	.answer-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 20rpx; padding: 28rpx 4rpx 12rpx; }
 	.answer-number { display: flex; align-items: center; justify-content: center; width: 80rpx; height: 80rpx; border: 2rpx solid #d5d9de; border-radius: 50%; box-sizing: border-box; color: #5e646d; font-size: 26rpx; }
 	.answer-number.current { border-color: #008cff; color: #008cff; box-shadow: 0 0 0 4rpx #eaf5ff; }
-	.answer-number.answered { border-color: #008cff; background: #eef7ff; color: #0074d4; }
-	.answer-number.correct { border-color: #28a665; background: #eff9f4; color: #218a54; }
-	.answer-number.wrong { border-color: #e45151; background: #fff2f2; color: #c94242; }
+	.answer-number.answered { border-color: #008cff; background: #008cff; color: #ffffff; }
+	.answer-sheet-submit { width: 100%; height: 84rpx; margin: 24rpx 0 0; border-radius: 42rpx; background: #008cff; color: #ffffff; font-size: 29rpx; font-weight: 600; line-height: 84rpx; }
+	.answer-sheet-submit::after { border: 0; }
 	.calculator-sheet { height: 68vh; overflow: hidden; border-radius: 16rpx 16rpx 0 0; background: #ffffff; }
 	.calculator-sheet-header { display: flex; align-items: center; justify-content: space-between; height: 96rpx; padding: 0 20rpx 0 32rpx; border-bottom: 1rpx solid #e8ebef; box-sizing: border-box; }
 	.calculator-sheet-title { font-size: 32rpx; font-weight: 600; color: #2b2f34; }
 	.calculator-sheet-close { display: flex; align-items: center; justify-content: center; width: 72rpx; height: 72rpx; }
 	.calculator-sheet-scroll { height: calc(68vh - 96rpx - env(safe-area-inset-bottom)); padding-bottom: env(safe-area-inset-bottom); box-sizing: border-box; }
+	.exam-result-page { height: 100vh; overflow: hidden; background: linear-gradient(155deg, #e9f5ff 0%, #f4faff 34%, #f4f5f7 68%); color: #2b2f34; }
+	.exam-result-scroll { height: 100%; }
+	.result-hero { position: relative; padding: 44rpx 44rpx 34rpx; overflow: hidden; box-sizing: border-box; }
+	.result-meta-list { position: relative; z-index: 2; display: flex; flex-direction: column; gap: 30rpx; }
+	.result-meta-row { display: flex; align-items: center; color: #3d4249; font-size: 29rpx; line-height: 1.5; }
+	.result-meta-icon { display: flex; align-items: center; justify-content: center; width: 42rpx; height: 42rpx; flex: 0 0 42rpx; margin-right: 18rpx; border-radius: 50%; background: rgba(90, 178, 239, 0.72); color: #ffffff; font-size: 20rpx; font-weight: 600; }
+	.result-summary-card { margin: 0 28rpx; padding: 56rpx 24rpx 42rpx; border-radius: 34rpx; background: rgba(255, 255, 255, 0.96); box-shadow: 0 22rpx 60rpx rgba(72, 82, 96, 0.08); }
+	.accuracy-ring { display: flex; align-items: center; justify-content: center; width: 340rpx; height: 340rpx; margin: 0 auto; border-radius: 50%; }
+	.accuracy-ring-inner { display: flex; align-items: center; flex-direction: column; justify-content: center; width: 270rpx; height: 270rpx; border-radius: 50%; background: #ffffff; box-shadow: 0 0 0 2rpx rgba(239, 241, 244, 0.7); }
+	.accuracy-value-line { display: flex; align-items: baseline; color: #008cff; }
+	.accuracy-value { font-size: 72rpx; font-weight: 500; line-height: 1; }
+	.accuracy-unit { margin-left: 5rpx; font-size: 34rpx; }
+	.accuracy-label { margin-top: 24rpx; color: #0074d4; font-size: 31rpx; font-weight: 600; }
+	.result-stats-grid { display: grid; grid-template-columns: repeat(3, 1fr); margin-top: 48rpx; }
+	.result-stat-item { display: flex; align-items: center; flex-direction: column; min-width: 0; }
+	.result-stat-value { font-size: 45rpx; line-height: 1.2; }
+	.result-stat-label { margin-top: 14rpx; color: #565c64; font-size: 24rpx; text-align: center; white-space: nowrap; }
+	.correct-stat .result-stat-value { color: #36bf62; }
+	.wrong-stat .result-stat-value { color: #df4937; }
+	.total-stat .result-stat-value { color: #42474e; }
+	.result-unanswered-note { margin: 38rpx 18rpx 0; padding: 20rpx 24rpx; border-radius: 12rpx; background: #eef7ff; color: #2677b8; font-size: 25rpx; text-align: center; }
+	.result-actions { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14rpx; padding: 32rpx 28rpx 24rpx; }
+	.result-actions.shared-result-actions { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+	.result-actions button { height: 88rpx; margin: 0; border-radius: 44rpx; font-size: 28rpx; line-height: 88rpx; }
+	.result-actions button::after { border: 0; }
+	.result-back-button { border: 2rpx solid #cfd5dc; background: rgba(255, 255, 255, 0.86); color: #535a63; }
+	.result-retry-button { background: linear-gradient(135deg, #33a8ff, #008cff); color: #ffffff; box-shadow: 0 14rpx 30rpx rgba(0, 140, 255, 0.2); }
+	.result-share-button { border: 2rpx solid #79bff0; background: #e9f6ff; color: #087dc9; }
+	.result-ad-container { min-height: 1rpx; margin: 0 28rpx; padding: 8rpx 0 calc(38rpx + env(safe-area-inset-bottom)); overflow: hidden; border-radius: 16rpx; }
 	.empty-state { display: flex; align-items: center; flex-direction: column; justify-content: center; min-height: 70vh; padding: 40rpx; color: #858b93; font-size: 28rpx; }
 	.loading-state { display: flex; align-items: center; justify-content: center; min-height: 70vh; }
 	.empty-state text { margin-top: 20rpx; }
@@ -744,6 +1047,16 @@
 	.empty-state.night-mode { min-height: 100vh; background: #12171d; color: #aeb7c1; box-sizing: border-box; }
 
 	.practice-page.night-mode { background: #12171d; color: #e6e9ed; }
+	.exam-result-page.night-mode { background: linear-gradient(155deg, #14283a 0%, #172430 38%, #12171d 72%); color: #e6e9ed; }
+	.night-mode .result-meta-row { color: #d1d7de; }
+	.night-mode .result-meta-icon { background: #46515d; color: #eef2f6; }
+	.night-mode .result-summary-card { background: rgba(27, 34, 42, 0.97); box-shadow: 0 22rpx 60rpx rgba(0, 0, 0, 0.2); }
+	.night-mode .accuracy-ring-inner { background: #1b222a; box-shadow: 0 0 0 2rpx #303943; }
+	.night-mode .result-stat-label { color: #aeb7c1; }
+	.night-mode .total-stat .result-stat-value { color: #e0e5ea; }
+	.night-mode .result-unanswered-note { background: #183149; color: #70bdf2; }
+	.night-mode .result-back-button { border-color: #47525e; background: #202832; color: #d2d8df; }
+	.night-mode .result-share-button { border-color: #35698f; background: #17364d; color: #72c2fa; }
 	.night-mode .progress-track { background: #303943; }
 	.night-mode .question-shell,
 	.night-mode .bottom-toolbar,
@@ -774,5 +1087,6 @@
 	.night-mode .unanswered-text { color: #9aa4af; }
 	.night-mode .answer-number { border-color: #4b5662; color: #bbc3cc; }
 	.night-mode .answer-number.current { border-color: #269df0; color: #63b9f6; box-shadow: 0 0 0 4rpx #17364d; }
-	.night-mode .answer-number.answered { border-color: #269df0; background: #17364d; color: #63b9f6; }
+	.night-mode .answer-number.answered { border-color: #168ee5; background: #168ee5; color: #ffffff; }
+	.night-mode .answer-sheet-submit { background: #168ee5; color: #ffffff; }
 </style>

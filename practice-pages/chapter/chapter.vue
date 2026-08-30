@@ -31,7 +31,7 @@
 				<view class="item-content">
 					<text class="item-title">{{ item.name }}</text>
 					<text class="item-meta" v-if="view === 'knowledge'">{{ item.chapter }}</text>
-					<view class="item-progress-row">
+					<view class="item-progress-row" v-if="answerMode !== 'exam'">
 						<view class="item-progress">
 							<view class="item-progress-fill" :style="{ width: item.progress.percent + '%' }"></view>
 						</view>
@@ -60,12 +60,14 @@
 	import { getCatalog } from '@/services/question-bank.js'
 	import {
 		getChapterPracticePosition,
+		getLocalPracticePreferences,
 		getKnowledgePracticePosition,
 		getPracticeStateSnapshot
 	} from '@/services/user-practice.js'
 
 	export default {
 		data() {
+			const localPreferences = getLocalPracticePreferences()
 			return {
 				subjectId: '',
 				view: 'chapter',
@@ -73,7 +75,8 @@
 				items: [],
 				loading: true,
 				loadError: '',
-				catalogName: ''
+				catalogName: '',
+				answerMode: localPreferences.answerMode
 			}
 		},
 		computed: {
@@ -96,10 +99,19 @@
 			this.loadItems()
 		},
 		onShow() {
-			if (this.view === 'chapter' && this.items.length) this.refreshChapterProgress()
+			const previousAnswerMode = this.answerMode
+			this.answerMode = getLocalPracticePreferences().answerMode
+			if (previousAnswerMode !== this.answerMode && this.items.length) {
+				this.loadItems()
+				return
+			}
+			if (this.answerMode !== 'exam' && this.view === 'chapter' && this.items.length) {
+				this.refreshChapterProgress()
+			}
 		},
 		methods: {
 			refreshChapterProgress() {
+				if (this.answerMode === 'exam') return
 				this.items = this.items.map(item => {
 					const localProgress = getChapterProgress(this.subjectId, item.id, item.count)
 					const attempted = Math.max(item.progress.attempted, localProgress.attempted)
@@ -119,14 +131,17 @@
 						forceRefresh: Boolean(forceRefresh)
 					})
 					this.catalogName = catalog.name || ''
+					const shouldLoadProgress = this.answerMode !== 'exam'
 					let cloudState = null
-					try {
-						cloudState = await getPracticeStateSnapshot(this.subjectId, {
-							localState: getPracticeState(),
-							forceRefresh: Boolean(forceRefresh)
-						})
-					} catch (syncError) {
-						cloudState = null
+					if (shouldLoadProgress) {
+						try {
+							cloudState = await getPracticeStateSnapshot(this.subjectId, {
+								localState: getPracticeState(),
+								forceRefresh: Boolean(forceRefresh)
+							})
+						} catch (syncError) {
+							cloudState = null
+						}
 					}
 
 					if (this.view === 'chapter') {
@@ -135,6 +150,17 @@
 							? cloudState.progressPositions.chapter || {}
 							: {}
 						this.items = chapters.map(item => {
+							if (!shouldLoadProgress) {
+								return {
+									...item,
+									progress: {
+										attempted: 0,
+										total: item.count,
+										percent: 0,
+										positionQuestionId: ''
+									}
+								}
+							}
 							const localProgress = getChapterProgress(this.subjectId, item.id, item.count)
 							const attempted = cloudState
 								? (cloudState.chapterAttempts[item.id] || 0)
@@ -151,23 +177,27 @@
 						return
 					}
 
-					const state = getPracticeState()
 					const attemptedByKnowledge = {}
-					Object.keys(state.answers).forEach(questionId => {
-						const answer = state.answers[questionId]
-						const isLegacyDefault = !answer.subjectId
-							&& this.subjectId === 'junior-personal-finance'
-							&& questionId.indexOf('ipf-') === 0
-						if (answer.subjectId !== this.subjectId && !isLegacyDefault) return
-						if (!answer.knowledge) return
-						attemptedByKnowledge[answer.knowledge] = (attemptedByKnowledge[answer.knowledge] || 0) + 1
-					})
+					if (shouldLoadProgress) {
+						const state = getPracticeState()
+						Object.keys(state.answers).forEach(questionId => {
+							const answer = state.answers[questionId]
+							const isLegacyDefault = !answer.subjectId
+								&& this.subjectId === 'junior-personal-finance'
+								&& questionId.indexOf('ipf-') === 0
+							if (answer.subjectId !== this.subjectId && !isLegacyDefault) return
+							if (!answer.knowledge) return
+							attemptedByKnowledge[answer.knowledge] = (attemptedByKnowledge[answer.knowledge] || 0) + 1
+						})
+					}
 					const knowledgeGroups = Array.isArray(catalog.knowledgeGroups) ? catalog.knowledgeGroups : []
 					const knowledgePositions = cloudState && cloudState.progressPositions
 						? cloudState.progressPositions.knowledge || {}
 						: {}
 					this.items = knowledgeGroups.map(item => {
-						const attempted = cloudState
+						const attempted = !shouldLoadProgress
+							? 0
+							: cloudState
 							? (cloudState.knowledgeAttempts[item.name] || 0)
 							: (attemptedByKnowledge[item.name] || 0)
 						const total = Number.isInteger(item.count) && item.count >= 0 ? item.count : 0
@@ -178,7 +208,9 @@
 								attempted,
 								total,
 								percent: total ? Math.min(100, Math.round(attempted / total * 100)) : 0,
-								positionQuestionId: knowledgePositions[item.name] || ''
+								positionQuestionId: shouldLoadProgress
+									? knowledgePositions[item.name] || ''
+									: ''
 							}
 						}
 					})
@@ -198,23 +230,27 @@
 				let url = `/practice-pages/practice/practice?subjectId=${this.subjectId}`
 				if (this.view === 'knowledge') {
 					url += `&mode=knowledge&knowledge=${encodeURIComponent(item.name)}`
-					const savedPosition = getKnowledgePracticePosition(this.subjectId, item.name)
-					const startId = savedPosition && savedPosition.questionId
-						|| item.progress.positionQuestionId
-					if (startId) {
-						url += `&startId=${encodeURIComponent(startId)}`
-					} else if (item.progress.attempted > 0) {
-						url += `&startNumber=${Math.min(item.progress.attempted, item.progress.total)}`
+					if (this.answerMode !== 'exam') {
+						const savedPosition = getKnowledgePracticePosition(this.subjectId, item.name)
+						const startId = savedPosition && savedPosition.questionId
+							|| item.progress.positionQuestionId
+						if (startId) {
+							url += `&startId=${encodeURIComponent(startId)}`
+						} else if (item.progress.attempted > 0) {
+							url += `&startNumber=${Math.min(item.progress.attempted, item.progress.total)}`
+						}
 					}
 				} else {
 					url += `&mode=chapter&chapterId=${item.id}`
-					const savedPosition = getChapterPracticePosition(this.subjectId, item.id)
-					const startId = savedPosition && savedPosition.questionId
-						|| item.progress.positionQuestionId
-					if (startId) {
-						url += `&startId=${encodeURIComponent(startId)}`
-					} else if (item.progress.attempted > 0) {
-						url += `&startNumber=${Math.min(item.progress.attempted, item.progress.total)}`
+					if (this.answerMode !== 'exam') {
+						const savedPosition = getChapterPracticePosition(this.subjectId, item.id)
+						const startId = savedPosition && savedPosition.questionId
+							|| item.progress.positionQuestionId
+						if (startId) {
+							url += `&startId=${encodeURIComponent(startId)}`
+						} else if (item.progress.attempted > 0) {
+							url += `&startNumber=${Math.min(item.progress.attempted, item.progress.total)}`
+						}
 					}
 				}
 				uni.navigateTo({ url })
