@@ -131,6 +131,7 @@
 
 					if (this.view === 'chapter') {
 						const chapters = Array.isArray(catalog.chapters) ? catalog.chapters : []
+						const chapterPositions = cloudState && cloudState.progressPositions
 							? cloudState.progressPositions.chapter || {}
 							: {}
 						this.items = chapters.map(item => {
