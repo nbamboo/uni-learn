@@ -115,6 +115,10 @@ async function run() {
 		return context
 	}
 
+	function getCurrentSlide(context) {
+		return context.visibleSlides.find(slide => slide.offset === 0)
+	}
+
 	const single = createQuestion('single-1', 'single', ['A'])
 	const practice = createContext('practice', [single])
 	practice.loadQuestion(0)
@@ -132,6 +136,47 @@ async function run() {
 	assert.equal(multiplePractice.sessionAnswers[multiple.id], undefined)
 	multiplePractice.confirmCurrentAnswer()
 	assert.equal(multiplePractice.sessionAnswers[multiple.id].correct, true)
+
+	const following = createQuestion('single-2', 'single', ['B'])
+	const swipe = createContext('practice', [single, multiple, following])
+	swipe.loadQuestion(0)
+	swipe.animateToQuestion(1)
+	assert.equal(swipe.swiperCurrent, 2)
+	assert.equal(swipe.swiperSettledSlot, 1)
+	assert.equal(swipe.currentIndex, 0)
+	assert.equal(swipe.visibleSlides[2].question.id, multiple.id)
+	swipe.handleSwiperChange({ detail: { current: 2 } })
+	swipe.handleSwiperAnimationFinish({ detail: { current: 2 } })
+	assert.equal(swipe.currentIndex, 1)
+	assert.equal(swipe.swiperCurrent, 2)
+	assert.equal(swipe.swiperSettledSlot, 2)
+	assert.equal(getCurrentSlide(swipe).question.id, multiple.id)
+	assert.equal(swipe.visibleSlides[0].question.id, following.id)
+	assert.equal(swipe.swipeAnimating, false)
+	assert.equal(swipe.swiperTouchDisabled, false)
+
+	// 连续前进时物理槽位 1 -> 2 -> 0 循环，逻辑题号在动画结束时立即同步。
+	swipe.animateToQuestion(2)
+	assert.equal(swipe.swiperCurrent, 0)
+	assert.equal(swipe.swiperSettledSlot, 2)
+	assert.equal(swipe.visibleSlides[0].question.id, following.id)
+	swipe.handleSwiperChange({ detail: { current: 0 } })
+	swipe.handleSwiperAnimationFinish({ detail: { current: 0 } })
+	assert.equal(swipe.currentIndex, 2)
+	assert.equal(swipe.swiperSettledSlot, 0)
+	assert.equal(getCurrentSlide(swipe).question.id, following.id)
+	assert.equal(swipe.swipeAnimating, false)
+
+	// 后退复用相邻物理槽位，不需要无动画复位到中间页。
+	swipe.animateToQuestion(1)
+	assert.equal(swipe.swiperCurrent, 2)
+	swipe.handleSwiperChange({ detail: { current: 2 } })
+	swipe.handleSwiperAnimationFinish({ detail: { current: 2 } })
+	assert.equal(swipe.currentIndex, 1)
+	assert.equal(swipe.swiperSettledSlot, 2)
+	assert.equal(getCurrentSlide(swipe).question.id, multiple.id)
+	assert.equal(swipe.visibleSlides[1].question.id, single.id)
+	assert.equal(swipe.visibleSlides[0].question.id, following.id)
 
 	const exam = createContext('exam', [single, multiple])
 	const callsBeforeExam = recordCalls.length

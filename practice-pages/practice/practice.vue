@@ -14,30 +14,24 @@
 			<view class="progress-fill" :style="{ width: progressPercent + '%' }"></view>
 		</view>
 
-		<movable-area class="question-swipe-area">
-			<movable-view
-				class="question-swipe-view"
-				:class="{ 'is-animating': swipeAnimating }"
-				direction="horizontal"
-				:x="cardPositionX"
-				:animation="cardAnimationEnabled"
-				:damping="60"
-				:friction="2"
-				@change="handleCardPositionChange"
-				@touchstart="handleCardTouchStart"
-				@touchend="handleCardTouchEnd"
-				@touchcancel="cancelCardGesture"
-				@mousedown="handleCardMouseDown"
-				@mouseup="handleCardMouseUp"
-			>
-				<view class="question-slide" v-for="slide in visibleSlides" :key="slide.slot">
-					<scroll-view
-						class="question-scroll"
-						scroll-y
-						:scroll-top="slide.offset === 0 ? scrollTop : 0"
-						v-if="slide.question"
-					>
-						<view class="question-shell" :class="{ 'is-dragging': slide.offset === 0 && cardIsDragging }">
+		<swiper
+			class="question-swiper"
+			:current="swiperCurrent"
+			:duration="swiperDuration"
+			:circular="questionList.length > 2"
+			easing-function="easeOutCubic"
+			:disable-touch="swiperTouchDisabled"
+			@change="handleSwiperChange"
+			@animationfinish="handleSwiperAnimationFinish"
+		>
+			<swiper-item class="question-slide" v-for="slide in visibleSlides" :key="slide.slot">
+				<scroll-view
+					class="question-scroll"
+					scroll-y
+					:scroll-top="slide.offset === 0 ? scrollTop : 0"
+					v-if="slide.question"
+				>
+					<view class="question-shell">
 							<view class="question-header">
 								<view class="type-badge">{{ slide.question.type === 'multiple' ? '多选题' : '单选题' }}</view>
 								<view class="question-count"><text>{{ slide.index + 1 }}</text>/{{ questionList.length }}</view>
@@ -95,12 +89,11 @@
 									<button class="next-button" @tap="nextQuestion">{{ slide.index === questionList.length - 1 ? '完成练习' : '下一题' }}</button>
 								</view>
 							</view>
-						</view>
-					</scroll-view>
-					<view class="question-slide-boundary" v-else></view>
-				</view>
-			</movable-view>
-		</movable-area>
+					</view>
+				</scroll-view>
+				<view class="question-slide-boundary" v-else></view>
+			</swiper-item>
+		</swiper>
 
 		<view class="bottom-toolbar" :class="{ 'exam-toolbar': examInProgress }">
 			<view class="toolbar-stat answered-text" v-if="examInProgress">
@@ -226,11 +219,9 @@
 				correctCount: 0,
 				wrongCount: 0,
 				scrollTop: 0,
-				cardPositionX: 375,
-				cardCenterX: 375,
-				cardAnimationEnabled: false,
-				cardIsDragging: false,
-				ignoreMouseUntil: 0,
+				swiperCurrent: 1,
+				swiperSettledSlot: 1,
+				swiperDuration: 300,
 				swipeAnimating: false,
 				mode: 'sequence',
 				loading: true,
@@ -244,14 +235,17 @@
 				return this.questionList[this.currentIndex] || null
 			},
 			visibleSlides() {
-				const slots = ['previous', 'current', 'next']
-				return [-1, 0, 1].map((offset, slotIndex) => {
+				const nextSlot = this.getSwiperSlot(this.swiperSettledSlot + 1)
+				return [0, 1, 2].map(slotIndex => {
+					const offset = slotIndex === this.swiperSettledSlot
+						? 0
+						: (slotIndex === nextSlot ? 1 : -1)
 					const index = this.currentIndex + offset
 					const question = this.questionList[index] || null
 					const answer = question ? this.sessionAnswers[question.id] : null
 					const draft = question ? this.draftAnswers[question.id] : null
 					return {
-						slot: slots[slotIndex],
+						slot: `slot-${slotIndex}`,
 						offset,
 						index,
 						question,
@@ -276,6 +270,9 @@
 			},
 			examInProgress() {
 				return this.answerMode === 'exam' && !this.examSubmitted
+			},
+			swiperTouchDisabled() {
+				return this.questionList.length < 2
 			}
 		},
 		onLoad(options) {
@@ -323,6 +320,7 @@
 				this.currentIndex = 0
 				this.draftAnswers = {}
 				this.examSubmitted = false
+				this.resetSwiperPosition()
 				try {
 					await this.loadAnswerPreferences()
 					if (this.mode === 'chapter') {
@@ -354,7 +352,6 @@
 							: -1
 						const startIndex = savedStartIndex > -1 ? savedStartIndex : numberedStartIndex
 						this.loadQuestion(startIndex > -1 ? startIndex : 0)
-						this.resetCardPosition(false)
 					}
 				} catch (error) {
 					this.loadError = error && error.errCode === 'QUESTION_BANK_SUBJECT_NOT_FOUND'
@@ -448,126 +445,56 @@
 					// 进度已持久化在本机，下次启动会自动重试。
 				})
 			},
-			handleCardPositionChange(event) {
-				const position = Number(event.detail && event.detail.x)
-				if (!isNaN(position)) this._cardCurrentX = position
+			handleSwiperChange(event) {
+				const position = Number(event.detail && event.detail.current)
+				if (position < 0 || position > 2 || isNaN(position)) return
+				this.swiperCurrent = position
+				if (position !== this.swiperSettledSlot) this.swipeAnimating = true
 			},
-			handleCardTouchStart(event) {
-				if (this.swipeAnimating) return
-				const touch = event.touches && event.touches[0]
-				if (!touch) return
-				this.cardIsDragging = true
-				this._cardGestureStartX = typeof touch.clientX === 'number' ? touch.clientX : touch.pageX
-			},
-			handleCardTouchEnd(event) {
-				const touch = event.changedTouches && event.changedTouches[0]
-				if (!touch) return
-				this.ignoreMouseUntil = Date.now() + 500
-				const endX = typeof touch.clientX === 'number' ? touch.clientX : touch.pageX
-				this.finishCardGesture(endX - this._cardGestureStartX)
-			},
-			handleCardMouseDown(event) {
-				if (Date.now() < this.ignoreMouseUntil || this.swipeAnimating) return
-				this.cardIsDragging = true
-				this._cardGestureStartX = event.clientX
-			},
-			handleCardMouseUp(event) {
-				if (Date.now() < this.ignoreMouseUntil || !this.cardIsDragging) return
-				this.finishCardGesture(event.clientX - this._cardGestureStartX)
-			},
-			finishCardGesture(horizontalDistance) {
-				this.cardIsDragging = false
-				this._cardGestureStartX = null
-				if (this.swipeAnimating) return
-				if (typeof horizontalDistance !== 'number' || isNaN(horizontalDistance)) {
-					setTimeout(() => this.settleCard(), 16)
+			handleSwiperAnimationFinish(event) {
+				const position = Number(event.detail && event.detail.current)
+				if (position < 0 || position > 2 || isNaN(position)) return
+				this.swiperCurrent = position
+				if (position === this.swiperSettledSlot) {
+					this.swipeAnimating = false
 					return
 				}
-				setTimeout(() => this.resolveCardGesture(horizontalDistance), 16)
-			},
-			resolveCardGesture(horizontalDistance) {
-				if (this.swipeAnimating) return
-				const screenWidth = this.cardCenterX
-				const swipeThreshold = Math.max(52, Math.min(90, screenWidth * 0.18))
-				if (Math.abs(horizontalDistance) < swipeThreshold) {
-					this.settleCard()
-					return
-				}
-				if (horizontalDistance < 0) this.swipeToNextQuestion()
-				else this.swipeToPreviousQuestion()
-			},
-			swipeToNextQuestion() {
-				if (this.currentIndex < this.questionList.length - 1) {
-					this.animateToQuestion(this.currentIndex + 1, -1)
-					return
-				}
-				this.settleCard()
-				uni.showToast({
-					title: this.examInProgress ? '已到最后一题，可点击交卷' : '已经是最后一题',
-					icon: 'none'
-				})
-			},
-			swipeToPreviousQuestion() {
-				if (this.currentIndex > 0) {
-					this.animateToQuestion(this.currentIndex - 1, 1)
-					return
-				}
-				this.settleCard()
-				uni.showToast({ title: '已经是第一题', icon: 'none' })
-			},
-			animateToQuestion(targetIndex, direction) {
-				if (this.swipeAnimating) return
-				this.swipeAnimating = true
-				this.cardIsDragging = false
-				const screenWidth = this.cardCenterX
-				const exitPosition = direction < 0 ? 0 : screenWidth * 2
-				this.moveCardTo(exitPosition, true)
-
-				setTimeout(() => {
-					this.cardAnimationEnabled = false
-					this.loadQuestion(targetIndex)
-					this.cardPositionX = screenWidth
-					this._cardCurrentX = screenWidth
-					this.$nextTick(() => {
-						setTimeout(() => {
-							this.swipeAnimating = false
-						}, 16)
+				const direction = position === this.getSwiperSlot(this.swiperSettledSlot + 1)
+					? 1
+					: -1
+				const targetIndex = this.currentIndex + direction
+				if (targetIndex < 0 || targetIndex >= this.questionList.length) {
+					this.swipeAnimating = true
+					this.swiperDuration = 300
+					this.swiperCurrent = this.swiperSettledSlot
+					uni.showToast({
+						title: direction > 0 && this.examInProgress
+							? '已到最后一题，可点击交卷'
+							: (direction > 0 ? '已经是最后一题' : '已经是第一题'),
+						icon: 'none'
 					})
-				}, 320)
+					return
+				}
+				this.loadQuestion(targetIndex)
+				this.swiperSettledSlot = position
+				this.swipeAnimating = false
 			},
-			settleCard() {
-				this.cardIsDragging = false
-				this.moveCardTo(this.cardCenterX, true)
+			animateToQuestion(targetIndex) {
+				if (this.swipeAnimating || targetIndex === this.currentIndex) return
+				if (targetIndex < 0 || targetIndex >= this.questionList.length) return
+				const moveDirection = targetIndex > this.currentIndex ? 1 : -1
+				this.swipeAnimating = true
+				this.swiperDuration = 300
+				this.swiperCurrent = this.getSwiperSlot(this.swiperSettledSlot + moveDirection)
 			},
-			cancelCardGesture() {
-				this._cardGestureStartX = null
-				setTimeout(() => this.settleCard(), 16)
+			resetSwiperPosition() {
+				this.swiperSettledSlot = 1
+				this.swiperCurrent = 1
+				this.swiperDuration = 300
+				this.swipeAnimating = false
 			},
-			moveCardTo(targetPosition, animated) {
-				this.cardAnimationEnabled = false
-				this.cardPositionX = this.getCurrentCardX()
-				this.$nextTick(() => {
-					setTimeout(() => {
-						this.cardAnimationEnabled = animated
-						this.cardPositionX = targetPosition
-					}, 16)
-				})
-			},
-			resetCardPosition(animated) {
-				const centerPosition = this.getScreenWidth()
-				this.cardCenterX = centerPosition
-				this.cardAnimationEnabled = animated
-				this.cardPositionX = centerPosition
-				this._cardCurrentX = centerPosition
-			},
-			getCurrentCardX() {
-				return typeof this._cardCurrentX === 'number'
-					? this._cardCurrentX
-					: this.cardCenterX
-			},
-			getScreenWidth() {
-				const systemInfo = uni.getSystemInfoSync()
-				return systemInfo.windowWidth || 375
+			getSwiperSlot(position) {
+				return (position + 3) % 3
 			},
 			chooseOption(alias) {
 				if (this.submitted || this.answerMode === 'review'
@@ -667,11 +594,11 @@
 				uni.showToast({ title: '交卷成功', icon: 'success' })
 			},
 			previousQuestion() {
-				if (this.currentIndex > 0) this.animateToQuestion(this.currentIndex - 1, 1)
+				if (this.currentIndex > 0) this.animateToQuestion(this.currentIndex - 1)
 			},
 			nextQuestion() {
 				if (this.currentIndex < this.questionList.length - 1) {
-					this.animateToQuestion(this.currentIndex + 1, -1)
+					this.animateToQuestion(this.currentIndex + 1)
 					return
 				}
 				const isReview = this.answerMode === 'review'
@@ -702,7 +629,6 @@
 			},
 			jumpToQuestion(index) {
 				this.loadQuestion(index)
-				this.resetCardPosition(false)
 				this.closeAnswerSheet()
 			},
 			answerNumberClass(index) {
@@ -742,14 +668,11 @@
 	.practice-page { height: 100vh; overflow: hidden; }
 	.progress-track { height: 6rpx; background: #dce0e5; }
 	.progress-fill { height: 100%; background: #008cff; transition: width 0.2s ease; }
-	.question-swipe-area { width: 500vw; height: calc(100vh - 106rpx - env(safe-area-inset-bottom)); margin-left: -200vw; overflow: hidden; background: transparent; }
-	.question-swipe-view { display: flex; width: 300vw; height: 100%; }
-	.question-swipe-view.is-animating { pointer-events: none; }
+	.question-swiper { width: 100%; height: calc(100vh - 106rpx - env(safe-area-inset-bottom)); overflow: hidden; background: transparent; }
 	.question-slide { width: 100vw; height: 100%; flex: 0 0 100vw; }
 	.question-slide-boundary { width: 100%; height: 100%; }
 	.question-scroll { width: 100%; height: 100%; }
 	.question-shell { margin: 24rpx; padding: 28rpx 28rpx 48rpx; border-radius: 8rpx; background: #ffffff; box-sizing: border-box; }
-	.question-shell.is-dragging { box-shadow: 0 16rpx 36rpx rgba(28, 67, 102, 0.14); }
 	.question-header, .question-meta, .answer-sheet-header { display: flex; align-items: center; justify-content: space-between; }
 	.type-badge { padding: 10rpx 20rpx; border-left: 6rpx solid #008cff; border-radius: 4rpx; background: #eaf5ff; color: #0074d4; font-size: 27rpx; font-weight: 600; }
 	.question-count { font-size: 30rpx; color: #4e545d; }
@@ -826,7 +749,6 @@
 	.night-mode .bottom-toolbar,
 	.night-mode .answer-sheet,
 	.night-mode .calculator-sheet { background: #1b222a; }
-	.night-mode .question-shell.is-dragging { box-shadow: 0 16rpx 36rpx rgba(0, 0, 0, 0.36); }
 	.night-mode .type-badge { background: #17364d; color: #65baff; }
 	.night-mode .question-count,
 	.night-mode .chapter-name,
