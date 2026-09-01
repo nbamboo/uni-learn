@@ -1,5 +1,5 @@
 <template>
-	<view class="records-page">
+	<view class="records-page" :class="{ 'night-mode': nightMode }">
 		<view class="records-header">
 			<text class="subject-name">{{ subject.name }}</text>
 			<view class="record-tabs">
@@ -11,14 +11,14 @@
 
 		<view class="records-summary">
 			<view>
-					<text class="summary-value">{{ total }}</text>
+				<text class="summary-value">{{ total }}</text>
 				<text class="summary-label">{{ activeTab.unit }}</text>
 			</view>
 			<button v-if="records.length" @tap="startAll">开始练习</button>
 		</view>
 
 		<view class="loading-state" v-if="loading">
-			<uni-load-more status="loading"></uni-load-more>
+			<uni-load-more status="loading" :color="nightMode ? '#8f99a5' : '#777777'"></uni-load-more>
 		</view>
 
 		<view class="empty-state error-state" v-else-if="loadError">
@@ -31,7 +31,7 @@
 		</view>
 
 		<view class="record-list" v-else-if="records.length">
-				<view class="record-item" v-for="(item, index) in records" :key="item.recordId" @tap="startFrom(item.question.id)">
+			<view class="record-item" v-for="(item, index) in records" :key="item.recordId" @tap="startFrom(item.question.id)">
 				<view class="record-index">{{ index + 1 }}</view>
 				<view class="record-content">
 					<text class="record-title">{{ item.question.title }}</text>
@@ -48,6 +48,7 @@
 			<uni-load-more
 				v-if="hasMore"
 				:status="loadingMore ? 'loading' : 'more'"
+				:color="nightMode ? '#8f99a5' : '#777777'"
 				:content-text="{ contentdown: '加载更多', contentrefresh: '正在加载', contentnomore: '没有更多了' }"
 				@clickLoadMore="loadMore"
 			></uni-load-more>
@@ -55,7 +56,7 @@
 
 		<view class="empty-state" v-else>
 			<view class="empty-icon">
-				<uni-icons :type="activeTab.icon" size="42" color="#9da3ab"></uni-icons>
+				<uni-icons :type="activeTab.icon" size="42" :color="nightMode ? '#717c88' : '#9da3ab'"></uni-icons>
 			</view>
 			<text class="empty-title">{{ activeTab.emptyTitle }}</text>
 			<text class="empty-caption">{{ activeTab.emptyCaption }}</text>
@@ -65,8 +66,11 @@
 </template>
 
 <script>
-		import { getSubjectById } from '@/data/practice.js'
-		import { getPracticeRecords } from '@/services/user-practice.js'
+	import { getSubjectById } from '@/data/practice.js'
+	import {
+		getLocalPracticePreferences,
+		getPracticeRecords
+	} from '@/services/user-practice.js'
 
 	function formatRecordTime(timestamp) {
 		const date = new Date(timestamp)
@@ -76,17 +80,19 @@
 
 	export default {
 		data() {
+			const localPreferences = getLocalPracticePreferences()
 			return {
 				subjectId: '',
-					activeView: 'wrong',
-					records: [],
-					total: 0,
-					page: 1,
-					hasMore: false,
-					loading: true,
-					loadingMore: false,
-					loadError: '',
-					requestId: 0,
+				activeView: 'wrong',
+				records: [],
+				total: 0,
+				page: 1,
+				hasMore: false,
+				loading: true,
+				loadingMore: false,
+				loadError: '',
+				requestId: 0,
+				nightMode: Boolean(localPreferences.nightMode),
 				tabs: [
 					{ key: 'wrong', label: '错题集', unit: '道待巩固', icon: 'refresh', emptyTitle: '暂时没有错题', emptyCaption: '继续保持，答错的题目会自动加入这里。' },
 					{ key: 'favorite', label: '收藏夹', unit: '道已收藏', icon: 'star', emptyTitle: '还没有收藏题目', emptyCaption: '刷题时点亮星标，重点题目会出现在这里。' }
@@ -104,59 +110,71 @@
 		onLoad(options) {
 			this.subjectId = options.subjectId
 			this.activeView = this.tabs.some(item => item.key === options.view) ? options.view : 'wrong'
+			this.applyNavigationTheme()
 		},
 		onShow() {
+			this.nightMode = Boolean(getLocalPracticePreferences().nightMode)
+			this.applyNavigationTheme()
 			this.loadRecords()
 		},
-			methods: {
-				switchView(view) {
-					this.activeView = view
-					this.loadRecords(true)
-				},
-				async loadRecords(reset) {
-					const shouldReset = reset !== false
-					const requestId = ++this.requestId
-					if (shouldReset) {
-						this.loading = true
-						this.loadError = ''
-						this.records = []
-						this.total = 0
-						this.page = 1
-					} else {
-						this.loadingMore = true
+		methods: {
+			applyNavigationTheme() {
+				uni.setNavigationBarColor({
+					frontColor: this.nightMode ? '#ffffff' : '#000000',
+					backgroundColor: this.nightMode ? '#171c22' : '#ffffff'
+				})
+			},
+			switchView(view) {
+				this.activeView = view
+				this.loadRecords(true)
+			},
+			async loadRecords(reset, forceRefresh) {
+				const shouldReset = reset !== false
+				const requestId = ++this.requestId
+				if (shouldReset) {
+					this.loading = true
+					this.loadError = ''
+					this.records = []
+					this.total = 0
+					this.page = 1
+				} else {
+					this.loadingMore = true
+				}
+				try {
+					const result = await getPracticeRecords({
+						subjectId: this.subjectId,
+						type: this.activeView,
+						page: this.page,
+						pageSize: 20,
+						forceRefresh: Boolean(forceRefresh)
+					})
+					if (requestId !== this.requestId) return
+					const items = (result.items || []).map(item => Object.assign({}, item, {
+						time: item.timestamp ? formatRecordTime(item.timestamp) : ''
+					}))
+					this.records = shouldReset ? items : this.records.concat(items)
+					if (result.total !== null && result.total !== undefined) {
+						this.total = Number(result.total) || 0
 					}
-					try {
-						const result = await getPracticeRecords({
-							subjectId: this.subjectId,
-							type: this.activeView,
-							page: this.page,
-							pageSize: 20
-						})
-						if (requestId !== this.requestId) return
-						const items = (result.items || []).map(item => Object.assign({}, item, {
-							time: item.timestamp ? formatRecordTime(item.timestamp) : ''
-						}))
-						this.records = shouldReset ? items : this.records.concat(items)
-						this.total = result.total || 0
-						this.hasMore = Boolean(result.hasMore)
-					} catch (error) {
-						if (requestId !== this.requestId) return
-						this.loadError = (error && (error.errMsg || error.message)) || '云端记录加载失败'
-					} finally {
-						if (requestId === this.requestId) {
-							this.loading = false
-							this.loadingMore = false
-						}
+					this.hasMore = Boolean(result.hasMore)
+				} catch (error) {
+					if (requestId !== this.requestId) return
+					this.loadError = (error && (error.errMsg || error.message)) || '云端记录加载失败'
+				} finally {
+					if (requestId === this.requestId) {
+						this.loading = false
+						this.loadingMore = false
 					}
-				},
-				loadMore() {
-					if (!this.hasMore || this.loadingMore) return
-					this.page += 1
-					this.loadRecords(false)
-				},
-				retryLoad() {
-					this.loadRecords(true)
-				},
+				}
+			},
+			loadMore() {
+				if (!this.hasMore || this.loadingMore) return
+				this.page += 1
+				this.loadRecords(false)
+			},
+			retryLoad() {
+				this.loadRecords(true, true)
+			},
 			startAll() {
 				uni.navigateTo({ url: `/practice-pages/practice/practice?subjectId=${this.subjectId}&mode=${this.activeView}` })
 			},
@@ -202,4 +220,23 @@
 	.empty-caption { margin-top: 12rpx; color: #8a9098; font-size: 25rpx; line-height: 1.6; }
 	.empty-state button { height: 76rpx; margin-top: 30rpx; padding: 0 42rpx; border-radius: 40rpx; background: #008cff; color: #ffffff; font-size: 27rpx; line-height: 76rpx; }
 	.error-state { color: #bd3f3f; }
+	.records-page.night-mode { background: #12171d; color: #e6e9ed; }
+	.night-mode .records-header { background: #171c22; }
+	.night-mode .subject-name,
+	.night-mode .record-tab,
+	.night-mode .summary-label,
+	.night-mode .record-meta,
+	.night-mode .empty-caption { color: #8f99a5; }
+	.night-mode .record-tab.active,
+	.night-mode .summary-value { color: #63b9f6; }
+	.night-mode .record-tab.active::after { background: #269df0; }
+	.night-mode .records-summary { background: #17364d; }
+	.night-mode .records-summary button,
+	.night-mode .empty-state button { background: #168ee5; }
+	.night-mode .record-item { background: #1b222a; }
+	.night-mode .record-index,
+	.night-mode .empty-icon { background: #242c35; color: #aeb7c1; }
+	.night-mode .record-status.correct { background: #1e372e; }
+	.night-mode .record-status.wrong { background: #3b2327; }
+	.night-mode .error-state { color: #ef9a9a; }
 </style>

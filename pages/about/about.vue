@@ -35,7 +35,10 @@
 </template>
 
 	<script>
-		import { getPracticeUserProfile, pendingPracticeEventCount } from '@/services/user-practice.js'
+		import {
+			getPracticeUserProfile,
+			pendingPracticeEventCount
+		} from '@/services/user-practice.js'
 
 		export default {
 			data() {

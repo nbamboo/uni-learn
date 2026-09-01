@@ -65,9 +65,10 @@ function projectDocument(document, fields) {
 }
 
 class FakeQuery {
-	constructor(documents, condition) {
+	constructor(documents, condition, metrics) {
 		this.documents = documents
 		this.condition = condition || {}
+		this.metrics = metrics
 		this.fields = null
 		this.orders = []
 		this.offset = 0
@@ -104,6 +105,7 @@ class FakeQuery {
 	}
 
 	async count() {
+		this.metrics.count += 1
 		return { total: this.filtered().length }
 	}
 
@@ -126,12 +128,13 @@ class FakeQuery {
 }
 
 class FakeCollection {
-	constructor(documents) {
+	constructor(documents, metrics) {
 		this.documents = documents
+		this.metrics = metrics
 	}
 
 	where(condition) {
-		return new FakeQuery(this.documents, condition)
+		return new FakeQuery(this.documents, condition, this.metrics)
 	}
 
 	doc(documentId) {
@@ -142,6 +145,7 @@ class FakeCollection {
 }
 
 function createFakeDatabase(collections) {
+	const metrics = { count: 0 }
 	const command = {
 		and() {
 			return { __command: 'and', conditions: Array.from(arguments) }
@@ -158,9 +162,10 @@ function createFakeDatabase(collections) {
 	}
 	return {
 		command,
+		metrics,
 		collection(name) {
 			if (!collections[name]) throw new Error(`Unknown collection: ${name}`)
-			return new FakeCollection(collections[name])
+			return new FakeCollection(collections[name], metrics)
 		}
 	}
 }
@@ -193,6 +198,16 @@ async function run() {
 	assert.equal(catalog.questionCount, 822)
 	assert.equal(catalog.chapters.length, 8)
 	assert.equal(catalog.knowledgeGroups.length, 122)
+	const catalogSummaries = await service.execute({ action: 'getCatalogSummaries' })
+	assert.equal(catalogSummaries.items.length, 1)
+	assert.deepEqual(catalogSummaries.items[0], {
+		id: subjectId,
+		subjectId,
+		name: '初级个人理财',
+		level: '初级',
+		activeVersion: catalog.activeVersion,
+		questionCount: 822
+	})
 
 	const firstPage = await service.execute({
 		action: 'getPracticePage', subjectId, mode: 'sequence', pageSize: 7
@@ -202,12 +217,14 @@ async function run() {
 	assert.equal(firstPage.items[0].id, questions[0].questionId)
 	assert.ok(firstPage.items[0].answer.length)
 	assert.equal(firstPage.nextCursor, 7)
+	assert.equal(db.metrics.count, 1)
 
 	const secondPage = await service.execute({
 		action: 'getPracticePage', subjectId, mode: 'sequence', pageSize: 7, cursor: firstPage.nextCursor
 	})
 	assert.equal(secondPage.items[0].sortOrder, 8)
 	assert.equal(new Set(firstPage.items.concat(secondPage.items).map(item => item.id)).size, 14)
+	assert.equal(db.metrics.count, 1)
 
 	const chapterPage = await service.execute({
 		action: 'getPracticePage', subjectId, mode: 'chapter', chapterId: '1', pageSize: 50
@@ -260,10 +277,11 @@ async function run() {
 		answeredQuestionIds,
 		wrongQuestionIds
 	})
-	assert.deepEqual(smartPage.stateCounts, { fresh: 2, wrong: 5, mastered: 815 })
+	assert.equal(smartPage.stateCounts.sampled, 100)
+	assert.equal(smartPage.stateCounts.wrong, 5)
+	assert.ok(smartPage.stateCounts.fresh + smartPage.stateCounts.mastered <= 100)
 	assert.equal(smartPage.items.length, 10)
-	assert.ok(smartPage.items.slice(0, 2).every(item => answeredQuestionIds.indexOf(item.id) === -1))
-	assert.ok(smartPage.items.slice(2, 7).every(item => wrongQuestionIds.indexOf(item.id) > -1))
+	assert.ok(smartPage.items.some(item => wrongQuestionIds.indexOf(item.id) > -1))
 
 	await assert.rejects(
 		service.execute({ action: 'getPracticePage', subjectId, pageSize: 51 }),

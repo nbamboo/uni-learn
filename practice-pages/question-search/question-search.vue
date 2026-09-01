@@ -8,7 +8,7 @@
 			</view>
 		</view>
 
-		<view class="loading-state" v-if="loading">
+		<view class="loading-state" v-if="loading && !results.length">
 			<uni-load-more status="loading"></uni-load-more>
 		</view>
 
@@ -28,10 +28,10 @@
 		<view v-else>
 			<view class="result-heading">
 				<text>搜索结果</text>
-				<text>{{ results.length }} 道</text>
+				<text>{{ total }} 道</text>
 			</view>
 			<view class="result-list" v-if="results.length">
-				<view class="result-item" v-for="(question, index) in visibleResults" :key="question.id" @tap="startQuestion(question.id)">
+				<view class="result-item" v-for="(question, index) in results" :key="question.id" @tap="startQuestion(question.id)">
 					<view class="result-index">{{ index + 1 }}</view>
 					<view class="result-content">
 						<text class="result-title">{{ question.title }}</text>
@@ -42,6 +42,12 @@
 					</view>
 					<uni-icons type="right" size="17" color="#a4a9b0"></uni-icons>
 				</view>
+				<uni-load-more
+					v-if="hasMore"
+					:status="loadingMore ? 'loading' : 'more'"
+					:content-text="{ contentdown: '加载更多', contentrefresh: '正在加载', contentnomore: '没有更多了' }"
+					@clickLoadMore="loadMore"
+				></uni-load-more>
 			</view>
 
 			<view class="empty-state" v-else>
@@ -54,52 +60,100 @@
 </template>
 
 <script>
-	import { getKnowledgeGroups, getQuestionsBySubject } from '@/data/practice-questions.js'
+	import { getKnowledgeGroups } from '@/data/practice-questions.js'
 	import { getSubjectById } from '@/data/practice.js'
+	import { searchQuestionBank } from '@/services/question-bank.js'
 
 	export default {
 		data() {
 			return {
 				subjectId: '',
 				keyword: '',
-				questions: [],
+				results: [],
+				total: 0,
+				cursor: 0,
+				hasMore: false,
 				popularKnowledge: [],
-				loading: true
+				loading: true,
+				loadingMore: false,
+				searchTimer: null,
+				searchRequestId: 0
 			}
 		},
 		computed: {
 			subject() {
 				return getSubjectById(this.subjectId)
-			},
-			results() {
-				const keyword = this.keyword.trim().toLowerCase()
-				if (!keyword) return []
-				return this.questions.filter(question => {
-					const source = [
-						question.title,
-						question.chapter,
-						question.section,
-						question.knowledge,
-						question.options.map(item => item.text).join(' ')
-					].join(' ').toLowerCase()
-					return source.indexOf(keyword) > -1
-				})
-			},
-			visibleResults() {
-				return this.results.slice(0, 80)
+			}
+		},
+		watch: {
+			keyword() {
+				if (this.searchTimer) clearTimeout(this.searchTimer)
+				this.searchTimer = setTimeout(() => this.search(true), 300)
 			}
 		},
 		async onLoad(options) {
 			this.subjectId = options.subjectId
-			const [questions, knowledgeGroups] = await Promise.all([
-				getQuestionsBySubject(this.subjectId),
-				getKnowledgeGroups(this.subjectId)
-			])
-			this.questions = questions
-			this.popularKnowledge = knowledgeGroups.slice(0, 10)
-			this.loading = false
+			try {
+				const knowledgeGroups = await getKnowledgeGroups(this.subjectId)
+				this.popularKnowledge = knowledgeGroups.slice(0, 10)
+			} catch (error) {
+				this.popularKnowledge = []
+			} finally {
+				this.loading = false
+			}
+		},
+		onUnload() {
+			if (this.searchTimer) clearTimeout(this.searchTimer)
 		},
 		methods: {
+			async search(reset) {
+				const keyword = this.keyword.trim()
+				const requestId = ++this.searchRequestId
+				if (!keyword) {
+					this.results = []
+					this.total = 0
+					this.cursor = 0
+					this.hasMore = false
+					this.loading = false
+					this.loadingMore = false
+					return
+				}
+				if (reset) {
+					this.loading = true
+					this.results = []
+					this.total = 0
+					this.cursor = 0
+				} else {
+					this.loadingMore = true
+				}
+				try {
+					const result = await searchQuestionBank({
+						subjectId: this.subjectId,
+						keyword,
+						cursor: reset ? 0 : this.cursor,
+						pageSize: 20
+					})
+					if (requestId !== this.searchRequestId || keyword !== this.keyword.trim()) return
+					const items = result.items || []
+					this.results = reset ? items : this.results.concat(items)
+					if (result.total !== null && result.total !== undefined) this.total = Number(result.total) || 0
+					this.cursor = Number(result.nextCursor) || 0
+					this.hasMore = Boolean(result.hasMore)
+				} catch (error) {
+					if (requestId === this.searchRequestId) {
+						uni.showToast({ title: (error && (error.errMsg || error.message)) || '搜索失败', icon: 'none' })
+					}
+				} finally {
+					if (requestId === this.searchRequestId) {
+						this.loading = false
+						this.loadingMore = false
+					}
+				}
+			},
+			loadMore() {
+				if (!this.hasMore || this.loadingMore) return
+				this.search(false)
+			},
 			startQuestion(questionId) {
 				const keyword = encodeURIComponent(this.keyword.trim())
 				uni.navigateTo({

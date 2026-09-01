@@ -1,0 +1,177 @@
+{
+  "status": "passed_with_rejections",
+  "input": "/Users/shenyongliang/Documents/GitHub/uni-learn/resources/topic/银行从业初级银行业法律法规与综合能力_章节练习_题目整理.xlsx",
+  "sourceSubject": "银行从业初级银行业法律法规与综合能力",
+  "subject": {
+    "subjectId": "junior-law",
+    "name": "初级银行业法律法规与综合能力",
+    "level": "初级",
+    "questionPrefix": "jlaw"
+  },
+  "version": "2026-09-01-v1",
+  "counts": {
+    "sourceRows": 1773,
+    "visibleRows": 820,
+    "permissionSkippedRows": 953,
+    "acceptedQuestions": 815,
+    "rejectedQuestions": 5,
+    "chapters": 22,
+    "knowledgeGroups": 202
+  },
+  "statusCounts": {
+    "可查看": 820,
+    "权限不足/收费题": 953
+  },
+  "rejectionReasons": {
+    "contains_image": 5
+  },
+  "warnings": {
+    "duplicateTitleGroups": 1,
+    "note": "相同题干但选项不同不按重复题处理；可结合 rejected.json 和源数据人工复核。"
+  },
+  "chapterCounts": [
+    {
+      "id": "1",
+      "subjectId": "junior-law",
+      "name": "第一部分第一章 经济基础知识",
+      "count": 44
+    },
+    {
+      "id": "2",
+      "subjectId": "junior-law",
+      "name": "第一部分第二章 金融基础知识",
+      "count": 86
+    },
+    {
+      "id": "3",
+      "subjectId": "junior-law",
+      "name": "第一部分第三章 金融市场",
+      "count": 59
+    },
+    {
+      "id": "4",
+      "subjectId": "junior-law",
+      "name": "第一部分第四章 银行体系",
+      "count": 28
+    },
+    {
+      "id": "5",
+      "subjectId": "junior-law",
+      "name": "第二部分第一章 存款业务",
+      "count": 63
+    },
+    {
+      "id": "6",
+      "subjectId": "junior-law",
+      "name": "第二部分第二章 贷款业务",
+      "count": 55
+    },
+    {
+      "id": "7",
+      "subjectId": "junior-law",
+      "name": "第二部分第三章 结算、代理及托管业务",
+      "count": 37
+    },
+    {
+      "id": "10",
+      "subjectId": "junior-law",
+      "name": "第二部分第六章 银行卡业务",
+      "count": 10
+    },
+    {
+      "id": "11",
+      "subjectId": "junior-law",
+      "name": "第二部分第七章 理财与同业业务",
+      "count": 6
+    },
+    {
+      "id": "12",
+      "subjectId": "junior-law",
+      "name": "第三部分第一章 银行管理基础",
+      "count": 36
+    },
+    {
+      "id": "13",
+      "subjectId": "junior-law",
+      "name": "第三部分第二章 公司治理、内部控制与合规管理",
+      "count": 10
+    },
+    {
+      "id": "14",
+      "subjectId": "junior-law",
+      "name": "第三部分第三章 商业银行资产负债管理",
+      "count": 10
+    },
+    {
+      "id": "15",
+      "subjectId": "junior-law",
+      "name": "第三部分第四章 资本管理",
+      "count": 21
+    },
+    {
+      "id": "16",
+      "subjectId": "junior-law",
+      "name": "第三部分第五章 风险管理",
+      "count": 55
+    },
+    {
+      "id": "17",
+      "subjectId": "junior-law",
+      "name": "第四部分第一章 银行基本法律法规",
+      "count": 56
+    },
+    {
+      "id": "18",
+      "subjectId": "junior-law",
+      "name": "第四部分第二章 民事法律制度",
+      "count": 90
+    },
+    {
+      "id": "19",
+      "subjectId": "junior-law",
+      "name": "第四部分第三章 商事法律制度",
+      "count": 39
+    },
+    {
+      "id": "20",
+      "subjectId": "junior-law",
+      "name": "第四部分第四章 刑事法律制度",
+      "count": 59
+    },
+    {
+      "id": "22",
+      "subjectId": "junior-law",
+      "name": "第五部分第一章 银行监管体制",
+      "count": 12
+    },
+    {
+      "id": "24",
+      "subjectId": "junior-law",
+      "name": "第五部分第三章 银行自律与市场约束",
+      "count": 24
+    },
+    {
+      "id": "25",
+      "subjectId": "junior-law",
+      "name": "第五部分第四章 清廉金融",
+      "count": 10
+    },
+    {
+      "id": "26",
+      "subjectId": "junior-law",
+      "name": "第五部分第五章 银行业消费者权益保护",
+      "count": 5
+    }
+  ],
+  "checks": {
+    "uniqueQuestionIds": true,
+    "uniqueDocumentIds": true,
+    "denseSortOrder": true,
+    "catalogCountMatches": true,
+    "chapterCountsMatch": true,
+    "knowledgeCountsMatch": true,
+    "answersMatchOptions": true,
+    "noImageMarkers": true
+  },
+  "generatedAt": "2026-09-01T13:54:07.199723+00:00"
+}

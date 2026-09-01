@@ -495,6 +495,15 @@
 					? savedStartIndex
 					: (numberedStartIndex > -1 ? numberedStartIndex : 0)
 			},
+			getSessionSnapshotQuestionIds(initialIndex) {
+				const maximum = 100
+				if (this.questionList.length <= maximum) return this.questionList.map(item => item.id)
+				const start = Math.max(0, Math.min(
+					this.questionList.length - maximum,
+					(Number(initialIndex) || 0) - Math.floor(maximum / 2)
+				))
+				return this.questionList.slice(start, start + maximum).map(item => item.id)
+			},
 			async loadAnswerPreferences() {
 				const preferences = await getPracticePreferences()
 				this.answerMode = preferences.answerMode
@@ -531,10 +540,14 @@
 					} else {
 						this.questionList = await buildPracticeQuestions(this.practiceConfig)
 					}
+					const initialQuestionIndex = this.resolveInitialQuestionIndex()
 					let snapshot = null
 					try {
 						snapshot = await getPracticeStateSnapshot(this.practiceConfig.subjectId, {
-							localState: getPracticeState()
+							localState: getPracticeState(),
+							questionIds: this.getSessionSnapshotQuestionIds(initialQuestionIndex),
+							includeAggregates: false,
+							includeProgress: false
 						})
 						this.favoriteQuestionIds = snapshot.favoriteQuestionIds || []
 					} catch (syncError) {
@@ -542,7 +555,7 @@
 					}
 					this.restoreSessionAnswers(snapshot)
 					if (this.questionList.length) {
-						this.loadQuestion(this.resolveInitialQuestionIndex())
+						this.loadQuestion(initialQuestionIndex)
 					}
 				} catch (error) {
 					this.loadError = error && error.errCode === 'QUESTION_BANK_SUBJECT_NOT_FOUND'

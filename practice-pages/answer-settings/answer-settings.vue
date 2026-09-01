@@ -56,6 +56,27 @@
 			</view>
 		</view>
 
+		<view class="settings-section data-section">
+			<view class="section-heading">
+				<text class="section-title">数据管理</text>
+				<text class="section-desc">仅管理当前登录用户的当前科目数据</text>
+			</view>
+
+			<view
+				class="clear-option"
+				:class="{ 'is-clearing': clearingSubjectData }"
+				@tap="confirmClearSubjectData"
+			>
+				<view class="clear-icon">
+					<uni-icons type="trash" size="24" color="#008cff"></uni-icons>
+				</view>
+				<view class="clear-copy">
+					<text class="clear-title">清除“{{ currentSubjectName }}”做题数据</text>
+					<text class="clear-desc">删除答题、错题、收藏、统计及练习进度</text>
+				</view>
+			</view>
+		</view>
+
 		<view class="sync-note" v-if="syncError" @tap="retrySync">
 			<uni-icons type="cloud-upload" size="17" color="#b36a1d"></uni-icons>
 			<text>{{ syncError }}，点击重试</text>
@@ -65,18 +86,40 @@
 
 <script>
 	import {
+		clearSubjectPracticeState,
+		getPracticeState,
+		getSubjectById
+	} from '@/data/practice.js'
+	import {
+		clearCurrentSubjectPracticeData,
 		getLocalPracticePreferences,
 		getPracticePreferences,
 		updatePracticePreferences
 	} from '@/services/user-practice.js'
 
+	function showConfirm(title, content, confirmText) {
+		return new Promise(resolve => {
+			uni.showModal({
+				title,
+				content,
+				confirmText,
+				confirmColor: '#d64545',
+				success: result => resolve(Boolean(result.confirm)),
+				fail: () => resolve(false)
+			})
+		})
+	}
+
 	export default {
 		data() {
 			const localPreferences = getLocalPracticePreferences()
+			const practiceState = getPracticeState()
 			return {
 				answerMode: localPreferences.answerMode,
 				nightMode: Boolean(localPreferences.nightMode),
 				saving: false,
+				clearingSubjectData: false,
+				currentSubjectId: practiceState.currentSubjectId,
 				syncError: '',
 				answerModes: [
 					{
@@ -106,11 +149,45 @@
 				]
 			}
 		},
+		computed: {
+			currentSubjectName() {
+				return getSubjectById(this.currentSubjectId).name
+			}
+		},
 		onLoad() {
 			this.applyPreferences(getLocalPracticePreferences())
 			this.loadPreferences()
 		},
 		methods: {
+			async confirmClearSubjectData() {
+				if (this.clearingSubjectData) return
+				const confirmed = await showConfirm(
+					'清除当前科目数据',
+					`将永久删除“${this.currentSubjectName}”的答题记录、错题、收藏、统计和练习进度。微信账号、答题偏好及其他科目不受影响。`,
+					'确认清除'
+				)
+				if (!confirmed) return
+				this.clearingSubjectData = true
+				uni.showLoading({ title: '正在清除', mask: true })
+				try {
+					await clearCurrentSubjectPracticeData(this.currentSubjectId)
+					clearSubjectPracticeState(this.currentSubjectId)
+					uni.hideLoading()
+					uni.showModal({
+						title: '清除完成',
+						content: `“${this.currentSubjectName}”的本地和云端做题数据已清除。`,
+						showCancel: false
+					})
+				} catch (error) {
+					uni.hideLoading()
+					uni.showToast({
+						title: (error && (error.errMsg || error.message)) || '清除失败，请重试',
+						icon: 'none'
+					})
+				} finally {
+					this.clearingSubjectData = false
+				}
+			},
 			applyPreferences(preferences) {
 				this.answerMode = preferences.answerMode
 				this.nightMode = Boolean(preferences.nightMode)
@@ -189,7 +266,7 @@
 	.radio-mark { display: flex; align-items: center; justify-content: center; width: 38rpx; height: 38rpx; flex: 0 0 38rpx; margin-left: 18rpx; border: 3rpx solid #d3d8de; border-radius: 50%; box-sizing: border-box; }
 	.radio-dot { width: 20rpx; height: 20rpx; border-radius: 50%; background: #008cff; }
 	.mode-option.selected .radio-mark { border-color: #008cff; }
-	.display-section { margin-bottom: 0; }
+	.display-section { margin-bottom: 38rpx; }
 	.night-option { display: flex; align-items: center; min-height: 124rpx; padding: 22rpx 24rpx; border-radius: 14rpx; box-sizing: border-box; background: #ffffff; box-shadow: 0 5rpx 18rpx rgba(31, 45, 61, 0.045); }
 	.night-icon { display: flex; align-items: center; justify-content: center; width: 70rpx; height: 70rpx; flex: 0 0 70rpx; margin-right: 22rpx; border-radius: 16rpx; background: #e4f3ff; }
 	.moon-shape { position: relative; width: 34rpx; height: 34rpx; overflow: hidden; border-radius: 50%; background: #008cff; }
@@ -203,6 +280,13 @@
 	.switch-preview.active { background: #008cff; }
 	.switch-thumb { position: absolute; top: 4rpx; left: 4rpx; width: 38rpx; height: 38rpx; border-radius: 50%; background: #ffffff; box-shadow: 0 2rpx 8rpx rgba(31, 45, 61, 0.2); transition: left 0.2s ease; }
 	.switch-preview.active .switch-thumb { left: 40rpx; }
+	.data-section { margin-bottom: 0; }
+	.clear-option { display: flex; align-items: center; min-height: 124rpx; padding: 22rpx 24rpx; border: 1rpx solid #b9dcf5; border-radius: 14rpx; box-sizing: border-box; background: #ffffff; box-shadow: 0 5rpx 18rpx rgba(0, 140, 255, 0.06); }
+	.clear-option.is-clearing { opacity: 0.64; }
+	.clear-icon { display: flex; align-items: center; justify-content: center; width: 70rpx; height: 70rpx; flex: 0 0 70rpx; margin-right: 22rpx; border-radius: 16rpx; background: #e4f3ff; }
+	.clear-copy { display: flex; flex: 1; flex-direction: column; min-width: 0; }
+	.clear-title { color: #262a30; font-size: 28rpx; font-weight: 600; }
+	.clear-desc { margin-top: 8rpx; color: #858c95; font-size: 21rpx; line-height: 1.45; }
 	.sync-note { display: flex; align-items: center; justify-content: center; gap: 8rpx; margin-top: 24rpx; color: #a86218; font-size: 22rpx; }
 
 	.settings-page.night-mode { background: #12171d; color: #e6e9ed; }
@@ -211,7 +295,8 @@
 	.night-mode .night-desc,
 	.night-mode .switch-status { color: #8f99a5; }
 	.night-mode .mode-option,
-	.night-mode .night-option { background: #1b222a; box-shadow: 0 5rpx 18rpx rgba(0, 0, 0, 0.16); }
+	.night-mode .night-option,
+	.night-mode .clear-option { background: #1b222a; box-shadow: 0 5rpx 18rpx rgba(0, 0, 0, 0.16); }
 	.night-mode .mode-option.selected { border-color: #269df0; background: #17364d; box-shadow: 0 7rpx 22rpx rgba(0, 0, 0, 0.2); }
 	.night-mode .mode-icon.blue,
 	.night-mode .night-icon { background: #17364d; }
@@ -221,5 +306,9 @@
 	.night-mode .moon-cutout { background: #17364d; }
 	.night-mode .switch-preview { background: #3b4651; }
 	.night-mode .switch-preview.active { background: #168ee5; }
+	.night-mode .clear-option { border-color: #35698f; }
+	.night-mode .clear-icon { background: #17364d; }
+	.night-mode .clear-title { color: #e6e9ed; }
+	.night-mode .clear-desc { color: #8f99a5; }
 	.night-mode .sync-note { color: #e0a15f; }
 </style>

@@ -13,6 +13,7 @@ function loadService(environment) {
 		.replace(/\bexport\s+(?=(?:class|async\s+function|function|const|let|var)\b)/g, '')
 	source += `\n;globalThis.__service = {
 		createPracticeEventId,
+		clearCurrentSubjectPracticeData,
 		ensurePracticeUser,
 		flushPracticeEvents,
 		getChapterPracticePosition,
@@ -20,6 +21,8 @@ function loadService(environment) {
 		getLocalPracticePreferences,
 		getPracticeProgress,
 		getPracticePreferences,
+		getPracticeRecords,
+		getSmartPracticeQuestions,
 		getPracticeStateSnapshot,
 		getPracticeSummary,
 		getPracticeUserProfile,
@@ -164,7 +167,8 @@ async function testPreferenceOfflineRetry() {
 	const environment = {
 		uni: {
 			getStorageSync: key => storage.get(key),
-			setStorageSync: (key, value) => storage.set(key, value)
+			setStorageSync: (key, value) => storage.set(key, value),
+			removeStorageSync: key => storage.delete(key)
 		},
 		uniCloud: {
 			getCurrentUserInfo: () => user,
@@ -220,6 +224,137 @@ async function testPreferenceOfflineRetry() {
 	assert.equal(cloudCalls, 2)
 }
 
+async function testBatchScheduling() {
+	const storage = new Map()
+	const timers = []
+	const calls = []
+	let nextTimerId = 0
+	const user = { uid: 'batch-user', tokenExpired: Date.now() + 60 * 60 * 1000 }
+	const environment = {
+		uni: {
+			getStorageSync: key => storage.get(key),
+			setStorageSync: (key, value) => storage.set(key, value),
+			removeStorageSync: key => storage.delete(key)
+		},
+		uniCloud: {
+			getCurrentUserInfo: () => user,
+			async callFunction(request) {
+				calls.push(request)
+				const summaries = {}
+				request.data.events.forEach(item => {
+					summaries[item.subjectId] = {
+						subjectId: item.subjectId,
+						attempted: request.data.events.length,
+						correct: request.data.events.length,
+						wrong: 0,
+						favorite: 0,
+						totalAttempts: request.data.events.length,
+						todayAttempts: request.data.events.length,
+						accuracy: 100
+					}
+				})
+				return {
+					result: {
+						errCode: 0,
+						data: {
+							acceptedEventIds: request.data.events.map(item => item.eventId),
+							duplicateEventIds: [],
+							summaries,
+							progress: null
+						}
+					}
+				}
+			}
+		},
+		console,
+		setTimeout(handler, delay) {
+			const timer = { id: ++nextTimerId, handler, delay, cleared: false }
+			timers.push(timer)
+			return timer.id
+		},
+		clearTimeout(timerId) {
+			const timer = timers.find(item => item.id === timerId)
+			if (timer) timer.cleared = true
+		},
+		Date,
+		Map,
+		Set,
+		Promise,
+		Math,
+		JSON,
+		Error,
+		Array,
+		Object,
+		Number,
+		String,
+		Boolean
+	}
+	const service = loadService(environment)
+	const question = {
+		id: 'batch-question',
+		subjectId: 'junior-personal-finance',
+		chapterId: '1',
+		knowledge: '批量同步',
+		answer: ['A']
+	}
+	for (let index = 0; index < 9; index += 1) {
+		service.queuePracticeAnswer(question, ['A'], {
+			eventId: `batch-answer-${index}`,
+			correct: true,
+			occurredAt: Date.now() + index
+		})
+	}
+	assert.equal(calls.length, 0)
+	assert.equal(timers.filter(item => !item.cleared).slice(-1)[0].delay, 15 * 1000)
+	service.queuePracticeAnswer(question, ['A'], {
+		eventId: 'batch-answer-nine',
+		correct: true,
+		occurredAt: Date.now() + 9
+	})
+	const immediateTimer = timers.filter(item => !item.cleared).slice(-1)[0]
+	assert.equal(immediateTimer.delay, 0)
+	immediateTimer.handler()
+	await service.flushPracticeEvents({ includeProgress: false })
+	assert.equal(calls.length, 1)
+	assert.equal(calls[0].data.events.length, 10)
+	assert.equal(service.pendingPracticeEventCount(), 0)
+}
+
+async function testEmptyFlushDoesNotLogin() {
+	let loginCalls = 0
+	const environment = {
+		uni: {
+			getStorageSync: () => null,
+			setStorageSync: () => {},
+			login() {
+				loginCalls += 1
+			}
+		},
+		uniCloud: {
+			getCurrentUserInfo: () => ({ uid: null, tokenExpired: 0 })
+		},
+		console,
+		setTimeout,
+		clearTimeout,
+		Date,
+		Map,
+		Set,
+		Promise,
+		Math,
+		JSON,
+		Error,
+		Array,
+		Object,
+		Number,
+		String,
+		Boolean
+	}
+	const service = loadService(environment)
+	const result = await service.flushPracticeEvents({ includeProgress: false })
+	assert.deepEqual(JSON.parse(JSON.stringify(result)), { synced: true, pending: 0 })
+	assert.equal(loginCalls, 0)
+}
+
 async function run() {
 	const storage = new Map()
 	const calls = []
@@ -228,7 +363,8 @@ async function run() {
 	const environment = {
 		uni: {
 			getStorageSync: key => storage.get(key),
-			setStorageSync: (key, value) => storage.set(key, value)
+			setStorageSync: (key, value) => storage.set(key, value),
+			removeStorageSync: key => storage.delete(key)
 		},
 		uniCloud: {
 			getCurrentUserInfo: () => user,
@@ -246,12 +382,26 @@ async function run() {
 					return { result: { errCode: 0, data: Object.assign({}, cloudPreferences) } }
 				}
 				if (request.data.action === 'syncEvents') {
+					const summaries = {}
+					request.data.events.forEach(item => {
+						summaries[item.subjectId] = {
+							subjectId: item.subjectId,
+							attempted: 1,
+							correct: 0,
+							wrong: 1,
+							favorite: 1,
+							totalAttempts: 1,
+							todayAttempts: 1,
+							accuracy: 0
+						}
+					})
 					return {
 						result: {
 							errCode: 0,
 							data: {
 								acceptedEventIds: request.data.events.map(item => item.eventId),
 								duplicateEventIds: [],
+								summaries,
 								progress: request.data.progress ? {
 									progressId: request.data.progress.progressId,
 									saved: true
@@ -279,6 +429,44 @@ async function run() {
 									knowledge: { '个人理财基础': 'ipf-1' }
 								}
 								}
+						}
+					}
+				}
+				if (request.data.action === 'getRecords') {
+					return {
+						result: {
+							errCode: 0,
+							data: {
+								subjectId: request.data.subjectId,
+								type: request.data.type,
+								page: request.data.page,
+								pageSize: request.data.pageSize,
+								total: 1,
+								hasMore: false,
+								items: [{ recordId: 'wrong-ipf-1', question: { id: 'ipf-1' } }]
+							}
+						}
+					}
+				}
+				if (request.data.action === 'getSmartPractice') {
+					return {
+						result: {
+							errCode: 0,
+							data: { subjectId: request.data.subjectId, items: [{ id: 'ipf-1' }] }
+						}
+					}
+				}
+				if (request.data.action === 'clearCurrentSubjectData') {
+					assert.equal(request.data.subjectId, 'junior-personal-finance')
+					assert.equal(request.data.confirmation, 'CLEAR_CURRENT_SUBJECT')
+					return {
+						result: {
+							errCode: 0,
+							data: {
+								cleared: true,
+								subjectId: request.data.subjectId,
+								deletedRecords: 4
+							}
 						}
 					}
 				}
@@ -349,12 +537,13 @@ async function run() {
 	assert.equal(cloudSavedPreferences.answerMode, 'review')
 	assert.equal(cloudSavedPreferences.nightMode, true)
 	assert.equal(calls.filter(item => item.data.action === 'updatePreferences').length, 1)
-	assert.equal(calls.filter(item => item.data.action === 'getPreferences').length, 1)
+	assert.equal(calls.filter(item => item.data.action === 'getPreferences').length, 0)
 	const question = {
 		id: 'ipf-1',
 		subjectId: 'junior-personal-finance',
 		chapterId: '1',
-		knowledge: '个人理财基础'
+		knowledge: '个人理财基础',
+		answer: ['A']
 	}
 	service.savePracticeProgress(question, {
 		progressId: 'progress-event-one',
@@ -377,6 +566,10 @@ async function run() {
 	assert.equal(service.pendingPracticeEventCount(), 1)
 	const eventOnlyCall = calls.find(item => item.data.action === 'syncEvents')
 	assert.equal(eventOnlyCall.data.progress, undefined)
+	assert.equal(eventOnlyCall.data.events[0].judgedLocally, true)
+	assert.equal(eventOnlyCall.data.events[0].correct, false)
+	assert.equal(eventOnlyCall.data.events[0].chapterId, question.chapterId)
+	assert.equal(eventOnlyCall.data.events[0].knowledge, question.knowledge)
 	await service.flushPracticeEvents()
 	assert.equal(service.pendingPracticeEventCount(), 0)
 	assert.equal(calls.filter(item => item.data.action === 'syncEvents').length, 2)
@@ -453,12 +646,40 @@ async function run() {
 
 	const summary = await service.getPracticeSummary(question.subjectId)
 	assert.equal(summary.attempted, 1)
-	const firstSnapshot = await service.getPracticeStateSnapshot(question.subjectId)
-	const cachedSnapshot = await service.getPracticeStateSnapshot(question.subjectId)
+	assert.equal(calls.filter(item => item.data.action === 'getSummary').length, 0)
+	const snapshotOptions = {
+		questionIds: ['ipf-1'],
+		includeAggregates: false,
+		includeProgress: false
+	}
+	const firstSnapshot = await service.getPracticeStateSnapshot(question.subjectId, snapshotOptions)
+	const cachedSnapshot = await service.getPracticeStateSnapshot(question.subjectId, snapshotOptions)
 	assert.deepEqual(Array.from(firstSnapshot.wrongQuestionIds), ['ipf-1'])
 	assert.deepEqual(Array.from(firstSnapshot.answerSelections['ipf-1']), ['B'])
 	assert.deepEqual(Array.from(cachedSnapshot.favoriteQuestionIds), ['ipf-1'])
 	assert.equal(calls.filter(item => item.data.action === 'getStateSnapshot').length, 1)
+	const snapshotCall = calls.find(item => item.data.action === 'getStateSnapshot')
+	assert.deepEqual(Array.from(snapshotCall.data.questionIds), ['ipf-1'])
+	assert.equal(snapshotCall.data.includeAggregates, false)
+	assert.equal(snapshotCall.data.includeProgress, false)
+	const firstRecords = await service.getPracticeRecords({
+		subjectId: question.subjectId,
+		type: 'wrong',
+		page: 1,
+		pageSize: 20
+	})
+	const cachedRecords = await service.getPracticeRecords({
+		subjectId: question.subjectId,
+		type: 'wrong',
+		page: 1,
+		pageSize: 20
+	})
+	assert.equal(firstRecords.items[0].recordId, 'wrong-ipf-1')
+	assert.equal(cachedRecords.total, 1)
+	assert.equal(calls.filter(item => item.data.action === 'getRecords').length, 1)
+	await service.getSmartPracticeQuestions({ subjectId: question.subjectId, pageSize: 20 })
+	await service.getSmartPracticeQuestions({ subjectId: question.subjectId, pageSize: 20 })
+	assert.equal(calls.filter(item => item.data.action === 'getSmartPractice').length, 1)
 	const profile = await service.getPracticeUserProfile()
 	const cachedProfile = await service.getPracticeUserProfile()
 	assert.equal(profile.nickname, '理财学员')
@@ -473,9 +694,55 @@ async function run() {
 	const progressReadCall = calls.filter(item => item.data.action === 'getProgress')[0]
 	assert.equal(progressReadCall.data.mode, 'chapter')
 	assert.equal(calls.filter(item => item.data.action === 'getProgress').length, 1)
+	storage.set('uni-learn-practice-cloud-outbox-v1', {
+		version: 1,
+		events: [{ eventId: 'answer-pending-one', subjectId: question.subjectId }]
+	})
+	storage.set('uni-learn-practice-cloud-progress-v1', {
+		version: 2,
+		progresses: {
+			current: {
+				progressId: 'progress-pending-one',
+				subjectId: question.subjectId,
+				mode: 'chapter',
+				chapterId: question.chapterId,
+				questionId: question.id,
+				occurredAt: Date.now()
+			}
+		}
+	})
+	storage.set('uni-learn-practice-chapter-position-v1', {
+		version: 1,
+		positions: {
+			[`${question.subjectId}|${question.chapterId}`]: {
+				subjectId: question.subjectId,
+				chapterId: question.chapterId,
+				questionId: question.id,
+				updatedAt: Date.now()
+			},
+			'junior-law|1': {
+				subjectId: 'junior-law',
+				chapterId: '1',
+				questionId: 'law-1',
+				updatedAt: Date.now()
+			}
+		}
+	})
+	const cleared = await service.clearCurrentSubjectPracticeData(question.subjectId)
+	assert.equal(cleared.cleared, true)
+	assert.equal(calls.filter(item => item.data.action === 'clearCurrentSubjectData').length, 1)
+	assert.equal(storage.has('uni-learn-practice-cloud-outbox-v1'), false)
+	assert.equal(storage.has('uni-learn-practice-cloud-progress-v1'), false)
+	assert.equal(
+		storage.get('uni-learn-practice-chapter-position-v1').positions['junior-law|1'].questionId,
+		'law-1'
+	)
+	assert.equal(storage.has(`uni-learn-practice-preferences-v1:${user.uid}`), true)
 	await testWeixinLogin()
 	await testServerTokenRecovery()
 	await testPreferenceOfflineRetry()
+	await testBatchScheduling()
+	await testEmptyFlushDoesNotLogin()
 
 	console.log('user-practice service tests passed')
 }

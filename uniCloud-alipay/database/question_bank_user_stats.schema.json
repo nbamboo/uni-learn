@@ -49,6 +49,29 @@
       "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
     },
     "todayAttempts": { "bsonType": "int", "minimum": 0 },
+    "stateAggregateVersion": { "bsonType": "int", "minimum": 1 },
+    "chapterAttempts": {
+      "bsonType": "array",
+      "items": {
+        "bsonType": "object",
+        "required": ["key", "count"],
+        "properties": {
+          "key": { "bsonType": "string", "maxLength": 32 },
+          "count": { "bsonType": "int", "minimum": 0 }
+        }
+      }
+    },
+    "knowledgeAttempts": {
+      "bsonType": "array",
+      "items": {
+        "bsonType": "object",
+        "required": ["key", "count"],
+        "properties": {
+          "key": { "bsonType": "string", "maxLength": 128 },
+          "count": { "bsonType": "int", "minimum": 0 }
+        }
+      }
+    },
     "createdAt": { "bsonType": "date" },
     "updatedAt": { "bsonType": "date" }
   }

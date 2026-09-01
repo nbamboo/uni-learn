@@ -152,7 +152,7 @@
 		selectSubject,
 		subjectGroups
 	} from '@/data/practice.js'
-	import { getCatalog } from '@/services/question-bank.js'
+	import { getCatalog, getCatalogSummaries } from '@/services/question-bank.js'
 	import {
 		getLocalPracticePreferences,
 		getPracticePreferences,
@@ -169,6 +169,8 @@
 				catalogStates: {},
 				catalogRequestIds: {},
 				nextCatalogRequestId: 0,
+				catalogSummariesLoaded: false,
+				nextCatalogSummariesRequestId: 0,
 				nextUserDataRequestId: 0,
 				userDataError: '',
 				stats: {
@@ -220,8 +222,10 @@
 			const state = getPracticeState()
 			this.currentSubjectId = state.currentSubjectId
 			this.refreshStats(this.subjectQuestionCount(this.currentSubjectId))
-			this.loadCatalog(this.currentSubjectId)
-			this.loadCloudStats(this.currentSubjectId)
+			const subjectId = this.currentSubjectId
+			this.loadCatalogSummaries().then(() => {
+				if (subjectId === this.currentSubjectId) this.loadCloudStats(subjectId)
+			})
 		},
 		onHide() {
 			this.applyTabBarTheme(false)
@@ -286,6 +290,65 @@
 			retryUserData() {
 				this.loadCloudStats(this.currentSubjectId)
 			},
+			async loadCatalogSummaries(options) {
+				const config = options || {}
+				if (this.catalogSummariesLoaded && !config.forceRefresh) return
+				const requestId = ++this.nextCatalogSummariesRequestId
+				const subjects = []
+				this.subjectGroups.forEach(group => {
+					group.items.forEach(subject => subjects.push(subject))
+				})
+				const loadingStates = Object.assign({}, this.catalogStates)
+				subjects.forEach(subject => {
+					const previous = loadingStates[subject.id] || {
+						loaded: false,
+						questionCount: 0,
+						error: ''
+					}
+					loadingStates[subject.id] = Object.assign({}, previous, {
+						loading: !previous.loaded,
+						error: ''
+					})
+				})
+				this.catalogStates = loadingStates
+				try {
+					const summaries = await getCatalogSummaries(config)
+					if (requestId !== this.nextCatalogSummariesRequestId) return
+					const summaryBySubject = {}
+					;(summaries || []).forEach(item => {
+						if (item && item.subjectId) summaryBySubject[item.subjectId] = item
+					})
+					const nextStates = Object.assign({}, this.catalogStates)
+					subjects.forEach(subject => {
+						const summary = summaryBySubject[subject.id]
+						const parsedCount = Number(summary && summary.questionCount)
+						nextStates[subject.id] = {
+							loading: false,
+							loaded: true,
+							questionCount: Number.isInteger(parsedCount) && parsedCount >= 0
+								? parsedCount
+								: 0,
+							error: ''
+						}
+					})
+					this.catalogStates = nextStates
+					this.catalogSummariesLoaded = true
+					this.refreshStats(this.subjectQuestionCount(this.currentSubjectId))
+				} catch (error) {
+					if (requestId !== this.nextCatalogSummariesRequestId) return
+					const errorMessage = (error && (error.errMsg || error.message)) || '题库目录加载失败'
+					const nextStates = Object.assign({}, this.catalogStates)
+					subjects.forEach(subject => {
+						const previous = nextStates[subject.id] || {}
+						nextStates[subject.id] = Object.assign({}, previous, {
+							loading: false,
+							error: previous.loaded ? '' : errorMessage
+						})
+					})
+					this.catalogStates = nextStates
+					await this.loadCatalog(this.currentSubjectId, config)
+				}
+			},
 			async loadCatalog(subjectId, options) {
 				const previous = this.catalogStates[subjectId] || {
 					loaded: false,
@@ -344,9 +407,13 @@
 				}
 			},
 			retryCatalog() {
-				this.loadCatalog(this.currentSubjectId, { forceRefresh: true })
+				this.catalogSummariesLoaded = false
+				this.loadCatalogSummaries({ forceRefresh: true }).then(() => {
+					this.loadCloudStats(this.currentSubjectId)
+				})
 			},
 			openSubjectPicker() {
+				this.loadCatalogSummaries()
 				this.$refs.subjectPopup.open()
 			},
 			closeSubjectPicker() {
@@ -357,8 +424,12 @@
 				selectSubject(subjectId)
 				this.refreshStats(this.subjectQuestionCount(subjectId))
 				this.closeSubjectPicker()
-				this.loadCatalog(subjectId)
-				this.loadCloudStats(subjectId)
+				const catalogState = this.catalogStates[subjectId]
+				if (catalogState && catalogState.loaded && catalogState.questionCount > 0) {
+					this.loadCloudStats(subjectId)
+				} else {
+					this.loadCatalog(subjectId)
+				}
 			},
 			subjectQuestionCount(subjectId) {
 				const state = this.catalogStates[subjectId]

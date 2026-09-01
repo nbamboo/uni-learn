@@ -29,6 +29,7 @@ const answerMemoryCache = new Map()
 const pendingRequests = new Map()
 let persistedCatalogsLoaded = false
 let persistedCatalogs = {}
+let catalogSummariesCache = null
 
 export class QuestionBankServiceError extends Error {
 	constructor(errCode, errMsg, options) {
@@ -683,6 +684,24 @@ export async function getQuestionCatalog(subjectId, options) {
 	return cloneValue(catalog)
 }
 
+export async function getCatalogSummaries(options) {
+	const config = options || {}
+	if (!config.forceRefresh
+		&& catalogSummariesCache
+		&& catalogSummariesCache.expiresAt > Date.now()) {
+		return cloneValue(catalogSummariesCache.items)
+	}
+	const data = await callQuestionBank('getCatalogSummaries', {}, config)
+	const items = data && Array.isArray(data.items)
+		? data.items.filter(item => item && item.subjectId && item.activeVersion)
+		: []
+	catalogSummariesCache = {
+		items: cloneValue(items),
+		expiresAt: Date.now() + CATALOG_CACHE_TTL
+	}
+	return cloneValue(items)
+}
+
 export async function getPracticePage(params, options) {
 	const input = requireObject(params, 'params')
 	const subjectId = normalizeSubjectId(input.subjectId)
@@ -962,6 +981,7 @@ export async function checkQuestionAnswer(params, options) {
 
 export function clearQuestionBankCache(subjectId) {
 	if (subjectId === undefined || subjectId === null || subjectId === '') {
+		catalogSummariesCache = null
 		catalogMemoryCache.clear()
 		pageMemoryCache.clear()
 		questionMemoryCache.clear()
@@ -979,6 +999,7 @@ export function clearQuestionBankCache(subjectId) {
 		return
 	}
 	const normalizedSubjectId = normalizeSubjectId(subjectId)
+	catalogSummariesCache = null
 	catalogMemoryCache.delete(normalizedSubjectId)
 	clearSubjectMemory(normalizedSubjectId)
 	clearPersistedChapterCache(normalizedSubjectId)
@@ -1001,6 +1022,7 @@ export function checkAnswer(params, options) {
 
 const questionBankService = {
 	getCatalog,
+	getCatalogSummaries,
 	getQuestionCatalog,
 	getPracticePage,
 	getAllPracticeQuestions,

@@ -6,7 +6,8 @@ const DEFAULT_PAGE_SIZE = 20
 const MAX_PAGE_SIZE = 50
 const MAX_QUESTION_IDS = 100
 const MAX_STATE_IDS = 2000
-const REFERENCE_PAGE_SIZE = 1000
+const MAX_SMART_CANDIDATES = 100
+const MAX_CATALOG_SUMMARIES = 50
 const SUBJECT_ID_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/
 const QUESTION_ID_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/
 const ANSWER_ALIASES = ['A', 'B', 'C', 'D', 'E', 'F']
@@ -209,6 +210,17 @@ function toPublicCatalog(document) {
 	return result
 }
 
+function toPublicCatalogSummary(document) {
+	return {
+		id: document.subjectId,
+		subjectId: document.subjectId,
+		name: document.name || '',
+		level: document.level || '',
+		activeVersion: document.activeVersion,
+		questionCount: Math.max(0, Number(document.questionCount) || 0)
+	}
+}
+
 function escapeRegExp(value) {
 	return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 }
@@ -283,7 +295,11 @@ async function queryQuestionPage(db, condition, cursor, pageSize, fields) {
 		? combineConditions(db, [condition, { sortOrder: db.command.gt(cursor) }])
 		: condition
 	const collection = db.collection(QUESTION_COLLECTION)
-	const countPromise = collection.where(condition).count()
+	// The first page is the only page that needs an exact total. Subsequent pages
+	// use the extra row to determine hasMore and avoid repeating count().
+	const countPromise = cursor === 0
+		? collection.where(condition).count()
+		: Promise.resolve(null)
 	const listPromise = collection
 		.where(pageCondition)
 		.field(fields)
@@ -295,7 +311,7 @@ async function queryQuestionPage(db, condition, cursor, pageSize, fields) {
 	const hasMore = rows.length > pageSize
 	const pageRows = hasMore ? rows.slice(0, pageSize) : rows
 	return {
-		total: getTotal(responses[0]),
+		total: responses[0] ? getTotal(responses[0]) : null,
 		rows: pageRows,
 		hasMore,
 		nextCursor: hasMore && pageRows.length ? pageRows[pageRows.length - 1].sortOrder : null
@@ -348,23 +364,26 @@ function shuffle(list, random) {
 	return result
 }
 
-async function getAllQuestionReferences(db, catalog) {
-	const references = []
-	let offset = 0
-	for (let page = 0; page < 100; page += 1) {
-		const response = await db.collection(QUESTION_COLLECTION)
-			.where(buildBaseCondition(catalog))
-			.field({ questionId: true, sortOrder: true })
-			.orderBy('sortOrder', 'asc')
-			.skip(offset)
-			.limit(REFERENCE_PAGE_SIZE)
-			.get()
-		const rows = getRows(response)
-		references.push.apply(references, rows)
-		if (rows.length < REFERENCE_PAGE_SIZE) return references
-		offset += rows.length
+async function getSampledQuestionReferences(db, catalog, pageSize, random) {
+	const questionCount = Math.max(0, Number(catalog.questionCount) || 0)
+	if (!questionCount) return []
+	const candidateCount = Math.min(
+		questionCount,
+		Math.max(pageSize * 5, Math.min(100, questionCount)),
+		MAX_SMART_CANDIDATES
+	)
+	const sortOrders = new Set()
+	while (sortOrders.size < candidateCount) {
+		sortOrders.add(1 + Math.floor(random() * questionCount))
 	}
-	throw new QuestionBankError('QUESTION_BANK_REFERENCE_LIMIT', '题库数据量超过智能练习处理上限')
+	const response = await db.collection(QUESTION_COLLECTION)
+		.where(Object.assign({}, buildBaseCondition(catalog), {
+			sortOrder: db.command.in(Array.from(sortOrders))
+		}))
+		.field({ questionId: true, sortOrder: true })
+		.limit(candidateCount)
+		.get()
+	return getRows(response)
 }
 
 function dateSeed(now) {
@@ -382,6 +401,25 @@ function createQuestionBankService(db, options) {
 		const subjectId = readSubjectId(event.subjectId)
 		const catalog = await getCatalogRecord(db, subjectId)
 		return toPublicCatalog(catalog)
+	}
+
+	async function getCatalogSummaries() {
+		const response = await db.collection(CATALOG_COLLECTION)
+			.where({ status: 1 })
+			.field({
+				subjectId: true,
+				name: true,
+				level: true,
+				activeVersion: true,
+				questionCount: true
+			})
+			.limit(MAX_CATALOG_SUMMARIES)
+			.get()
+		return {
+			items: getRows(response)
+				.filter(item => item.subjectId && item.activeVersion)
+				.map(toPublicCatalogSummary)
+		}
 	}
 
 	async function getPracticePage(event) {
@@ -497,7 +535,8 @@ function createQuestionBankService(db, options) {
 			defaultValue: `${subjectId}:${catalog.activeVersion}:${dateSeed(now)}`,
 			maxLength: 128
 		})
-		const references = await getAllQuestionReferences(db, catalog)
+		const random = createRandom(hashSeed(seed))
+		const references = await getSampledQuestionReferences(db, catalog, pageSize, random)
 		const answered = new Set(answeredQuestionIds)
 		const wrong = new Set(wrongQuestionIds)
 		const groups = { fresh: [], wrong: [], mastered: [] }
@@ -506,26 +545,31 @@ function createQuestionBankService(db, options) {
 			else if (answered.has(reference.questionId)) groups.mastered.push(reference)
 			else groups.fresh.push(reference)
 		})
-		const random = createRandom(hashSeed(seed))
-		const ordered = shuffle(groups.fresh, random)
-			.concat(shuffle(groups.wrong, random), shuffle(groups.mastered, random))
-		const selectedReferences = ordered.slice(0, pageSize)
-		const selectedIds = selectedReferences.map(reference => reference.questionId)
+		const sampledIds = new Set(references.map(reference => reference.questionId))
+		const sampledWrongIds = groups.wrong.map(reference => reference.questionId)
+		const externalWrongIds = wrongQuestionIds.filter(questionId => !sampledIds.has(questionId))
+		const orderedIds = shuffle(groups.fresh, random).map(reference => reference.questionId)
+			.concat(
+				shuffle(sampledWrongIds.concat(externalWrongIds), random),
+				shuffle(groups.mastered, random).map(reference => reference.questionId)
+			)
+		const selectedIds = Array.from(new Set(orderedIds)).slice(0, pageSize)
 		const documents = await getQuestionsByIdsInternal(db, catalog, selectedIds)
 		return {
 			subjectId,
 			version: catalog.activeVersion,
 			mode: 'smart',
 			seed,
-			total: references.length,
+			total: Number(catalog.questionCount) || references.length,
 			pageSize,
 			cursor: 0,
 			nextCursor: null,
 			hasMore: false,
 			stateCounts: {
 				fresh: groups.fresh.length,
-				wrong: groups.wrong.length,
-				mastered: groups.mastered.length
+				wrong: wrongQuestionIds.length,
+				mastered: groups.mastered.length,
+				sampled: references.length
 			},
 			items: documents.map(toPublicQuestion)
 		}
@@ -533,6 +577,7 @@ function createQuestionBankService(db, options) {
 
 	const handlers = {
 		getCatalog,
+		getCatalogSummaries,
 		getPracticePage,
 		getQuestionsByIds,
 		searchQuestions,

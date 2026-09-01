@@ -1,5 +1,5 @@
 <template>
-	<view class="catalog-page">
+	<view class="catalog-page" :class="{ 'night-mode': nightMode }">
 		<view class="catalog-summary">
 			<view>
 				<text class="summary-label">{{ view === 'knowledge' ? '专项考点' : '教材目录' }}</text>
@@ -9,14 +9,19 @@
 
 		<view class="catalog-search" v-if="view === 'knowledge'">
 			<uni-icons type="search" size="19" color="#8a8f99"></uni-icons>
-			<input v-model="keyword" placeholder="搜索知识点" confirm-type="search" />
+			<input
+				v-model="keyword"
+				placeholder="搜索知识点"
+				:placeholder-style="nightMode ? 'color:#6f7a86' : 'color:#a0a5ad'"
+				confirm-type="search"
+			/>
 			<view v-if="keyword" @tap="keyword = ''">
 				<uni-icons type="clear" size="18" color="#a0a5ad"></uni-icons>
 			</view>
 		</view>
 
 		<view class="loading-state" v-if="loading">
-			<uni-load-more status="loading"></uni-load-more>
+			<uni-load-more status="loading" :color="nightMode ? '#8f99a5' : '#777777'"></uni-load-more>
 		</view>
 
 		<view class="empty-state error-state" v-else-if="loadError">
@@ -76,7 +81,8 @@
 				loading: true,
 				loadError: '',
 				catalogName: '',
-				answerMode: localPreferences.answerMode
+				answerMode: localPreferences.answerMode,
+				nightMode: Boolean(localPreferences.nightMode)
 			}
 		},
 		computed: {
@@ -96,11 +102,15 @@
 			this.subjectId = options.subjectId
 			this.view = options.view === 'knowledge' ? 'knowledge' : 'chapter'
 			uni.setNavigationBarTitle({ title: this.view === 'knowledge' ? '知识点练习' : '章节练习' })
+			this.applyNavigationTheme()
 			this.loadItems()
 		},
 		onShow() {
+			const localPreferences = getLocalPracticePreferences()
 			const previousAnswerMode = this.answerMode
-			this.answerMode = getLocalPracticePreferences().answerMode
+			this.answerMode = localPreferences.answerMode
+			this.nightMode = Boolean(localPreferences.nightMode)
+			this.applyNavigationTheme()
 			if (previousAnswerMode !== this.answerMode && this.items.length) {
 				this.loadItems()
 				return
@@ -110,6 +120,12 @@
 			}
 		},
 		methods: {
+			applyNavigationTheme() {
+				uni.setNavigationBarColor({
+					frontColor: this.nightMode ? '#ffffff' : '#000000',
+					backgroundColor: this.nightMode ? '#171c22' : '#ffffff'
+				})
+			},
 			refreshChapterProgress() {
 				if (this.answerMode === 'exam') return
 				this.items = this.items.map(item => {
@@ -284,4 +300,18 @@
 	.empty-state button { min-width: 220rpx; height: 76rpx; margin-top: 28rpx; border: 0; border-radius: 38rpx; background: #008cff; color: #ffffff; font-size: 27rpx; line-height: 76rpx; }
 	.empty-state button::after { border: 0; }
 	.error-state { color: #bd3f3f; }
+	.catalog-page.night-mode { background: #12171d; color: #e6e9ed; }
+	.night-mode .catalog-summary { background: #086cae; }
+	.night-mode .catalog-search { border-color: #39434e; background: #1b222a; }
+	.night-mode .catalog-search input { color: #e6e9ed; }
+	.night-mode .catalog-item { background: #1b222a; }
+	.night-mode .item-index,
+	.night-mode .item-action { background: #17364d; color: #63b9f6; }
+	.night-mode .item-meta,
+	.night-mode .item-progress-row,
+	.night-mode .empty-state { color: #8f99a5; }
+	.night-mode .item-progress { background: #303943; }
+	.night-mode .item-progress-fill { background: #269df0; }
+	.night-mode .empty-state button { background: #168ee5; }
+	.night-mode .error-state { color: #ef9a9a; }
 </style>

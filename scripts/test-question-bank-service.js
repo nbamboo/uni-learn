@@ -13,6 +13,7 @@ function loadService(sandbox) {
 		.replace(/\bexport\s+(?=(?:class|async\s+function|function|const|let|var)\b)/g, '')
 	source += `\n;globalThis.__questionBankService = {
 		QuestionBankServiceError,
+		getCatalogSummaries,
 		getQuestionCatalog,
 		getPracticePage,
 		getAllPracticeQuestions,
@@ -100,6 +101,25 @@ function createEnvironment() {
 							questionCount: 3,
 							chapters: [{ id: '1', count: 3 }],
 							knowledgeGroups: []
+						}
+					}
+				}
+			}
+			if (data.action === 'getCatalogSummaries') {
+				return {
+					result: {
+						errCode: 0,
+						errMsg: 'ok',
+						data: {
+							items: [{
+								subjectId: 'junior-personal-finance',
+								activeVersion: catalogVersion,
+								questionCount: 3
+							}, {
+								subjectId: 'junior-law',
+								activeVersion: '2026-09-01',
+								questionCount: 1250
+							}]
 						}
 					}
 				}
@@ -270,6 +290,11 @@ async function run() {
 	const environment = createEnvironment()
 	const service = loadService(environment.sandbox)
 	const subjectId = 'junior-personal-finance'
+	const summaries = await service.getCatalogSummaries()
+	const cachedSummaries = await service.getCatalogSummaries()
+	assert.equal(summaries.find(item => item.subjectId === 'junior-law').questionCount, 1250)
+	assert.equal(cachedSummaries.length, 2)
+	assert.equal(environment.calls.filter(call => call.data.action === 'getCatalogSummaries').length, 1)
 
 	const catalogs = await Promise.all([
 		service.getQuestionCatalog(subjectId),

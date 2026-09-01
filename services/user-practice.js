@@ -11,6 +11,12 @@ const SYNC_BATCH_SIZE = 50
 const SNAPSHOT_CACHE_TTL = 2 * 60 * 1000
 const SUMMARY_CACHE_TTL = 30 * 1000
 const PROFILE_CACHE_TTL = 5 * 60 * 1000
+const RECORDS_CACHE_TTL = 2 * 60 * 1000
+const SMART_CACHE_TTL = 5 * 60 * 1000
+const PREFERENCES_CACHE_TTL = 6 * 60 * 60 * 1000
+const MAX_SNAPSHOT_QUESTION_IDS = 100
+const SYNC_BATCH_TRIGGER = 10
+const SYNC_DELAY = 15 * 1000
 const RETRY_DELAY = 180
 const MAX_PRACTICE_POSITIONS = 200
 const MAX_PENDING_PROGRESS = 500
@@ -19,9 +25,13 @@ const ANSWER_MODES = ['exam', 'practice', 'review']
 const snapshotCache = new Map()
 const summaryCache = new Map()
 const userProfileCache = new Map()
+const recordsCache = new Map()
+const smartCache = new Map()
 let loginRequest = null
+let preferencesRequest = null
 let flushRequest = null
 let scheduledFlush = null
+let scheduledSyncOptions = null
 let progressFlushRequested = false
 let eventSequence = 0
 
@@ -74,7 +84,9 @@ function removeStorage(key) {
 function clearPracticeLogin() {
 	UNI_ID_STORAGE_KEYS.forEach(removeStorage)
 	loginRequest = null
+	preferencesRequest = null
 	userProfileCache.clear()
+	invalidateUserPracticeCache()
 }
 
 function loginRequiredError(errCode) {
@@ -127,22 +139,25 @@ function readPreferencesEntry() {
 	if (!saved || saved.version !== 1 || !isObject(saved.preferences)) {
 		return {
 			preferences: normalizePracticePreferences(),
-			dirty: false
+			dirty: false,
+			syncedAt: 0
 		}
 	}
 	return {
 		preferences: normalizePracticePreferences(saved.preferences),
-		dirty: Boolean(saved.dirty)
+		dirty: Boolean(saved.dirty),
+		syncedAt: Number(saved.syncedAt) || 0
 	}
 }
 
-function savePreferencesEntry(preferences, dirty) {
+function savePreferencesEntry(preferences, dirty, syncedAt) {
 	const normalized = normalizePracticePreferences(preferences)
 	const storageKey = preferencesStorageKey()
 	setStorage(storageKey, {
 		version: 1,
 		preferences: normalized,
-		dirty: Boolean(dirty)
+		dirty: Boolean(dirty),
+		syncedAt: Number(syncedAt) || 0
 	})
 	if (storageKey !== PREFERENCES_STORAGE_KEY) removeStorage(PREFERENCES_STORAGE_KEY)
 	return normalized
@@ -288,12 +303,26 @@ function enqueueEvent(event) {
 	}
 	events.push(cloneValue(event))
 	saveOutbox(events)
-	schedulePracticeSync({ includeProgress: false })
+	schedulePracticeSync({
+		includeProgress: false,
+		immediate: events.length >= SYNC_BATCH_TRIGGER
+	})
 	return event.eventId
+}
+
+function answersMatch(selected, answer) {
+	if (!Array.isArray(selected) || !Array.isArray(answer)) return null
+	const left = selected.slice().sort()
+	const right = answer.slice().sort()
+	return left.length === right.length && left.every((item, index) => item === right[index])
 }
 
 export function queuePracticeAnswer(question, selected, options) {
 	const config = options || {}
+	const chapterId = question && question.chapterId
+	const localCorrect = typeof config.correct === 'boolean'
+		? config.correct
+		: answersMatch(selected, question && question.answer)
 	const event = {
 		type: 'answer',
 		eventId: config.eventId || createPracticeEventId('answer'),
@@ -301,6 +330,15 @@ export function queuePracticeAnswer(question, selected, options) {
 		questionId: question.questionId || question.id,
 		selected: (selected || []).slice(),
 		occurredAt: Number(config.occurredAt) || Date.now()
+	}
+	if (typeof localCorrect === 'boolean'
+		&& chapterId !== undefined
+		&& chapterId !== null
+		&& String(chapterId)) {
+		event.judgedLocally = true
+		event.correct = localCorrect
+		event.chapterId = String(chapterId)
+		event.knowledge = question.knowledge || ''
 	}
 	invalidateUserPracticeCache(event.subjectId)
 	return enqueueEvent(event)
@@ -446,6 +484,7 @@ async function loginByWeixin() {
 		throw new UserPracticeServiceError('QUESTION_BANK_WEIXIN_LOGIN_FAILED', '登录成功但未取得用户身份')
 	}
 	userProfileCache.clear()
+	invalidateUserPracticeCache()
 	return user
 }
 
@@ -577,8 +616,20 @@ function markMigrationComplete(userId, remainingEvents) {
 
 export async function flushPracticeEvents(options) {
 	const config = options || {}
+	if (scheduledFlush) {
+		clearTimeout(scheduledFlush)
+		scheduledFlush = null
+		scheduledSyncOptions = null
+	}
 	if (config.includeProgress !== false) progressFlushRequested = true
 	if (flushRequest) return flushRequest
+	const hasQueuedEvents = readOutbox().length > 0
+	const hasQueuedProgress = progressFlushRequested && readPendingProgresses().length > 0
+	const canPrepareLoggedInMigration = Boolean(config.localState) && practiceUserLoggedIn()
+	if (!hasQueuedEvents && !hasQueuedProgress && !canPrepareLoggedInMigration) {
+		progressFlushRequested = false
+		return { synced: true, pending: 0 }
+	}
 	flushRequest = (async () => {
 		const user = await ensurePracticeUser()
 		if (config.localState) prepareLegacyMigration(user.uid, config.localState)
@@ -607,12 +658,27 @@ export async function flushPracticeEvents(options) {
 			events = readOutbox().filter(item => !completedIds.has(item.eventId))
 			saveOutbox(events)
 			batch.forEach(item => invalidateUserPracticeCache(item.subjectId))
+			const summaries = result && result.summaries
+			if (isObject(summaries)) {
+				Object.keys(summaries).forEach(subjectId => {
+					setCached(summaryCache, subjectId, summaries[subjectId], SUMMARY_CACHE_TTL)
+				})
+			}
 		}
 		markMigrationComplete(user.uid, events)
 		return { synced: true, pending: 0 }
 	})().then(result => {
+		const remainingEvents = readOutbox().length
+		const remainingProgress = readPendingProgresses().length
+		const shouldFlushProgress = progressFlushRequested && remainingProgress > 0
 		progressFlushRequested = false
 		flushRequest = null
+		if (remainingEvents || shouldFlushProgress) {
+			schedulePracticeSync({
+				includeProgress: shouldFlushProgress,
+				immediate: remainingEvents >= SYNC_BATCH_TRIGGER
+			})
+		}
 		return result
 	}, error => {
 		flushRequest = null
@@ -622,13 +688,30 @@ export async function flushPracticeEvents(options) {
 }
 
 export function schedulePracticeSync(options) {
-	if (scheduledFlush) return
+	const input = options || {}
+	const nextOptions = {
+		includeProgress: input.includeProgress !== false,
+		localState: input.localState
+	}
+	if (scheduledSyncOptions) {
+		scheduledSyncOptions = {
+			includeProgress: scheduledSyncOptions.includeProgress || nextOptions.includeProgress,
+			localState: nextOptions.localState || scheduledSyncOptions.localState
+		}
+	} else {
+		scheduledSyncOptions = nextOptions
+	}
+	const immediate = Boolean(input.immediate) || readOutbox().length >= SYNC_BATCH_TRIGGER
+	if (scheduledFlush && !immediate) return
+	if (scheduledFlush) clearTimeout(scheduledFlush)
 	scheduledFlush = setTimeout(() => {
 		scheduledFlush = null
-		flushPracticeEvents(options).catch(() => {
+		const syncOptions = scheduledSyncOptions || nextOptions
+		scheduledSyncOptions = null
+		flushPracticeEvents(syncOptions).catch(() => {
 			// The persistent outbox will retry on the next foreground/page request.
 		})
-	}, 300)
+	}, immediate ? 0 : SYNC_DELAY)
 }
 
 function getCached(cache, key) {
@@ -647,16 +730,30 @@ function setCached(cache, key, data, ttl) {
 
 export function invalidateUserPracticeCache(subjectId) {
 	if (subjectId) {
-		snapshotCache.delete(subjectId)
+		Array.from(snapshotCache.keys()).forEach(key => {
+			if (key.indexOf(`${subjectId}|`) === 0) snapshotCache.delete(key)
+		})
+		Array.from(recordsCache.keys()).forEach(key => {
+			if (key.indexOf(`${subjectId}|`) === 0) recordsCache.delete(key)
+		})
+		Array.from(smartCache.keys()).forEach(key => {
+			if (key.indexOf(`${subjectId}|`) === 0) smartCache.delete(key)
+		})
 		summaryCache.delete(subjectId)
 		return
 	}
 	snapshotCache.clear()
 	summaryCache.clear()
+	recordsCache.clear()
+	smartCache.clear()
 }
 
 export async function getPracticeSummary(subjectId, options) {
 	const config = options || {}
+	if (!config.forceRefresh && pendingPracticeEventCount() === 0) {
+		const cached = getCached(summaryCache, subjectId)
+		if (cached) return cached
+	}
 	if (config.localState) await flushPracticeEvents({ localState: config.localState })
 	else await ensurePracticeUser()
 	if (!config.forceRefresh) {
@@ -669,25 +766,73 @@ export async function getPracticeSummary(subjectId, options) {
 
 export async function getPracticeStateSnapshot(subjectId, options) {
 	const config = options || {}
+	const questionIds = Array.isArray(config.questionIds)
+		? Array.from(new Set(config.questionIds.filter(Boolean))).slice(0, MAX_SNAPSHOT_QUESTION_IDS)
+		: []
+	const includeAggregates = config.includeAggregates !== false
+	const includeProgress = config.includeProgress !== false
+	const cacheKey = `${subjectId}|${includeAggregates ? 1 : 0}|${includeProgress ? 1 : 0}|${hashString(questionIds.slice().sort().join('|'))}`
+	if (!config.forceRefresh && pendingPracticeEventCount() === 0) {
+		const cached = getCached(snapshotCache, cacheKey)
+		if (cached) return cached
+	}
 	if (config.localState) await flushPracticeEvents({ localState: config.localState })
 	else await ensurePracticeUser()
 	if (!config.forceRefresh) {
-		const cached = getCached(snapshotCache, subjectId)
+		const cached = getCached(snapshotCache, cacheKey)
 		if (cached) return cached
 	}
-	const result = await executeCloudCall('getStateSnapshot', { subjectId })
-	return setCached(snapshotCache, subjectId, result, SNAPSHOT_CACHE_TTL)
+	const result = await executeCloudCall('getStateSnapshot', {
+		subjectId,
+		questionIds,
+		includeAggregates,
+		includeProgress
+	})
+	return setCached(snapshotCache, cacheKey, result, SNAPSHOT_CACHE_TTL)
 }
 
 export async function getPracticeRecords(params) {
 	const input = params || {}
-	await flushPracticeEvents()
-	return executeCloudCall('getRecords', {
-		subjectId: input.subjectId,
-		type: input.type || 'wrong',
-		page: input.page || 1,
-		pageSize: input.pageSize || 20
+	const subjectId = input.subjectId
+	const type = input.type || 'wrong'
+	const page = input.page || 1
+	const pageSize = input.pageSize || 20
+	const cacheKey = `${subjectId}|${type}|${page}|${pageSize}`
+	if (!input.forceRefresh && pendingPracticeEventCount() === 0) {
+		const cached = getCached(recordsCache, cacheKey)
+		if (cached) return cached
+	}
+	await flushPracticeEvents({ includeProgress: false })
+	if (!input.forceRefresh) {
+		const cached = getCached(recordsCache, cacheKey)
+		if (cached) return cached
+	}
+	const result = await executeCloudCall('getRecords', {
+		subjectId,
+		type,
+		page,
+		pageSize
 	})
+	return setCached(recordsCache, cacheKey, result, RECORDS_CACHE_TTL)
+}
+
+export async function getSmartPracticeQuestions(options) {
+	const input = options || {}
+	const subjectId = input.subjectId
+	const pageSize = Number(input.pageSize) || 20
+	const seed = input.seed || ''
+	const cacheKey = `${subjectId}|${pageSize}|${seed}`
+	if (!input.forceRefresh && pendingPracticeEventCount() === 0) {
+		const cached = getCached(smartCache, cacheKey)
+		if (cached) return cached
+	}
+	await flushPracticeEvents({ includeProgress: false })
+	const result = await executeCloudCall('getSmartPractice', {
+		subjectId,
+		pageSize,
+		seed
+	})
+	return setCached(smartCache, cacheKey, result, SMART_CACHE_TTL)
 }
 
 export async function getPracticeProgress(options) {
@@ -712,6 +857,61 @@ export async function getPracticeUserProfile(options) {
 	return setCached(userProfileCache, user.uid, profile, PROFILE_CACHE_TTL)
 }
 
+function removeSubjectPracticePositions(storageKey, subjectId) {
+	const positions = readPracticePositions(storageKey)
+	Object.keys(positions).forEach(key => {
+		const position = positions[key]
+		if (position && position.subjectId === subjectId) delete positions[key]
+	})
+	if (Object.keys(positions).length) {
+		setStorage(storageKey, { version: 1, positions })
+	} else {
+		removeStorage(storageKey)
+	}
+}
+
+function clearSubjectLocalSyncData(subjectId) {
+	const remainingEvents = readOutbox().filter(item => item.subjectId !== subjectId)
+	if (remainingEvents.length) saveOutbox(remainingEvents)
+	else removeStorage(OUTBOX_STORAGE_KEY)
+	writePendingProgresses(
+		readPendingProgresses().filter(item => item.subjectId !== subjectId)
+	)
+	removeSubjectPracticePositions(CHAPTER_POSITION_STORAGE_KEY, subjectId)
+	removeSubjectPracticePositions(KNOWLEDGE_POSITION_STORAGE_KEY, subjectId)
+	invalidateUserPracticeCache(subjectId)
+	return {
+		remainingEvents: remainingEvents.length,
+		remainingProgress: readPendingProgresses().length
+	}
+}
+
+export async function clearCurrentSubjectPracticeData(subjectId) {
+	if (typeof subjectId !== 'string' || !subjectId.trim()) {
+		throw new UserPracticeServiceError(
+			'QUESTION_BANK_USER_CLIENT_ERROR',
+			'当前科目信息无效'
+		)
+	}
+	const normalizedSubjectId = subjectId.trim()
+	if (scheduledFlush) clearTimeout(scheduledFlush)
+	scheduledFlush = null
+	scheduledSyncOptions = null
+	if (flushRequest) await flushRequest
+	const result = await executeCloudCall('clearCurrentSubjectData', {
+		subjectId: normalizedSubjectId,
+		confirmation: 'CLEAR_CURRENT_SUBJECT'
+	}, { retry: false })
+	const pending = clearSubjectLocalSyncData(normalizedSubjectId)
+	if (pending.remainingEvents || pending.remainingProgress) {
+		schedulePracticeSync({
+			includeProgress: pending.remainingProgress > 0,
+			immediate: pending.remainingEvents >= SYNC_BATCH_TRIGGER
+		})
+	}
+	return result
+}
+
 export function getLocalPracticePreferences() {
 	const entry = readPreferencesEntry()
 	return Object.assign({}, entry.preferences, {
@@ -722,19 +922,34 @@ export function getLocalPracticePreferences() {
 export async function getPracticePreferences(options) {
 	const config = options || {}
 	const localEntry = readPreferencesEntry()
-	try {
-		const result = localEntry.dirty
-			? await executeCloudCall('updatePreferences', localEntry.preferences)
-			: await executeCloudCall('getPreferences')
-		const saved = savePreferencesEntry(result, false)
-		return Object.assign({}, saved, { _syncPending: false })
-	} catch (error) {
-		if (config.localFallback === false) throw error
-		return Object.assign({}, localEntry.preferences, {
-			_syncPending: localEntry.dirty,
-			_syncError: error && (error.errMsg || error.message) || '答题设置同步失败'
-		})
+	if (!localEntry.dirty
+		&& !config.forceRefresh
+		&& localEntry.syncedAt + PREFERENCES_CACHE_TTL > Date.now()) {
+		return Object.assign({}, localEntry.preferences, { _syncPending: false })
 	}
+	if (preferencesRequest) return preferencesRequest
+	preferencesRequest = (async () => {
+		try {
+			const result = localEntry.dirty
+				? await executeCloudCall('updatePreferences', localEntry.preferences)
+				: await executeCloudCall('getPreferences')
+			const saved = savePreferencesEntry(result, false, Date.now())
+			return Object.assign({}, saved, { _syncPending: false })
+		} catch (error) {
+			if (config.localFallback === false) throw error
+			return Object.assign({}, localEntry.preferences, {
+				_syncPending: localEntry.dirty,
+				_syncError: error && (error.errMsg || error.message) || '答题设置同步失败'
+			})
+		}
+	})().then(result => {
+		preferencesRequest = null
+		return result
+	}, error => {
+		preferencesRequest = null
+		throw error
+	})
+	return preferencesRequest
 }
 
 export async function updatePracticePreferences(preferences) {
@@ -744,9 +959,10 @@ export async function updatePracticePreferences(preferences) {
 		preferences,
 		{ updatedAt: Date.now() }
 	))
-	savePreferencesEntry(next, true)
+	const previous = readPreferencesEntry()
+	savePreferencesEntry(next, true, previous.syncedAt)
 	const result = await executeCloudCall('updatePreferences', next)
-	const saved = savePreferencesEntry(result, false)
+	const saved = savePreferencesEntry(result, false, Date.now())
 	return Object.assign({}, saved, { _syncPending: false })
 }
 
@@ -755,6 +971,7 @@ export function pendingPracticeEventCount() {
 }
 
 export default {
+	clearCurrentSubjectPracticeData,
 	ensurePracticeUser,
 	flushPracticeEvents,
 	getChapterPracticePosition,
@@ -763,6 +980,7 @@ export default {
 	getPracticeProgress,
 	getPracticePreferences,
 	getPracticeRecords,
+	getSmartPracticeQuestions,
 	getPracticeStateSnapshot,
 	getPracticeSummary,
 	getPracticeUserProfile,

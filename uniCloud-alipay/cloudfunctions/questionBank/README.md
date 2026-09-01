@@ -43,6 +43,16 @@ console.log(result.data)
 }
 ```
 
+### getCatalogSummaries
+
+一次读取所有已启用、已发布科目的摘要，用于科目切换面板直接显示题目数。该接口只查询目录表，不读取题目表。
+
+```js
+{
+	action: 'getCatalogSummaries'
+}
+```
+
 ### getPracticePage
 
 按 `sortOrder` 游标分页获取练习题。`pageSize` 默认为 20，最大为 50。
@@ -63,9 +73,9 @@ console.log(result.data)
 - `chapter`：必须传 `chapterId`。
 - `knowledge`：必须传 `knowledge`。
 - `search`：必须传 `keyword`，返回完整题目。
-- `smart`：可传 `answeredQuestionIds`、`wrongQuestionIds` 和 `seed`，按未做、错题、已掌握的顺序抽取题目。
+- `smart`：旧客户端兼容入口；只抽取最多 100 个随机候选题号，不再遍历整科题号。新版客户端使用 `questionBankUser.getSmartPractice`。
 
-普通分页响应包含 `total`、`nextCursor`、`hasMore` 和 `items`。当前试点版本会在完整题目中返回
+普通分页响应包含 `total`、`nextCursor`、`hasMore` 和 `items`；只有首屏执行 `count()` 并返回精确 `total`，后续页的 `total` 为 `null`。当前试点版本会在完整题目中返回
 `answer` 与 `explanation`，后续切换服务端判题时可从练习响应中移除这两个字段。
 
 ### searchQuestions

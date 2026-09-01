@@ -1,6 +1,7 @@
 unpackage/
 .hbuilderx/
-pages/.DS_Store
+.DS_Store
+scripts/__pycache__
 
 # uni-id 服务端密钥，仅保留本地配置；提交 config.example.json 作为模板
 uni_modules/uni-config-center/uniCloud/cloudfunctions/common/uni-config-center/uni-id/config.json

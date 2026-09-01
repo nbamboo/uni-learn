@@ -1,0 +1,29 @@
+{
+  "schemaVersion": 1,
+  "subjectId": "junior-law",
+  "version": "2026-09-01-v1",
+  "questionCount": 815,
+  "files": [
+    {
+      "name": "questions.json",
+      "bytes": 851450,
+      "sha256": "993207ea27f756e094ca5feae53a4ce348fd6967c7823b7a135af031815f90a2"
+    },
+    {
+      "name": "catalog.json",
+      "bytes": 25253,
+      "sha256": "70c575003ed1fe96d7079ac83ed5f8696641213b980495a684d1c82d393f263e"
+    },
+    {
+      "name": "rejected.json",
+      "bytes": 2504,
+      "sha256": "93a7a0486b4cdc7f4d66174c36056c4ada5da7021ba8ab065ac910806e384405"
+    },
+    {
+      "name": "validation-report.json",
+      "bytes": 4432,
+      "sha256": "92604b005c24e5eb6adb10cfd189c5c17291da89800743b8fe15e3c322730181"
+    }
+  ],
+  "generatedAt": "2026-09-01T13:54:07.199723+00:00"
+}

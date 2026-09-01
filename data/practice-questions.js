@@ -1,11 +1,14 @@
-import { DAILY_GOAL, DEFAULT_SUBJECT_ID, getPracticeState } from './practice.js'
+import { DAILY_GOAL, DEFAULT_SUBJECT_ID } from './practice.js'
 import {
 	getAllPracticeQuestions,
 	getCatalog,
 	getPracticePage,
 	getQuestionsByIds
 } from '@/services/question-bank.js'
-import { getPracticeStateSnapshot } from '@/services/user-practice.js'
+import {
+	getPracticeRecords,
+	getSmartPracticeQuestions
+} from '@/services/user-practice.js'
 
 export async function getQuestionsBySubject(subjectId) {
 	const result = await getAllPracticeQuestions({
@@ -21,13 +24,24 @@ function applyLimit(list, limit) {
 	return value > 0 ? list.slice(0, value) : list
 }
 
-async function loadRecordedQuestions(subjectId, mode, localState) {
-	const snapshot = await getPracticeStateSnapshot(subjectId, { localState })
-	const idField = {
-		wrong: 'wrongQuestionIds',
-		favorite: 'favoriteQuestionIds'
-	}[mode]
-	const questionIds = snapshot[idField] || []
+async function loadRecordedQuestions(subjectId, mode) {
+	const questionIds = []
+	let page = 1
+	let hasMore = true
+	while (hasMore && page <= 100) {
+		const result = await getPracticeRecords({
+			subjectId,
+			type: mode,
+			page,
+			pageSize: 50
+		})
+		;(result.items || []).forEach(item => {
+			const questionId = item && item.question && item.question.id
+			if (questionId) questionIds.push(questionId)
+		})
+		hasMore = Boolean(result.hasMore)
+		page += 1
+	}
 	if (!questionIds.length) return []
 	const result = await getQuestionsByIds({ subjectId, questionIds })
 	return result.items
@@ -37,21 +51,29 @@ export async function buildPracticeQuestions(options) {
 	const config = options || {}
 	const subjectId = config.subjectId || DEFAULT_SUBJECT_ID
 	const mode = config.mode || 'sequence'
-	const localState = getPracticeState()
 	let list = []
 
 	if (mode === 'wrong' || mode === 'favorite') {
-		list = await loadRecordedQuestions(subjectId, mode, localState)
+		list = await loadRecordedQuestions(subjectId, mode)
 	} else if (mode === 'smart') {
-		const snapshot = await getPracticeStateSnapshot(subjectId, { localState })
-		const result = await getPracticePage({
+		const result = await getSmartPracticeQuestions({
 			subjectId,
-			mode: 'smart',
-			pageSize: Number(config.limit) || DAILY_GOAL,
-			answeredQuestionIds: snapshot.answeredQuestionIds,
-			wrongQuestionIds: snapshot.wrongQuestionIds
+			pageSize: Number(config.limit) || DAILY_GOAL
 		})
 		list = result.items
+	} else if (mode === 'search') {
+		const result = await getPracticePage({
+			subjectId,
+			mode,
+			keyword: config.keyword,
+			pageSize: 50,
+			cursor: 0
+		})
+		list = result.items || []
+		if (config.startId && !list.some(question => question.id === config.startId)) {
+			const selected = await getQuestionsByIds({ subjectId, questionIds: [config.startId] })
+			list = selected.items.concat(list)
+		}
 	} else {
 		const query = {
 			subjectId,
@@ -60,7 +82,6 @@ export async function buildPracticeQuestions(options) {
 		}
 		if (mode === 'chapter') query.chapterId = config.chapterId
 		if (mode === 'knowledge') query.knowledge = config.knowledge
-		if (mode === 'search') query.keyword = config.keyword
 		const result = await getAllPracticeQuestions(query)
 		list = result.items
 	}

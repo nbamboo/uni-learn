@@ -12,6 +12,8 @@ const PREFERENCES_COLLECTION = 'question_bank_user_preferences'
 const MAX_SYNC_EVENTS = 50
 const MAX_STATE_ROWS = 2000
 const MAX_PROGRESS_ROWS = 500
+const MAX_SNAPSHOT_QUESTION_IDS = 100
+const MAX_SMART_CANDIDATES = 100
 const DEFAULT_PAGE_SIZE = 20
 const MAX_PAGE_SIZE = 50
 const SUBJECT_ID_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/
@@ -103,6 +105,27 @@ function readQuestionId(value) {
 		maxLength: 64,
 		pattern: QUESTION_ID_PATTERN
 	})
+}
+
+function readQuestionIds(value, fieldName, maximum) {
+	const name = fieldName || 'questionIds'
+	if (value === undefined || value === null) return []
+	if (!Array.isArray(value)) invalidArgument(`${name}必须是数组`)
+	if (value.length > maximum) invalidArgument(`${name}最多包含${maximum}个题目ID`)
+	const result = []
+	const seen = new Set()
+	value.forEach((item, index) => {
+		const id = readString(item, `${name}[${index}]`, {
+			required: true,
+			maxLength: 64,
+			pattern: QUESTION_ID_PATTERN
+		})
+		if (!seen.has(id)) {
+			seen.add(id)
+			result.push(id)
+		}
+	})
+	return result
 }
 
 function readEventId(value) {
@@ -213,6 +236,31 @@ function emptyState(userId, subjectId, questionId, timestamp) {
 	}
 }
 
+function normalizeAggregateEntries(value) {
+	if (Array.isArray(value)) {
+		return value.filter(item => item && typeof item.key === 'string' && Number(item.count) > 0)
+			.map(item => ({ key: item.key, count: Number(item.count) }))
+	}
+	if (!isPlainObject(value)) return []
+	return Object.keys(value).filter(key => Number(value[key]) > 0)
+		.map(key => ({ key, count: Number(value[key]) }))
+}
+
+function incrementAggregate(entries, key) {
+	if (!key) return
+	const saved = entries.find(item => item.key === key)
+	if (saved) saved.count += 1
+	else entries.push({ key, count: 1 })
+}
+
+function aggregateEntriesToObject(entries) {
+	const result = {}
+	entries.forEach(item => {
+		if (item && item.key) result[item.key] = Number(item.count) || 0
+	})
+	return result
+}
+
 function emptyStats(userId, subjectId, timestamp, todayKey) {
 	return {
 		_id: statsDocumentId(userId, subjectId),
@@ -225,6 +273,9 @@ function emptyStats(userId, subjectId, timestamp, todayKey) {
 		totalAttempts: 0,
 		todayKey,
 		todayAttempts: 0,
+		chapterAttempts: [],
+		knowledgeAttempts: [],
+		stateAggregateVersion: 1,
 		createdAt: timestamp,
 		updatedAt: timestamp
 	}
@@ -232,6 +283,8 @@ function emptyStats(userId, subjectId, timestamp, todayKey) {
 
 function normalizeStats(stats, userId, subjectId, timestamp, todayKey) {
 	const result = stats || emptyStats(userId, subjectId, timestamp, todayKey)
+	result.chapterAttempts = normalizeAggregateEntries(result.chapterAttempts)
+	result.knowledgeAttempts = normalizeAggregateEntries(result.knowledgeAttempts)
 	if (result.todayKey !== todayKey) {
 		result.todayKey = todayKey
 		result.todayAttempts = 0
@@ -243,6 +296,63 @@ function answerIsCorrect(selected, answer) {
 	const left = selected.slice().sort()
 	const right = answer.slice().sort()
 	return left.length === right.length && left.every((item, index) => item === right[index])
+}
+
+function hashSeed(value) {
+	let hash = 2166136261
+	for (let index = 0; index < value.length; index += 1) {
+		hash ^= value.charCodeAt(index)
+		hash = Math.imul(hash, 16777619)
+	}
+	return hash >>> 0
+}
+
+function createRandom(seed) {
+	let state = seed >>> 0
+	return function random() {
+		state += 0x6D2B79F5
+		let value = state
+		value = Math.imul(value ^ value >>> 15, value | 1)
+		value ^= value + Math.imul(value ^ value >>> 7, value | 61)
+		return ((value ^ value >>> 14) >>> 0) / 4294967296
+	}
+}
+
+function shuffle(list, random) {
+	const result = list.slice()
+	for (let index = result.length - 1; index > 0; index -= 1) {
+		const target = Math.floor(random() * (index + 1))
+		const current = result[index]
+		result[index] = result[target]
+		result[target] = current
+	}
+	return result
+}
+
+function toPublicQuestion(document) {
+	const result = Object.assign({}, document)
+	delete result._id
+	delete result.version
+	delete result.status
+	delete result.updatedAt
+	result.id = result.questionId
+	return result
+}
+
+async function loadFullQuestionsByIds(db, catalog, questionIds) {
+	if (!questionIds.length) return []
+	const response = await db.collection(QUESTION_COLLECTION)
+		.where({
+			subjectId: catalog.subjectId,
+			version: catalog.activeVersion,
+			status: 1,
+			questionId: db.command.in(questionIds)
+		})
+		.limit(questionIds.length)
+		.get()
+	const byId = new Map()
+	getRows(response).forEach(question => byId.set(question.questionId, question))
+	return questionIds.map(questionId => byId.get(questionId)).filter(Boolean)
 }
 
 function readSyncEvent(rawEvent, currentTime, index) {
@@ -259,12 +369,40 @@ function readSyncEvent(rawEvent, currentTime, index) {
 		occurredAt: readOccurredAt(event.occurredAt, currentTime),
 		originalIndex: index
 	}
-	if (type === 'answer') result.selected = readSelected(event.selected)
+	if (type === 'answer') {
+		result.selected = readSelected(event.selected)
+		result.judgedLocally = event.judgedLocally === true
+		if (result.judgedLocally) {
+			result.correct = readBoolean(event.correct, `events[${index}].correct`)
+			result.chapterId = readString(event.chapterId, `events[${index}].chapterId`, {
+				required: true,
+				maxLength: 32
+			})
+			result.knowledge = readString(event.knowledge, `events[${index}].knowledge`, {
+				maxLength: 128
+			})
+		}
+	}
 	else {
 		if (typeof event.favorite !== 'boolean') invalidArgument('favorite必须是布尔值')
 		result.favorite = event.favorite
 	}
 	return result
+}
+
+function toSummary(stats, subjectId, currentTime) {
+	const todayKey = chinaDayKey(currentTime)
+	return {
+		subjectId,
+		attempted: Number(stats.attempted) || 0,
+		correct: Number(stats.correct) || 0,
+		wrong: Number(stats.wrong) || 0,
+		favorite: Number(stats.favorite) || 0,
+		totalAttempts: Number(stats.totalAttempts) || 0,
+		todayAttempts: stats.todayKey === todayKey ? (Number(stats.todayAttempts) || 0) : 0,
+		todayKey,
+		accuracy: stats.attempted ? Math.round(stats.correct / stats.attempted * 100) : 0
+	}
 }
 
 function readProgress(rawProgress, currentTime) {
@@ -300,6 +438,11 @@ async function getDocument(store, collectionName, documentId) {
 
 async function setDocument(store, collectionName, documentId, document) {
 	return store.collection(collectionName).doc(documentId).set(document)
+}
+
+function removedCount(response) {
+	const value = Number(response && (response.deleted || response.affectedDocs || response.updated))
+	return Number.isFinite(value) ? value : 0
 }
 
 async function loadCatalog(db, subjectId) {
@@ -435,7 +578,12 @@ function createQuestionBankUserService(db, options) {
 			const timeDiff = left.occurredAt.getTime() - right.occurredAt.getTime()
 			return timeDiff || left.originalIndex - right.originalIndex
 		})
-		const loaded = await loadQuestionsForEvents(db, progress ? events.concat([progress]) : events)
+		// 旧版客户端没有上传本地判题结果，发布过渡期内才回查题库。
+		// 新版事件和练习进度均直接信任客户端数据，不读取题库目录或题目答案。
+		const legacyAnswerEvents = events.filter(item => item.type === 'answer' && !item.judgedLocally)
+		const loaded = legacyAnswerEvents.length
+			? await loadQuestionsForEvents(db, legacyAnswerEvents)
+			: { questions: new Map() }
 		const todayKey = chinaDayKey(currentTime)
 
 		return withTransaction(db, async store => {
@@ -465,8 +613,12 @@ function createQuestionBankUserService(db, options) {
 
 			for (const item of events) {
 				if (item.type === 'answer') {
-					const question = loaded.questions.get(`${item.subjectId}|${item.questionId}`)
-					const correct = answerIsCorrect(item.selected, question.answer)
+					const question = item.judgedLocally
+						? null
+						: loaded.questions.get(`${item.subjectId}|${item.questionId}`)
+					const correct = item.judgedLocally
+						? item.correct
+						: answerIsCorrect(item.selected, question.answer)
 					const state = await getState(item.subjectId, item.questionId)
 					const wasAttempted = Boolean(state.attempted)
 					const wasCorrect = Boolean(state.lastCorrect)
@@ -481,8 +633,8 @@ function createQuestionBankUserService(db, options) {
 					}
 					const stats = await getStats(item.subjectId)
 
-					state.chapterId = question.chapterId
-					state.knowledge = question.knowledge
+					state.chapterId = item.judgedLocally ? item.chapterId : question.chapterId
+					state.knowledge = item.judgedLocally ? item.knowledge : question.knowledge
 					state.attempted = true
 					state.attempts = (Number(state.attempts) || 0) + 1
 					state.firstAnsweredAt = state.firstAnsweredAt || item.occurredAt
@@ -496,6 +648,10 @@ function createQuestionBankUserService(db, options) {
 						stats.attempted += 1
 						if (correct) stats.correct += 1
 						else stats.wrong += 1
+						if (stats.stateAggregateVersion === 1) {
+							incrementAggregate(stats.chapterAttempts, state.chapterId)
+							incrementAggregate(stats.knowledgeAttempts, state.knowledge)
+						}
 					} else if (wasCorrect !== correct) {
 						if (correct) {
 							stats.correct += 1
@@ -532,13 +688,6 @@ function createQuestionBankUserService(db, options) {
 
 			let progressResult = null
 			if (progress) {
-				const question = loaded.questions.get(`${progress.subjectId}|${progress.questionId}`)
-				if (String(question.chapterId) !== progress.chapterId) {
-					invalidArgument('progress中的章节与题目不匹配')
-				}
-				if (progress.mode === 'knowledge' && question.knowledge !== progress.knowledge) {
-					invalidArgument('progress中的知识点与题目不匹配')
-				}
 				const id = progressDocumentId(
 					userId,
 					progress.subjectId,
@@ -570,17 +719,25 @@ function createQuestionBankUserService(db, options) {
 				}
 			}
 
+			const summarySubjectIds = Array.from(new Set(events.map(item => item.subjectId)))
+			for (const subjectId of summarySubjectIds) await getStats(subjectId)
+
 			for (const state of stateCache.values()) {
 				await setDocument(store, STATE_COLLECTION, state._id, state)
 			}
 			for (const stats of statsCache.values()) {
 				await setDocument(store, STATS_COLLECTION, stats._id, stats)
 			}
+			const summaries = {}
+			statsCache.forEach(stats => {
+				summaries[stats.subjectId] = toSummary(stats, stats.subjectId, currentTime)
+			})
 
 			return {
 				acceptedEventIds,
 				duplicateEventIds,
 				answerResults,
+				summaries,
 				progress: progressResult
 			}
 		})
@@ -592,17 +749,7 @@ function createQuestionBankUserService(db, options) {
 		const todayKey = chinaDayKey(currentTime)
 		const saved = await getDocument(db, STATS_COLLECTION, statsDocumentId(userId, subjectId))
 		const stats = normalizeStats(saved, userId, subjectId, currentTime, todayKey)
-		return {
-			subjectId,
-			attempted: Number(stats.attempted) || 0,
-			correct: Number(stats.correct) || 0,
-			wrong: Number(stats.wrong) || 0,
-			favorite: Number(stats.favorite) || 0,
-			totalAttempts: Number(stats.totalAttempts) || 0,
-			todayAttempts: stats.todayKey === todayKey ? (Number(stats.todayAttempts) || 0) : 0,
-			todayKey,
-			accuracy: stats.attempted ? Math.round(stats.correct / stats.attempted * 100) : 0
-		}
+		return toSummary(stats, subjectId, currentTime)
 	}
 
 	async function getUserProfile(event, userId) {
@@ -655,15 +802,82 @@ function createQuestionBankUserService(db, options) {
 		}
 	}
 
+	async function clearCurrentSubjectData(event, userId) {
+		const subjectId = readSubjectId(event.subjectId)
+		const confirmation = readString(event.confirmation, 'confirmation', {
+			required: true,
+			maxLength: 32
+		})
+		if (confirmation !== 'CLEAR_CURRENT_SUBJECT') {
+			invalidArgument('删除确认信息不正确')
+		}
+		return withTransaction(db, async store => {
+			const targets = [
+				STATE_COLLECTION,
+				STATS_COLLECTION,
+				PROGRESS_COLLECTION
+			]
+			const deletedByCollection = {}
+			for (const collectionName of targets) {
+				const response = await store.collection(collectionName)
+					.where({ userId, subjectId })
+					.remove()
+				deletedByCollection[collectionName] = removedCount(response)
+			}
+			return {
+				cleared: true,
+				subjectId,
+				deletedRecords: Object.keys(deletedByCollection)
+					.reduce((total, name) => total + deletedByCollection[name], 0),
+				deletedByCollection
+			}
+		})
+	}
+
+	async function loadStateAggregates(userId, subjectId, currentTime) {
+		const todayKey = chinaDayKey(currentTime)
+		const saved = await getDocument(db, STATS_COLLECTION, statsDocumentId(userId, subjectId))
+		const stats = normalizeStats(saved, userId, subjectId, currentTime, todayKey)
+		if (!saved || stats.stateAggregateVersion === 1) return stats
+
+		// Existing users are backfilled once. Later snapshots read these bounded
+		// maps from the stats document instead of returning every answered state.
+		const response = await db.collection(STATE_COLLECTION)
+			.where({ userId, subjectId, attempted: true })
+			.field({ chapterId: true, knowledge: true })
+			.limit(MAX_STATE_ROWS + 1)
+			.get()
+		const rows = getRows(response)
+		if (rows.length > MAX_STATE_ROWS) {
+			throw new QuestionBankUserError('QUESTION_BANK_USER_STATE_LIMIT', '用户题目状态超过处理上限')
+		}
+		stats.chapterAttempts = []
+		stats.knowledgeAttempts = []
+		rows.forEach(item => {
+			incrementAggregate(stats.chapterAttempts, item.chapterId)
+			incrementAggregate(stats.knowledgeAttempts, item.knowledge)
+		})
+		stats.stateAggregateVersion = 1
+		stats.updatedAt = serverDate()
+		await setDocument(db, STATS_COLLECTION, stats._id, stats)
+		return stats
+	}
+
 	async function getStateSnapshot(event, userId) {
 		const subjectId = readSubjectId(event.subjectId)
-		const responses = await Promise.all([
-			db.collection(STATE_COLLECTION)
-				.where({ userId, subjectId })
+		const questionIds = readQuestionIds(
+			event.questionIds,
+			'questionIds',
+			MAX_SNAPSHOT_QUESTION_IDS
+		)
+		const includeAggregates = event.includeAggregates !== false
+		const includeProgress = event.includeProgress !== false
+		const currentTime = now()
+		const statePromise = questionIds.length
+			? db.collection(STATE_COLLECTION)
+				.where({ userId, subjectId, questionId: db.command.in(questionIds) })
 				.field({
 					questionId: true,
-					chapterId: true,
-					knowledge: true,
 					attempted: true,
 					lastSelected: true,
 					lastCorrect: true,
@@ -671,9 +885,11 @@ function createQuestionBankUserService(db, options) {
 					favorite: true,
 					favoriteUpdatedAt: true
 				})
-				.limit(MAX_STATE_ROWS + 1)
-				.get(),
-			db.collection(PROGRESS_COLLECTION)
+				.limit(questionIds.length)
+				.get()
+			: Promise.resolve({ data: [] })
+		const progressPromise = includeProgress
+			? db.collection(PROGRESS_COLLECTION)
 				.where({ userId, subjectId })
 				.field({
 					mode: true,
@@ -685,12 +901,14 @@ function createQuestionBankUserService(db, options) {
 				})
 				.limit(MAX_PROGRESS_ROWS + 1)
 				.get()
-		])
+			: Promise.resolve({ data: [] })
+		const aggregatePromise = includeAggregates
+			? loadStateAggregates(userId, subjectId, currentTime)
+			: Promise.resolve(null)
+		const responses = await Promise.all([statePromise, progressPromise, aggregatePromise])
 		const rows = getRows(responses[0])
-		if (rows.length > MAX_STATE_ROWS) {
-			throw new QuestionBankUserError('QUESTION_BANK_USER_STATE_LIMIT', '用户题目状态超过处理上限')
-		}
 		const progressRows = getRows(responses[1])
+		const stats = responses[2]
 		if (progressRows.length > MAX_PROGRESS_ROWS) {
 			throw new QuestionBankUserError('QUESTION_BANK_USER_PROGRESS_LIMIT', '用户练习进度超过处理上限')
 		}
@@ -699,13 +917,11 @@ function createQuestionBankUserService(db, options) {
 		const wrongRows = answeredRows.filter(item => item.lastCorrect === false)
 		const favoriteRows = rows.filter(item => item.favorite)
 			.sort((left, right) => getDateValue(right.favoriteUpdatedAt) - getDateValue(left.favoriteUpdatedAt))
-		const chapterAttempts = {}
-		const knowledgeAttempts = {}
+		const chapterAttempts = stats ? aggregateEntriesToObject(stats.chapterAttempts) : {}
+		const knowledgeAttempts = stats ? aggregateEntriesToObject(stats.knowledgeAttempts) : {}
 		const answerSelections = {}
 		const progressPositions = { chapter: {}, knowledge: {} }
 		answeredRows.forEach(item => {
-			if (item.chapterId) chapterAttempts[item.chapterId] = (chapterAttempts[item.chapterId] || 0) + 1
-			if (item.knowledge) knowledgeAttempts[item.knowledge] = (knowledgeAttempts[item.knowledge] || 0) + 1
 			if (Array.isArray(item.lastSelected) && item.lastSelected.length) {
 				answerSelections[item.questionId] = item.lastSelected
 			}
@@ -775,6 +991,89 @@ function createQuestionBankUserService(db, options) {
 		}
 	}
 
+	async function getSmartPractice(event, userId) {
+		const subjectId = readSubjectId(event.subjectId)
+		const pageSize = readInteger(event.pageSize, 'pageSize', {
+			defaultValue: DEFAULT_PAGE_SIZE,
+			minimum: 1,
+			maximum: MAX_PAGE_SIZE
+		})
+		const catalog = await loadCatalog(db, subjectId)
+		const questionCount = Math.max(0, Number(catalog.questionCount) || 0)
+		if (!questionCount) {
+			return { subjectId, version: catalog.activeVersion, items: [], total: 0 }
+		}
+		const seed = readString(event.seed, 'seed', {
+			defaultValue: `${subjectId}:${catalog.activeVersion}:${now().toISOString().slice(0, 10)}`,
+			maxLength: 128
+		})
+		const random = createRandom(hashSeed(seed))
+		const candidateCount = Math.min(
+			questionCount,
+			MAX_SMART_CANDIDATES,
+			Math.max(pageSize * 4, Math.min(50, questionCount))
+		)
+		const sortOrders = new Set()
+		while (sortOrders.size < candidateCount) {
+			sortOrders.add(1 + Math.floor(random() * questionCount))
+		}
+		const candidateResponse = await db.collection(QUESTION_COLLECTION)
+			.where({
+				subjectId,
+				version: catalog.activeVersion,
+				status: 1,
+				sortOrder: db.command.in(Array.from(sortOrders))
+			})
+			.field({ questionId: true, sortOrder: true })
+			.limit(candidateCount)
+			.get()
+		const candidates = getRows(candidateResponse)
+		const candidateIds = candidates.map(item => item.questionId)
+		const stateResponse = candidateIds.length
+			? await db.collection(STATE_COLLECTION)
+				.where({ userId, subjectId, questionId: db.command.in(candidateIds) })
+				.field({ questionId: true, attempted: true, lastCorrect: true })
+				.limit(candidateIds.length)
+				.get()
+			: { data: [] }
+		const stateById = new Map()
+		getRows(stateResponse).forEach(state => stateById.set(state.questionId, state))
+		const freshIds = []
+		const masteredIds = []
+		const sampledWrongIds = []
+		candidateIds.forEach(questionId => {
+			const state = stateById.get(questionId)
+			if (!state || !state.attempted) freshIds.push(questionId)
+			else if (state.lastCorrect === false) sampledWrongIds.push(questionId)
+			else masteredIds.push(questionId)
+		})
+
+		const wrongResponse = await db.collection(STATE_COLLECTION)
+			.where({ userId, subjectId, attempted: true, lastCorrect: false })
+			.field({ questionId: true })
+			.orderBy('lastAnsweredAt', 'desc')
+			.limit(Math.min(MAX_SMART_CANDIDATES, pageSize * 2))
+			.get()
+		const recentWrongIds = getRows(wrongResponse).map(item => item.questionId)
+		const orderedIds = shuffle(freshIds, random)
+			.concat(shuffle(recentWrongIds.concat(sampledWrongIds), random), shuffle(masteredIds, random))
+		const selectedIds = Array.from(new Set(orderedIds)).slice(0, pageSize)
+		const documents = await loadFullQuestionsByIds(db, catalog, selectedIds)
+		return {
+			subjectId,
+			version: catalog.activeVersion,
+			seed,
+			total: questionCount,
+			stateCounts: {
+				fresh: freshIds.length,
+				wrong: recentWrongIds.length,
+				mastered: masteredIds.length,
+				sampled: candidates.length
+			},
+			items: documents.map(toPublicQuestion)
+		}
+	}
+
 	async function getRecords(event, userId) {
 		const subjectId = readSubjectId(event.subjectId)
 		const type = readString(event.type, 'type', {
@@ -794,7 +1093,7 @@ function createQuestionBankUserService(db, options) {
 		const condition = recordTypeCondition(userId, subjectId, type)
 		const collection = db.collection(STATE_COLLECTION)
 		const responses = await Promise.all([
-			collection.where(condition).count(),
+			page === 1 ? collection.where(condition).count() : Promise.resolve(null),
 			collection.where(condition)
 				.field({
 					questionId: true,
@@ -804,11 +1103,13 @@ function createQuestionBankUserService(db, options) {
 				})
 				.orderBy(recordSortField(type), 'desc')
 				.skip((page - 1) * pageSize)
-				.limit(pageSize)
+				.limit(pageSize + 1)
 				.get()
 		])
-		const total = getTotal(responses[0])
-		const states = getRows(responses[1])
+		const total = responses[0] ? getTotal(responses[0]) : null
+		const rows = getRows(responses[1])
+		const hasMore = rows.length > pageSize
+		const states = hasMore ? rows.slice(0, pageSize) : rows
 		const questionMap = await loadQuestionSummaries(db, subjectId, states.map(item => item.questionId))
 		const items = states.map(state => {
 			const question = questionMap.get(state.questionId)
@@ -826,7 +1127,7 @@ function createQuestionBankUserService(db, options) {
 			page,
 			pageSize,
 			total,
-			hasMore: page * pageSize < total,
+			hasMore,
 			items
 		}
 	}
@@ -836,10 +1137,12 @@ function createQuestionBankUserService(db, options) {
 		getSummary,
 		getStateSnapshot,
 		getProgress,
+		getSmartPractice,
 		getRecords,
 		getUserProfile,
 		getPreferences,
-		updatePreferences
+		updatePreferences,
+		clearCurrentSubjectData
 	}
 
 	async function execute(rawEvent, userId) {

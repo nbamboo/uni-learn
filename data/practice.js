@@ -80,6 +80,51 @@ export function savePracticeState(state) {
 	uni.setStorageSync(PRACTICE_STATE_KEY, state)
 }
 
+export function clearPracticeState() {
+	if (typeof uni !== 'undefined' && typeof uni.removeStorageSync === 'function') {
+		uni.removeStorageSync(PRACTICE_STATE_KEY)
+	}
+	return createDefaultState()
+}
+
+export function clearSubjectPracticeState(subjectId) {
+	if (typeof subjectId !== 'string' || !subjectId.trim()) return getPracticeState()
+	const normalizedSubjectId = subjectId.trim()
+	const state = getPracticeState()
+	const removedQuestionIds = new Set()
+
+	Object.keys(state.answers).forEach(questionId => {
+		const answer = state.answers[questionId]
+		const isLegacyDefault = !answer.subjectId
+			&& normalizedSubjectId === DEFAULT_SUBJECT_ID
+			&& questionId.indexOf('ipf-') === 0
+		if (answer.subjectId === normalizedSubjectId || isLegacyDefault) {
+			removedQuestionIds.add(questionId)
+			delete state.answers[questionId]
+		}
+	})
+
+	state.favorites = state.favorites.filter(questionId => {
+		const savedSubjectId = state.favoriteSubjects[questionId]
+		const isLegacyDefault = !savedSubjectId
+			&& normalizedSubjectId === DEFAULT_SUBJECT_ID
+			&& questionId.indexOf('ipf-') === 0
+		const shouldRemove = savedSubjectId === normalizedSubjectId
+			|| removedQuestionIds.has(questionId)
+			|| isLegacyDefault
+		if (shouldRemove) removedQuestionIds.add(questionId)
+		return !shouldRemove
+	})
+
+	removedQuestionIds.forEach(questionId => {
+		delete state.favoriteSubjects[questionId]
+		delete state.favoriteUpdatedAt[questionId]
+	})
+	delete state.dailyAttempts[normalizedSubjectId]
+	savePracticeState(state)
+	return state
+}
+
 export function getSubjectById(subjectId) {
 	for (let i = 0; i < subjectGroups.length; i++) {
 		const item = subjectGroups[i].items.find(subject => subject.id === subjectId)
@@ -198,7 +243,11 @@ export function recordAnswer(question, selected) {
 		attempts: daily && daily.dayKey === todayKey ? (Number(daily.attempts) || 0) + 1 : 1
 	}
 	savePracticeState(state)
-	queuePracticeAnswer(question, selected, { eventId, occurredAt: timestamp })
+	queuePracticeAnswer(question, selected, {
+		eventId,
+		correct,
+		occurredAt: timestamp
+	})
 	return correct
 }
 

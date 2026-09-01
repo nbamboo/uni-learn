@@ -36,9 +36,11 @@ function project(document, fields) {
 }
 
 class FakeQuery {
-	constructor(collection, condition) {
+	constructor(collection, condition, collectionName, reads) {
 		this.collection = collection
 		this.condition = condition || {}
+		this.collectionName = collectionName
+		this.reads = reads
 		this.fields = null
 		this.order = null
 		this.offset = 0
@@ -83,32 +85,47 @@ class FakeQuery {
 	}
 
 	async count() {
+		this.reads[this.collectionName] = (this.reads[this.collectionName] || 0) + 1
 		return { total: this.rows().length }
 	}
 
 	async get() {
+		this.reads[this.collectionName] = (this.reads[this.collectionName] || 0) + 1
 		return {
 			data: this.rows().slice(this.offset, this.offset + this.maximum)
 				.map(item => project(item, this.fields))
 		}
 	}
+
+	async remove() {
+		const rows = this.rows()
+		rows.forEach(item => this.collection.delete(item._id))
+		return { deleted: rows.length }
+	}
 }
 
 class FakeCollection extends FakeQuery {
-	constructor(collection) {
-		super(collection, {})
+	constructor(collection, collectionName, reads) {
+		super(collection, {}, collectionName, reads)
 	}
 
 	doc(documentId) {
 		return {
-			get: async () => ({
-				data: this.collection.has(documentId)
-					? [Object.assign({}, this.collection.get(documentId))]
-					: []
-			}),
+			get: async () => {
+				this.reads[this.collectionName] = (this.reads[this.collectionName] || 0) + 1
+				return {
+					data: this.collection.has(documentId)
+						? [Object.assign({}, this.collection.get(documentId))]
+						: []
+				}
+			},
 			set: async document => {
 				this.collection.set(documentId, Object.assign({}, document, { _id: documentId }))
 				return { updated: 1 }
+			},
+			remove: async () => {
+				const deleted = this.collection.delete(documentId) ? 1 : 0
+				return { deleted }
 			}
 		}
 	}
@@ -116,6 +133,7 @@ class FakeCollection extends FakeQuery {
 
 function createDatabase(seed, now) {
 	const collections = {}
+	const reads = {}
 	Object.keys(seed).forEach(name => {
 		collections[name] = new Map(seed[name].map(item => [item._id, Object.assign({}, item)]))
 	})
@@ -129,7 +147,7 @@ function createDatabase(seed, now) {
 		serverDate: () => new Date(now.getTime()),
 		collection(name) {
 			if (!collections[name]) collections[name] = new Map()
-			return new FakeCollection(collections[name])
+			return new FakeCollection(collections[name], name, reads)
 		},
 		async startTransaction() {
 			return {
@@ -139,7 +157,7 @@ function createDatabase(seed, now) {
 			}
 		}
 	}
-	return { db, collections }
+	return { db, collections, reads }
 }
 
 function loadSeed() {
@@ -159,8 +177,19 @@ function loadSeed() {
 				avatar_file: { url: 'https://example.com/avatar.png' },
 				wx_openid: { mp: 'openid-for-test' },
 				register_date: new Date('2026-08-01T00:00:00.000Z'),
-				last_login_date: new Date('2026-08-28T03:59:00.000Z')
+			last_login_date: new Date('2026-08-28T03:59:00.000Z')
+		}, {
+			_id: 'user-two',
+			nickname: '保留用户'
 		}],
+		'uni-id-device': [
+			{ _id: 'device-one', user_id: 'user-one' },
+			{ _id: 'device-two', user_id: 'user-two' }
+		],
+		'uni-id-log': [
+			{ _id: 'log-one', user_id: 'user-one' },
+			{ _id: 'log-two', user_id: 'user-two' }
+		],
 		question_bank_user_states: [],
 		question_bank_user_stats: [],
 		question_bank_user_progress: [],
@@ -230,6 +259,10 @@ async function run() {
 			subjectId,
 			questionId: question.questionId,
 			selected: [wrongAlias],
+			judgedLocally: true,
+			correct: false,
+			chapterId: question.chapterId,
+			knowledge: question.knowledge,
 			occurredAt: currentTime.getTime()
 		}],
 		progress: {
@@ -244,6 +277,9 @@ async function run() {
 	assert.deepEqual(first.acceptedEventIds, ['answer-event-one'])
 	assert.equal(first.answerResults[0].correct, false)
 	assert.deepEqual(first.progress, { progressId: 'progress-event-one', saved: true })
+	assert.equal(first.summaries[subjectId].wrong, 1)
+	assert.equal(environment.reads.question_bank_catalogs || 0, 0)
+	assert.equal(environment.reads.question_bank_questions || 0, 0)
 
 	const duplicate = await service.execute({
 		action: 'syncEvents',
@@ -253,6 +289,10 @@ async function run() {
 			subjectId,
 			questionId: question.questionId,
 			selected: [wrongAlias],
+			judgedLocally: true,
+			correct: false,
+			chapterId: question.chapterId,
+			knowledge: question.knowledge,
 			occurredAt: currentTime.getTime()
 		}]
 	}, userId)
@@ -267,6 +307,10 @@ async function run() {
 				subjectId,
 				questionId: question.questionId,
 				selected: question.answer,
+				judgedLocally: true,
+				correct: true,
+				chapterId: question.chapterId,
+				knowledge: question.knowledge,
 				occurredAt: currentTime.getTime() + 1000
 			},
 			{
@@ -297,13 +341,34 @@ async function run() {
 		todayAttempts: 2
 	})
 
-	const snapshot = await service.execute({ action: 'getStateSnapshot', subjectId }, userId)
+	const snapshot = await service.execute({
+		action: 'getStateSnapshot',
+		subjectId,
+		questionIds: [question.questionId]
+	}, userId)
 	assert.deepEqual(snapshot.answeredQuestionIds, [question.questionId])
 	assert.deepEqual(snapshot.answerSelections[question.questionId], question.answer)
 	assert.deepEqual(snapshot.wrongQuestionIds, [])
 	assert.deepEqual(snapshot.favoriteQuestionIds, [question.questionId])
 	assert.equal(snapshot.chapterAttempts[question.chapterId], 1)
 	assert.equal(snapshot.progressPositions.chapter[question.chapterId], question.questionId)
+	const aggregateOnlySnapshot = await service.execute({
+		action: 'getStateSnapshot',
+		subjectId,
+		includeProgress: false
+	}, userId)
+	assert.deepEqual(aggregateOnlySnapshot.answeredQuestionIds, [])
+	assert.equal(aggregateOnlySnapshot.chapterAttempts[question.chapterId], 1)
+
+	const smartPractice = await service.execute({
+		action: 'getSmartPractice',
+		subjectId,
+		pageSize: 20,
+		seed: 'bounded-smart-test'
+	}, userId)
+	assert.equal(smartPractice.total, 822)
+	assert.equal(smartPractice.items.length, 20)
+	assert.ok(smartPractice.stateCounts.sampled <= 100)
 
 	const savedProgress = await service.execute({
 		action: 'getProgress',
@@ -388,6 +453,53 @@ async function run() {
 	const isolated = await service.execute({ action: 'getSummary', subjectId }, 'user-two')
 	assert.equal(isolated.attempted, 0)
 	assert.equal(isolated.favorite, 0)
+	const otherSubjectId = 'junior-law'
+	environment.collections.question_bank_user_states.set('other-subject-state', {
+		_id: 'other-subject-state', userId, subjectId: otherSubjectId, questionId: 'law-1'
+	})
+	environment.collections.question_bank_user_stats.set('other-subject-stats', {
+		_id: 'other-subject-stats', userId, subjectId: otherSubjectId, attempted: 1
+	})
+	environment.collections.question_bank_user_progress.set('other-subject-progress', {
+		_id: 'other-subject-progress', userId, subjectId: otherSubjectId, mode: 'chapter'
+	})
+
+	await assert.rejects(
+		service.execute({
+			action: 'clearCurrentSubjectData',
+			subjectId,
+			confirmation: 'wrong'
+		}, userId),
+		error => error && error.errCode === 'QUESTION_BANK_USER_INVALID_ARGUMENT'
+	)
+	const cleared = await service.execute({
+		action: 'clearCurrentSubjectData',
+		subjectId,
+		confirmation: 'CLEAR_CURRENT_SUBJECT'
+	}, userId)
+	assert.equal(cleared.cleared, true)
+	assert.equal(cleared.subjectId, subjectId)
+	assert.ok(cleared.deletedRecords >= 3)
+	assert.deepEqual(
+		Array.from(environment.collections.question_bank_user_states.values()).map(item => item.subjectId),
+		[otherSubjectId]
+	)
+	assert.deepEqual(
+		Array.from(environment.collections.question_bank_user_stats.values()).map(item => item.subjectId),
+		[otherSubjectId]
+	)
+	assert.deepEqual(
+		Array.from(environment.collections.question_bank_user_progress.values()).map(item => item.subjectId),
+		[otherSubjectId]
+	)
+	assert.equal(environment.collections.question_bank_user_preferences.size, 1)
+	assert.equal(environment.collections['uni-id-users'].has('user-one'), true)
+	assert.equal(environment.collections['uni-id-users'].has('user-two'), true)
+	assert.equal(environment.collections['uni-id-device'].has('device-one'), true)
+	assert.equal(environment.collections['uni-id-device'].has('device-two'), true)
+	assert.equal(environment.collections['uni-id-log'].has('log-one'), true)
+	assert.equal(environment.collections['uni-id-log'].has('log-two'), true)
+	assert.ok(environment.collections.question_bank_questions.size > 0)
 
 	console.log('questionBankUser tests passed')
 }

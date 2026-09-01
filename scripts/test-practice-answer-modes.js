@@ -50,6 +50,7 @@ async function run() {
 	let snapshotCalls = 0
 	let chapterPositionCalls = 0
 	let knowledgePositionCalls = 0
+	let catalogSummaryCalls = 0
 	let preferenceResponse = { answerMode: 'practice', nightMode: false }
 	const environment = {
 		FinanceCalculator: {},
@@ -61,7 +62,14 @@ async function run() {
 		getSubjectStats: () => ({ attempted: 0, correct: 0, wrong: 0, favorite: 0, accuracy: 0 }),
 		getTodayProgress: () => ({ attempts: 0, goal: 20, percent: 0 }),
 		selectSubject: () => {},
-		subjectGroups: [],
+		subjectGroups: [{
+			level: '初级',
+			items: [
+				{ id: 'junior-law', name: '初级法规' },
+				{ id: 'junior-personal-finance', name: '初级个人理财' },
+				{ id: 'junior-risk', name: '初级风险管理' }
+			]
+		}],
 		isCorrectAnswer: (selected, answer) => selected.slice().sort().join(',') === answer.slice().sort().join(','),
 		isFavorite: () => false,
 		recordAnswer(question, selected) {
@@ -105,6 +113,18 @@ async function run() {
 			chapters: [{ id: '1', name: '第一章', count: 10 }],
 			knowledgeGroups: [{ chapterId: '1', chapter: '第一章', name: '测试知识点', count: 5 }]
 		}),
+		getCatalogSummaries: async () => {
+			catalogSummaryCalls += 1
+			return [{
+				subjectId: 'junior-law',
+				activeVersion: '2026-09-01',
+				questionCount: 1250
+			}, {
+				subjectId: 'junior-personal-finance',
+				activeVersion: '2026-08-21',
+				questionCount: 822
+			}]
+		},
 		savePracticeProgress: () => {
 			progressSaveCalls += 1
 			return null
@@ -426,6 +446,34 @@ async function run() {
 		backgroundColor: '#171c22'
 	})
 
+	const chapterTheme = Object.assign(chapterComponent.data(), chapterComponent.methods, {
+		items: []
+	})
+	chapterComponent.onShow.call(chapterTheme)
+	assert.equal(chapterTheme.nightMode, true)
+	assert.deepEqual(JSON.parse(JSON.stringify(navigationColors.slice(-1)[0])), {
+		frontColor: '#ffffff',
+		backgroundColor: '#171c22'
+	})
+
+	const recordsComponent = loadComponent(
+		environment,
+		'../practice-pages/practice-records/practice-records.vue'
+	)
+	let recordsLoadCalls = 0
+	const recordsTheme = Object.assign(recordsComponent.data(), recordsComponent.methods, {
+		loadRecords() {
+			recordsLoadCalls += 1
+		}
+	})
+	recordsComponent.onShow.call(recordsTheme)
+	assert.equal(recordsTheme.nightMode, true)
+	assert.equal(recordsLoadCalls, 1)
+	assert.deepEqual(JSON.parse(JSON.stringify(navigationColors.slice(-1)[0])), {
+		frontColor: '#ffffff',
+		backgroundColor: '#171c22'
+	})
+
 	const settingsComponent = loadComponent(
 		environment,
 		'../practice-pages/answer-settings/answer-settings.vue'
@@ -444,7 +492,14 @@ async function run() {
 	})
 
 	const homeComponent = loadComponent(environment, '../pages/exam/exam.vue')
-	const home = Object.assign(homeComponent.data(), homeComponent.methods)
+	const home = Object.assign(homeComponent.data(), homeComponent.methods, {
+		currentSubjectId: 'junior-personal-finance'
+	})
+	await home.loadCatalogSummaries()
+	assert.equal(catalogSummaryCalls, 1)
+	assert.equal(home.subjectCatalogStatusText('junior-law'), '1250题')
+	assert.equal(home.subjectCatalogStatusText('junior-personal-finance'), '822题')
+	assert.equal(home.subjectCatalogStatusText('junior-risk'), '待导入')
 	await home.refreshNightMode()
 	assert.equal(home.nightMode, true)
 	assert.deepEqual(JSON.parse(JSON.stringify(tabBarStyles.slice(-1)[0])), {
@@ -455,6 +510,9 @@ async function run() {
 	})
 	home.applyTabBarTheme(false)
 	assert.equal(tabBarStyles.slice(-1)[0].backgroundColor, '#ffffff')
+
+	const pagesConfig = JSON.parse(fs.readFileSync(path.resolve(__dirname, '../pages.json'), 'utf8'))
+	assert.equal(pagesConfig.pages.some(page => page.path === 'pages/privacy/privacy'), false)
 
 	console.log('practice answer mode tests passed')
 }
