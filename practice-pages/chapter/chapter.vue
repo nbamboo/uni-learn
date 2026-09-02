@@ -202,6 +202,7 @@
 								&& this.subjectId === 'junior-personal-finance'
 								&& questionId.indexOf('ipf-') === 0
 							if (answer.subjectId !== this.subjectId && !isLegacyDefault) return
+							if (!Array.isArray(answer.practiceModes) || answer.practiceModes.indexOf('knowledge') === -1) return
 							if (!answer.knowledge) return
 							attemptedByKnowledge[answer.knowledge] = (attemptedByKnowledge[answer.knowledge] || 0) + 1
 						})

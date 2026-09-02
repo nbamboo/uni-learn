@@ -1,0 +1,53 @@
+{
+  "bsonType": "object",
+  "description": "个人主体小程序虚拟支付订单，仅允许云函数读写",
+  "required": [
+    "_id",
+    "outTradeNo",
+    "userId",
+    "openid",
+    "productId",
+    "productName",
+    "months",
+    "quantity",
+    "amountFen",
+    "env",
+    "status",
+    "createdAt",
+    "updatedAt"
+  ],
+  "permission": {
+    "read": false,
+    "create": false,
+    "update": false,
+    "delete": false,
+    "count": false
+  },
+  "properties": {
+    "_id": { "bsonType": "string", "minLength": 8, "maxLength": 32 },
+    "outTradeNo": { "bsonType": "string", "minLength": 8, "maxLength": 32 },
+    "userId": { "bsonType": "string", "minLength": 1, "maxLength": 64 },
+    "openid": { "bsonType": "string", "minLength": 1, "maxLength": 128 },
+    "productId": { "bsonType": "string", "minLength": 1, "maxLength": 64 },
+    "productName": { "bsonType": "string", "minLength": 1, "maxLength": 64 },
+    "months": { "bsonType": "int", "minimum": 1, "maximum": 120 },
+    "quantity": { "bsonType": "int", "minimum": 1, "maximum": 100 },
+    "amountFen": { "bsonType": "int", "minimum": 1, "maximum": 10000000 },
+    "env": { "bsonType": "int", "enum": [0] },
+    "status": {
+      "bsonType": "string",
+      "enum": ["pending", "paid", "delivered", "refunded", "closed"]
+    },
+    "wxOrderId": { "bsonType": "string", "minLength": 1, "maxLength": 96 },
+    "transactionId": { "bsonType": "string", "maxLength": 128 },
+    "refundId": { "bsonType": "string", "maxLength": 128 },
+    "refundFee": { "bsonType": "int", "minimum": 0 },
+    "queryAttempts": { "bsonType": "int", "minimum": 0 },
+    "createdAt": { "bsonType": "date" },
+    "updatedAt": { "bsonType": "date" },
+    "lastQueryAt": { "bsonType": "date" },
+    "paidAt": { "bsonType": "date" },
+    "deliveredAt": { "bsonType": "date" },
+    "refundedAt": { "bsonType": "date" }
+  }
+}

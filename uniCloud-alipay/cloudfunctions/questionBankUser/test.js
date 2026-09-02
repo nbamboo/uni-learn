@@ -193,7 +193,16 @@ function loadSeed() {
 		question_bank_user_states: [],
 		question_bank_user_stats: [],
 		question_bank_user_progress: [],
-		question_bank_user_preferences: []
+		question_bank_user_preferences: [],
+		question_bank_memberships: [{
+			_id: 'user-one',
+			userId: 'user-one',
+			status: 'active',
+			expiresAt: new Date('2027-08-28T04:00:00.000Z'),
+			grants: [],
+			createdAt: new Date('2026-08-01T00:00:00.000Z'),
+			updatedAt: new Date('2026-08-01T00:00:00.000Z')
+		}]
 	}
 }
 
@@ -213,6 +222,54 @@ async function run() {
 		nightMode: false,
 		updatedAt: 0
 	})
+
+	await assert.rejects(
+		() => service.execute({
+			action: 'getRecords',
+			subjectId,
+			type: 'wrong',
+			page: 1,
+			pageSize: 20
+		}, 'user-two'),
+		error => error && error.errCode === 'QUESTION_BANK_MEMBERSHIP_REQUIRED'
+	)
+	const nonMemberSync = await service.execute({
+		action: 'syncEvents',
+		events: [{
+			type: 'answer',
+			eventId: 'answer-nonmember',
+			subjectId,
+			questionId: question.questionId,
+			selected: [wrongAlias],
+			judgedLocally: true,
+			correct: false,
+			chapterId: question.chapterId,
+			knowledge: question.knowledge,
+			occurredAt: currentTime.getTime()
+		}, {
+			type: 'favorite',
+			eventId: 'favorite-nonmember',
+			subjectId,
+			questionId: question.questionId,
+			favorite: true,
+			occurredAt: currentTime.getTime()
+		}]
+	}, 'user-nonmember')
+	assert.deepEqual(nonMemberSync.acceptedEventIds, ['answer-nonmember'])
+	assert.deepEqual(nonMemberSync.rejectedEventIds, ['favorite-nonmember'])
+	;['question_bank_user_states', 'question_bank_user_stats'].forEach(collectionName => {
+		for (const [id, document] of environment.collections[collectionName]) {
+			if (document.userId === 'user-nonmember') environment.collections[collectionName].delete(id)
+		}
+	})
+	await assert.rejects(
+		() => service.execute({
+			action: 'updatePreferences',
+			answerMode: 'exam',
+			nightMode: false
+		}, 'user-two'),
+		error => error && error.errCode === 'QUESTION_BANK_MEMBERSHIP_REQUIRED'
+	)
 	const updatedPreferences = await service.execute({
 		action: 'updatePreferences',
 		answerMode: 'exam',

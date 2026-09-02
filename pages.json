@@ -82,6 +82,13 @@
 
 		},
 		{
+			"path": "pages/membership/membership",
+			"style": {
+				"navigationBarTitleText": "会员中心",
+				"enablePullDownRefresh": false
+			}
+		},
+		{
 			"path": "pages/subject/subject",
 			"style": {
 				"navigationBarTitleText": "",

@@ -1,0 +1,26 @@
+{
+  "name": "virtualPayment",
+  "version": "1.0.0",
+  "description": "个人主体小程序会员虚拟支付、发货与补单",
+  "main": "index.js",
+  "scripts": {
+    "test": "node test.js"
+  },
+  "dependencies": {
+    "uni-config-center": "file:../../../uni_modules/uni-config-center/uniCloud/cloudfunctions/common/uni-config-center",
+    "uni-id-common": "file:../../../uni_modules/uni-id-common/uniCloud/cloudfunctions/common/uni-id-common"
+  },
+  "cloudfunction-config": {
+    "memorySize": 512,
+    "timeout": 60,
+    "runtime": "Nodejs18",
+    "path": "/virtual-payment-notify",
+    "triggers": [
+      {
+        "name": "reconcileVirtualPaymentOrders",
+        "type": "timer",
+        "config": "17 */5 * * * * *"
+      }
+    ]
+  }
+}

@@ -1,0 +1,37 @@
+{
+  "bsonType": "object",
+  "description": "用户会员有效期与虚拟支付发货台账，仅允许云函数读写",
+  "required": ["_id", "userId", "status", "grants", "createdAt", "updatedAt"],
+  "permission": {
+    "read": false,
+    "create": false,
+    "update": false,
+    "delete": false,
+    "count": false
+  },
+  "properties": {
+    "_id": { "bsonType": "string", "minLength": 1, "maxLength": 64 },
+    "userId": { "bsonType": "string", "minLength": 1, "maxLength": 64 },
+    "status": { "bsonType": "string", "enum": ["active", "expired", "revoked"] },
+    "expiresAt": { "bsonType": "date" },
+    "grants": {
+      "bsonType": "array",
+      "maxItems": 200,
+      "items": {
+        "bsonType": "object",
+        "required": ["grantId", "outTradeNo", "productId", "months", "quantity", "grantedAt"],
+        "properties": {
+          "grantId": { "bsonType": "string", "minLength": 1, "maxLength": 96 },
+          "outTradeNo": { "bsonType": "string", "minLength": 8, "maxLength": 32 },
+          "productId": { "bsonType": "string", "minLength": 1, "maxLength": 64 },
+          "months": { "bsonType": "int", "minimum": 1, "maximum": 120 },
+          "quantity": { "bsonType": "int", "minimum": 1, "maximum": 100 },
+          "grantedAt": { "bsonType": "date" },
+          "revokedAt": { "bsonType": "date" }
+        }
+      }
+    },
+    "createdAt": { "bsonType": "date" },
+    "updatedAt": { "bsonType": "date" }
+  }
+}

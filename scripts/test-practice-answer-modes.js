@@ -51,7 +51,17 @@ async function run() {
 	let chapterPositionCalls = 0
 	let knowledgePositionCalls = 0
 	let catalogSummaryCalls = 0
+	let favoriteToggleCalls = 0
+	const membershipPrompts = []
 	let preferenceResponse = { answerMode: 'practice', nightMode: false }
+	const activeMembership = {
+		isMember: true,
+		status: 'active',
+		expiresAt: new Date('2027-09-01T00:00:00.000Z').getTime(),
+		entitlements: { adFree: true, practiceRecords: true, advancedAnswerModes: true },
+		plans: []
+	}
+	let membershipResponse = activeMembership
 	const environment = {
 		FinanceCalculator: {},
 		buildPracticeQuestions: async () => [],
@@ -76,13 +86,22 @@ async function run() {
 			recordCalls.push({ question, selected: selected.slice() })
 			return selected.slice().sort().join(',') === question.answer.slice().sort().join(',')
 		},
-		toggleFavorite: () => true,
+		toggleFavorite: () => {
+			favoriteToggleCalls += 1
+			return true
+		},
 		flushPracticeEvents: async () => {
 			flushCalls += 1
 			return { synced: true }
 		},
 		getLocalPracticePreferences: () => preferenceResponse,
 		getPracticePreferences: async () => preferenceResponse,
+		getCachedMembership: () => membershipResponse,
+		getMembership: async () => membershipResponse,
+		showMembershipRequired: async feature => {
+			membershipPrompts.push(feature)
+			return true
+		},
 		updatePracticePreferences: async preferences => {
 			preferenceResponse = Object.assign({}, preferences, { updatedAt: Date.now() })
 			return preferenceResponse
@@ -511,8 +530,57 @@ async function run() {
 	home.applyTabBarTheme(false)
 	assert.equal(tabBarStyles.slice(-1)[0].backgroundColor, '#ffffff')
 
+	membershipResponse = {
+		isMember: false,
+		status: 'inactive',
+		expiresAt: 0,
+		entitlements: { adFree: false, practiceRecords: false, advancedAnswerModes: false },
+		plans: []
+	}
+	home.membership = membershipResponse
+	home.stats = Object.assign({}, home.stats, { wrong: 7, favorite: 3 })
+	assert.equal(home.featureCount('wrong'), 0)
+	assert.equal(home.featureCount('favorite'), 0)
+	home.membership = activeMembership
+	assert.equal(home.featureCount('wrong'), 7)
+	assert.equal(home.featureCount('favorite'), 3)
+	home.membership = membershipResponse
+
+	const lockedPractice = createContext('practice', [single])
+	lockedPractice.membershipLoaded = true
+	assert.equal(lockedPractice.showAds, true)
+	lockedPractice.currentIndex = 0
+	lockedPractice.loadQuestion(0)
+	const recordsBeforeLockedWrongAnswer = recordCalls.length
+	lockedPractice.chooseOption('B')
+	assert.equal(recordCalls.length, recordsBeforeLockedWrongAnswer + 1)
+	assert.equal(lockedPractice.sessionAnswers[single.id].correct, false)
+	const togglesBeforeLockedFavorite = favoriteToggleCalls
+	await lockedPractice.favoriteCurrent()
+	assert.equal(favoriteToggleCalls, togglesBeforeLockedFavorite)
+	assert.equal(membershipPrompts.slice(-1)[0], '收藏夹')
+	lockedPractice.mode = 'wrong'
+	await lockedPractice.initializePractice()
+	assert.equal(lockedPractice.loadError, '错题集为会员权益')
+	assert.equal(membershipPrompts.slice(-1)[0], '错题集')
+
+	const lockedSettings = Object.assign(settingsComponent.data(), settingsComponent.methods)
+	lockedSettings.answerMode = 'practice'
+	lockedSettings.saving = false
+	await lockedSettings.selectAnswerMode('exam')
+	assert.equal(lockedSettings.answerMode, 'practice')
+	assert.equal(membershipPrompts.slice(-1)[0], '考试模式')
+
 	const pagesConfig = JSON.parse(fs.readFileSync(path.resolve(__dirname, '../pages.json'), 'utf8'))
 	assert.equal(pagesConfig.pages.some(page => page.path === 'pages/privacy/privacy'), false)
+	const aboutPageSource = fs.readFileSync(path.resolve(__dirname, '../pages/about/about.vue'), 'utf8')
+	const membershipEntry = aboutPageSource.match(/<uni-list-item[\s\S]*?title="会员中心"[\s\S]*?\/>/)
+	assert.ok(membershipEntry, '个人中心应包含会员中心入口')
+	assert.match(membershipEntry[0], /\bto="\/pages\/membership\/membership"/)
+	const membershipPageSource = fs.readFileSync(path.resolve(__dirname, '../pages/membership/membership.vue'), 'utf8')
+	assert.doesNotMatch(membershipPageSource, /支付后权益未到账|class="notice-card"/)
+	assert.match(membershipPageSource, /云端学习数据同步/)
+	assert.match(membershipPageSource, /同一微信账号跨设备登录，答题记录与学习进度自动同步/)
 
 	console.log('practice answer mode tests passed')
 }

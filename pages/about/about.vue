@@ -13,6 +13,15 @@
 				<uni-icons v-else type="cloud-upload" size="24" color="#ffffff"></uni-icons>
 			</view>
 			<uni-list>
+			<uni-list-item
+				:showExtraIcon="true"
+				:showArrow="true"
+				:extraIcon="{type: 'vip-filled', color: '#008cff', size: '36'}"
+				title="会员中心"
+				:rightText="membershipText"
+				to="/pages/membership/membership"
+				titleStyle="font-size: 60rpx;"
+			/>
 			<uni-list-item :showExtraIcon="true" :showArrow="true" :extraIcon="{type: 'map', color: '#008cff', size: '36'}"
 				:to="`/pages/course/course`" @click="onClick"
 				title="图文教程"
@@ -39,6 +48,10 @@
 			getPracticeUserProfile,
 			pendingPracticeEventCount
 		} from '@/services/user-practice.js'
+		import {
+			getCachedMembership,
+			getMembership
+		} from '@/services/membership.js'
 
 		export default {
 			data() {
@@ -47,7 +60,8 @@
 					accountError: '',
 					profile: null,
 					pendingCount: 0,
-					accountRequestId: 0
+					accountRequestId: 0,
+					membership: getCachedMembership()
 				}
 			},
 			computed: {
@@ -60,12 +74,25 @@
 				accountStatus() {
 					if (!this.profile) return '等待连接云端账号'
 					return this.profile.weixinBound ? '微信账号已连接，做题数据已开启云同步' : '云端账号已登录'
+				},
+				membershipText() {
+					if (!this.membership.isMember) return '未开通'
+					const date = new Date(this.membership.expiresAt)
+					return `有效至 ${date.getMonth() + 1}月${date.getDate()}日`
 				}
 			},
 			onShow() {
 				this.loadAccount()
+				this.loadMembership()
 			},
 			methods: {
+				async loadMembership() {
+					try {
+						this.membership = await getMembership({ forceRefresh: true })
+					} catch (error) {
+						this.membership = getCachedMembership()
+					}
+				},
 				async loadAccount(forceRefresh) {
 					const requestId = ++this.accountRequestId
 					this.accountLoading = true

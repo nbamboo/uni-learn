@@ -1,0 +1,35 @@
+[
+  {
+    "IndexName": "payment_orders_user_created",
+    "MgoKeySchema": {
+      "MgoIndexKeys": [
+        { "Name": "userId", "Direction": "1", "Type": "varchar" },
+        { "Name": "createdAt", "Direction": "-1", "Type": "date" }
+      ],
+      "MgoIsUnique": false,
+      "MgoIsSparse": false
+    }
+  },
+  {
+    "IndexName": "payment_orders_status_updated",
+    "MgoKeySchema": {
+      "MgoIndexKeys": [
+        { "Name": "status", "Direction": "1", "Type": "varchar" },
+        { "Name": "env", "Direction": "1", "Type": "int" },
+        { "Name": "updatedAt", "Direction": "1", "Type": "date" }
+      ],
+      "MgoIsUnique": false,
+      "MgoIsSparse": false
+    }
+  },
+  {
+    "IndexName": "payment_orders_wx_order_unique",
+    "MgoKeySchema": {
+      "MgoIndexKeys": [
+        { "Name": "wxOrderId", "Direction": "1", "Type": "varchar" }
+      ],
+      "MgoIsUnique": true,
+      "MgoIsSparse": true
+    }
+  }
+]

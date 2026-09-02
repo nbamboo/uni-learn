@@ -8,6 +8,7 @@ import {
 export const DEFAULT_SUBJECT_ID = 'junior-personal-finance'
 export const PRACTICE_STATE_KEY = 'uni-learn-practice-state-v1'
 export const DAILY_GOAL = 20
+const PRACTICE_ENTRY_MODES = ['smart', 'chapter', 'knowledge', 'wrong', 'favorite', 'search', 'sequence']
 
 export const subjectGroups = [
 	{
@@ -45,6 +46,15 @@ function createDefaultState() {
 	}
 }
 
+function practiceStateStorageKey() {
+	let userId = ''
+	if (typeof uniCloud !== 'undefined' && typeof uniCloud.getCurrentUserInfo === 'function') {
+		const user = uniCloud.getCurrentUserInfo() || {}
+		userId = typeof user.uid === 'string' ? user.uid.trim() : ''
+	}
+	return `${PRACTICE_STATE_KEY}:${userId || 'guest'}`
+}
+
 function localDayKey(timestamp) {
 	const date = timestamp ? new Date(timestamp) : new Date()
 	const pad = value => value < 10 ? `0${value}` : String(value)
@@ -52,7 +62,8 @@ function localDayKey(timestamp) {
 }
 
 export function getPracticeState() {
-	const saved = uni.getStorageSync(PRACTICE_STATE_KEY)
+	const storageKey = practiceStateStorageKey()
+	const saved = uni.getStorageSync(storageKey)
 	const state = saved && typeof saved === 'object' ? saved : createDefaultState()
 	state.currentSubjectId = state.currentSubjectId || DEFAULT_SUBJECT_ID
 	state.answers = state.answers || {}
@@ -71,18 +82,18 @@ export function getPracticeState() {
 			state.dailyAttempts[item.subjectId].attempts += 1
 		})
 		delete state.history
-		uni.setStorageSync(PRACTICE_STATE_KEY, state)
+		uni.setStorageSync(storageKey, state)
 	}
 	return state
 }
 
 export function savePracticeState(state) {
-	uni.setStorageSync(PRACTICE_STATE_KEY, state)
+	uni.setStorageSync(practiceStateStorageKey(), state)
 }
 
 export function clearPracticeState() {
 	if (typeof uni !== 'undefined' && typeof uni.removeStorageSync === 'function') {
-		uni.removeStorageSync(PRACTICE_STATE_KEY)
+		uni.removeStorageSync(practiceStateStorageKey())
 	}
 	return createDefaultState()
 }
@@ -220,12 +231,20 @@ export function isCorrectAnswer(selected, answer) {
 	return left === right
 }
 
-export function recordAnswer(question, selected) {
+export function recordAnswer(question, selected, options) {
+	const config = options || {}
 	const state = getPracticeState()
 	const correct = isCorrectAnswer(selected, question.answer)
 	const previous = state.answers[question.id]
 	const timestamp = Date.now()
 	const eventId = createPracticeEventId('answer')
+	const practiceModes = previous && Array.isArray(previous.practiceModes)
+		? previous.practiceModes.filter(mode => PRACTICE_ENTRY_MODES.indexOf(mode) > -1)
+		: []
+	const practiceMode = PRACTICE_ENTRY_MODES.indexOf(config.practiceMode) > -1
+		? config.practiceMode
+		: ''
+	if (practiceMode && practiceModes.indexOf(practiceMode) === -1) practiceModes.push(practiceMode)
 
 	state.answers[question.id] = {
 		subjectId: question.subjectId,
@@ -234,6 +253,7 @@ export function recordAnswer(question, selected) {
 		selected: selected.slice(),
 		correct,
 		attempts: previous ? previous.attempts + 1 : 1,
+		practiceModes,
 		timestamp
 	}
 	const todayKey = localDayKey(timestamp)
@@ -246,6 +266,7 @@ export function recordAnswer(question, selected) {
 	queuePracticeAnswer(question, selected, {
 		eventId,
 		correct,
+		practiceMode,
 		occurredAt: timestamp
 	})
 	return correct
@@ -259,7 +280,10 @@ export function getChapterProgress(subjectId, chapterId, questionCount) {
 		: (chapter ? chapter.count : 0)
 	const attempted = Object.keys(state.answers).filter(questionId => {
 		const answer = state.answers[questionId]
-		return answer.subjectId === subjectId && answer.chapterId === String(chapterId)
+		return answer.subjectId === subjectId
+			&& answer.chapterId === String(chapterId)
+			&& Array.isArray(answer.practiceModes)
+			&& answer.practiceModes.indexOf('chapter') > -1
 	}).length
 	return {
 		attempted,

@@ -79,6 +79,7 @@
 				<view class="feature-icon" :class="item.tone">
 					<uni-icons :type="item.icon" size="25" :color="item.color"></uni-icons>
 					<view class="feature-badge" v-if="featureCount(item.key)">{{ featureCount(item.key) }}</view>
+					<view class="member-tag" v-if="item.memberOnly && !membership.isMember">会员</view>
 				</view>
 				<text class="feature-title">{{ item.title }}</text>
 				<text class="feature-desc">{{ item.desc }}</text>
@@ -158,11 +159,17 @@
 		getPracticePreferences,
 		getPracticeSummary
 	} from '@/services/user-practice.js'
+	import {
+		getCachedMembership,
+		getMembership,
+		showMembershipRequired
+	} from '@/services/membership.js'
 
 	export default {
 		data() {
 			const localPreferences = getLocalPracticePreferences()
 			return {
+				membership: getCachedMembership(),
 				nightMode: Boolean(localPreferences.nightMode),
 				currentSubjectId: '',
 				subjectGroups,
@@ -184,8 +191,8 @@
 				},
 				today: { attempts: 0, goal: 20, percent: 0 },
 				features: [
-					{ key: 'wrong', title: '错题集', desc: '集中攻克薄弱项', icon: 'refresh', color: '#008cff', tone: 'blue' },
-					{ key: 'favorite', title: '收藏夹', desc: '保存重点题目', icon: 'star', color: '#008cff', tone: 'blue' },
+					{ key: 'wrong', title: '错题集', desc: '集中攻克薄弱项', icon: 'refresh', color: '#008cff', tone: 'blue', memberOnly: true },
+					{ key: 'favorite', title: '收藏夹', desc: '保存重点题目', icon: 'star', color: '#008cff', tone: 'blue', memberOnly: true },
 					{ key: 'knowledge', title: '知识点', desc: '按考点专项练习', icon: 'map', color: '#008cff', tone: 'blue' },
 					{ key: 'settings', title: '答题设置', desc: '答题模式与夜间模式', icon: 'tune', color: '#008cff', tone: 'blue' },
 					{ key: 'coming-soon', title: '敬请期待', desc: '更多功能陆续上线', icon: 'more-filled', color: '#008cff', tone: 'blue' }
@@ -219,6 +226,7 @@
 		},
 		onShow() {
 			this.refreshNightMode()
+			this.refreshMembership()
 			const state = getPracticeState()
 			this.currentSubjectId = state.currentSubjectId
 			this.refreshStats(this.subjectQuestionCount(this.currentSubjectId))
@@ -231,6 +239,13 @@
 			this.applyTabBarTheme(false)
 		},
 		methods: {
+			async refreshMembership() {
+				try {
+					this.membership = await getMembership()
+				} catch (error) {
+					this.membership = getCachedMembership()
+				}
+			},
 			applyNightMode(preferences) {
 				this.nightMode = Boolean(preferences && preferences.nightMode)
 				uni.setNavigationBarColor({
@@ -470,7 +485,7 @@
 			goAnswerSettings() {
 				uni.navigateTo({ url: '/practice-pages/answer-settings/answer-settings' })
 			},
-			handleFeature(item) {
+			async handleFeature(item) {
 				if (item.key === 'coming-soon') {
 					uni.showToast({ title: '更多功能敬请期待', icon: 'none' })
 					return
@@ -483,10 +498,22 @@
 					this.goChapter(item.key)
 					return
 				}
+				if (item.memberOnly) {
+					try {
+						this.membership = await getMembership()
+					} catch (error) {
+						this.membership = getCachedMembership()
+					}
+					if (!this.membership.isMember) {
+						showMembershipRequired(item.title)
+						return
+					}
+				}
 				if (!this.ensureQuestions()) return
 				uni.navigateTo({ url: `/practice-pages/practice-records/practice-records?subjectId=${this.currentSubjectId}&view=${item.key}` })
 			},
 			featureCount(key) {
+				if ((key === 'wrong' || key === 'favorite') && !this.membership.isMember) return 0
 				if (key === 'wrong') return this.stats.wrong
 				if (key === 'favorite') return this.stats.favorite
 				return 0
@@ -532,6 +559,7 @@
 	.feature-item { display: flex; align-items: center; flex-direction: column; min-height: 196rpx; padding: 18rpx 8rpx; box-sizing: border-box; text-align: center; }
 	.feature-icon { position: relative; display: flex; align-items: center; justify-content: center; width: 72rpx; height: 72rpx; border-radius: 8rpx; background: #eaf5ff; }
 	.feature-badge { position: absolute; top: -10rpx; right: -14rpx; min-width: 34rpx; height: 34rpx; padding: 0 8rpx; border: 3rpx solid #ffffff; border-radius: 18rpx; box-sizing: border-box; background: #e65757; color: #ffffff; font-size: 19rpx; line-height: 31rpx; }
+	.member-tag { position: absolute; top: -12rpx; right: -24rpx; padding: 4rpx 9rpx; border: 3rpx solid #ffffff; border-radius: 12rpx; background: #273a50; color: #ffffff; font-size: 16rpx; line-height: 1.2; }
 	.feature-title { margin-top: 14rpx; font-size: 27rpx; font-weight: 500; }
 	.feature-desc { margin-top: 6rpx; font-size: 21rpx; color: #8c9199; white-space: nowrap; }
 	.bank-note { display: flex; align-items: center; gap: 10rpx; margin: 10rpx 32rpx 0; padding: 20rpx 22rpx; border-radius: 8rpx; background: #f5f6f8; font-size: 24rpx; color: #6f747d; }
@@ -562,6 +590,7 @@
 	.night-mode .secondary-button { border-color: #168ee5; background: #1b222a; color: #63b9f6; }
 	.night-mode .search-entry { border-color: #39434e; background: #1b222a; color: #9ca6b1; }
 	.night-mode .feature-badge { border-color: #12171d; }
+	.night-mode .member-tag { border-color: #12171d; background: #55718f; }
 	.night-mode .bank-note { background: #1b222a; color: #aeb7c1; }
 	.night-mode .bank-note.error { background: #3b2327; color: #ef9a9a; }
 	.night-mode .subject-sheet { background: #1b222a; color: #e6e9ed; }

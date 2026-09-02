@@ -21,6 +21,7 @@ const RETRY_DELAY = 180
 const MAX_PRACTICE_POSITIONS = 200
 const MAX_PENDING_PROGRESS = 500
 const ANSWER_MODES = ['exam', 'practice', 'review']
+const PRACTICE_ENTRY_MODES = ['smart', 'chapter', 'knowledge', 'wrong', 'favorite', 'search', 'sequence']
 
 const snapshotCache = new Map()
 const summaryCache = new Map()
@@ -79,6 +80,11 @@ function removeStorage(key) {
 	} catch (error) {
 		return false
 	}
+}
+
+function userScopedStorageKey(baseKey) {
+	const user = getCurrentPracticeUser()
+	return `${baseKey}:${user.uid || 'guest'}`
 }
 
 function clearPracticeLogin() {
@@ -183,13 +189,13 @@ export function createPracticeEventId(prefix) {
 }
 
 function readOutbox() {
-	const saved = getStorage(OUTBOX_STORAGE_KEY)
+	const saved = getStorage(userScopedStorageKey(OUTBOX_STORAGE_KEY))
 	if (!saved || saved.version !== 1 || !Array.isArray(saved.events)) return []
 	return saved.events.filter(isObject)
 }
 
 function saveOutbox(events) {
-	return setStorage(OUTBOX_STORAGE_KEY, {
+	return setStorage(userScopedStorageKey(OUTBOX_STORAGE_KEY), {
 		version: 1,
 		events: events.slice(-MAX_OUTBOX_EVENTS)
 	})
@@ -205,7 +211,7 @@ function progressScopeKey(progress) {
 }
 
 function readPendingProgresses() {
-	const saved = getStorage(PROGRESS_STORAGE_KEY)
+	const saved = getStorage(userScopedStorageKey(PROGRESS_STORAGE_KEY))
 	if (!saved || (saved.version !== 1 && saved.version !== 2)) return []
 	const progresses = []
 	if (isObject(saved.progress)) progresses.push(saved.progress)
@@ -234,15 +240,16 @@ function writePendingProgresses(progresses) {
 		.sort((left, right) => Number(right.occurredAt) - Number(left.occurredAt))
 		.slice(0, MAX_PENDING_PROGRESS)
 	if (!limited.length) {
-		if (removeStorage(PROGRESS_STORAGE_KEY)) return true
-		return setStorage(PROGRESS_STORAGE_KEY, null)
+		const storageKey = userScopedStorageKey(PROGRESS_STORAGE_KEY)
+		if (removeStorage(storageKey)) return true
+		return setStorage(storageKey, null)
 	}
 	const progressMap = {}
 	limited.forEach(progress => {
 		const key = progressScopeKey(progress)
 		if (key) progressMap[key] = cloneValue(progress)
 	})
-	return setStorage(PROGRESS_STORAGE_KEY, {
+	return setStorage(userScopedStorageKey(PROGRESS_STORAGE_KEY), {
 		version: 2,
 		progresses: progressMap
 	})
@@ -266,7 +273,7 @@ function removePendingProgress(progress) {
 }
 
 function readPracticePositions(storageKey) {
-	const saved = getStorage(storageKey)
+	const saved = getStorage(userScopedStorageKey(storageKey))
 	if (!saved || saved.version !== 1 || !isObject(saved.positions)) return {}
 	return cloneValue(saved.positions)
 }
@@ -284,7 +291,7 @@ function savePracticePosition(storageKey, positionKey, progress) {
 		return Number(positions[right].updatedAt) - Number(positions[left].updatedAt)
 	})
 	positionKeys.slice(MAX_PRACTICE_POSITIONS).forEach(key => delete positions[key])
-	setStorage(storageKey, { version: 1, positions })
+	setStorage(userScopedStorageKey(storageKey), { version: 1, positions })
 }
 
 function enqueueEvent(event) {
@@ -330,6 +337,9 @@ export function queuePracticeAnswer(question, selected, options) {
 		questionId: question.questionId || question.id,
 		selected: (selected || []).slice(),
 		occurredAt: Number(config.occurredAt) || Date.now()
+	}
+	if (PRACTICE_ENTRY_MODES.indexOf(config.practiceMode) > -1) {
+		event.practiceMode = config.practiceMode
 	}
 	if (typeof localCorrect === 'boolean'
 		&& chapterId !== undefined
@@ -568,6 +578,7 @@ function prepareLegacyMigration(userId, localState) {
 			selected: answer.selected.slice(),
 			occurredAt: timestamp
 		}
+		if (PRACTICE_ENTRY_MODES.indexOf(answer.practiceMode) > -1) event.practiceMode = answer.practiceMode
 		if (!eventIds.has(event.eventId)) {
 			events.push(event)
 			eventIds.add(event.eventId)
@@ -642,7 +653,8 @@ export async function flushPracticeEvents(options) {
 			const result = await executeCloudCall('syncEvents', payload)
 			const completedIds = new Set([].concat(
 				result && result.acceptedEventIds || [],
-				result && result.duplicateEventIds || []
+				result && result.duplicateEventIds || [],
+				result && result.rejectedEventIds || []
 			))
 			if (batch.length && !completedIds.size) {
 				throw new UserPracticeServiceError('QUESTION_BANK_USER_INVALID_RESPONSE', '同步服务未确认任何记录')
@@ -864,16 +876,16 @@ function removeSubjectPracticePositions(storageKey, subjectId) {
 		if (position && position.subjectId === subjectId) delete positions[key]
 	})
 	if (Object.keys(positions).length) {
-		setStorage(storageKey, { version: 1, positions })
+		setStorage(userScopedStorageKey(storageKey), { version: 1, positions })
 	} else {
-		removeStorage(storageKey)
+		removeStorage(userScopedStorageKey(storageKey))
 	}
 }
 
 function clearSubjectLocalSyncData(subjectId) {
 	const remainingEvents = readOutbox().filter(item => item.subjectId !== subjectId)
 	if (remainingEvents.length) saveOutbox(remainingEvents)
-	else removeStorage(OUTBOX_STORAGE_KEY)
+	else removeStorage(userScopedStorageKey(OUTBOX_STORAGE_KEY))
 	writePendingProgresses(
 		readPendingProgresses().filter(item => item.subjectId !== subjectId)
 	)
@@ -936,6 +948,14 @@ export async function getPracticePreferences(options) {
 			const saved = savePreferencesEntry(result, false, Date.now())
 			return Object.assign({}, saved, { _syncPending: false })
 		} catch (error) {
+			if (error && error.errCode === 'QUESTION_BANK_MEMBERSHIP_REQUIRED') {
+				const downgraded = normalizePracticePreferences(Object.assign({}, localEntry.preferences, {
+					answerMode: 'practice',
+					updatedAt: Date.now()
+				}))
+				const saved = savePreferencesEntry(downgraded, false, Date.now())
+				return Object.assign({}, saved, { _syncPending: false })
+			}
 			if (config.localFallback === false) throw error
 			return Object.assign({}, localEntry.preferences, {
 				_syncPending: localEntry.dirty,
@@ -961,7 +981,18 @@ export async function updatePracticePreferences(preferences) {
 	))
 	const previous = readPreferencesEntry()
 	savePreferencesEntry(next, true, previous.syncedAt)
-	const result = await executeCloudCall('updatePreferences', next)
+	let result
+	try {
+		result = await executeCloudCall('updatePreferences', next)
+	} catch (error) {
+		if (error && error.errCode === 'QUESTION_BANK_MEMBERSHIP_REQUIRED') {
+			savePreferencesEntry(Object.assign({}, next, {
+				answerMode: 'practice',
+				updatedAt: Date.now()
+			}), false, Date.now())
+		}
+		throw error
+	}
 	const saved = savePreferencesEntry(result, false, Date.now())
 	return Object.assign({}, saved, { _syncPending: false })
 }

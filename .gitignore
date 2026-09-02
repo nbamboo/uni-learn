@@ -5,3 +5,6 @@ scripts/__pycache__
 
 # uni-id 服务端密钥，仅保留本地配置；提交 config.example.json 作为模板
 uni_modules/uni-config-center/uniCloud/cloudfunctions/common/uni-config-center/uni-id/config.json
+
+# 微信虚拟支付密钥与消息推送验签配置
+uni_modules/uni-config-center/uniCloud/cloudfunctions/common/uni-config-center/virtual-payment/config.json

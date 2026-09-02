@@ -355,6 +355,63 @@ async function testEmptyFlushDoesNotLogin() {
 	assert.equal(loginCalls, 0)
 }
 
+async function testMembershipPreferenceDowngrade() {
+	const storage = new Map([[
+		'uni-learn-practice-preferences-v1:member-expired-user',
+		{
+			version: 1,
+			preferences: { answerMode: 'exam', nightMode: true, updatedAt: Date.now() },
+			dirty: true,
+			syncedAt: 0
+		}
+	]])
+	const user = { uid: 'member-expired-user', tokenExpired: Date.now() + 60 * 60 * 1000 }
+	const environment = {
+		uni: {
+			getStorageSync: key => storage.get(key),
+			setStorageSync: (key, value) => storage.set(key, value),
+			removeStorageSync: key => storage.delete(key)
+		},
+		uniCloud: {
+			getCurrentUserInfo: () => user,
+			async callFunction() {
+				return {
+					result: {
+						errCode: 'QUESTION_BANK_MEMBERSHIP_REQUIRED',
+						errMsg: '考试模式和背题模式为会员权益'
+					}
+				}
+			}
+		},
+		console,
+		setTimeout,
+		clearTimeout,
+		Date,
+		Map,
+		Set,
+		Promise,
+		Math,
+		JSON,
+		Error,
+		Array,
+		Object,
+		Number,
+		String,
+		Boolean
+	}
+	const service = loadService(environment)
+	const loaded = await service.getPracticePreferences()
+	assert.equal(loaded.answerMode, 'practice')
+	assert.equal(loaded.nightMode, true)
+	assert.equal(loaded._syncPending, false)
+	await assert.rejects(
+		service.updatePracticePreferences({ answerMode: 'review', nightMode: true }),
+		error => error && error.errCode === 'QUESTION_BANK_MEMBERSHIP_REQUIRED'
+	)
+	assert.equal(service.getLocalPracticePreferences().answerMode, 'practice')
+	assert.equal(service.getLocalPracticePreferences()._syncPending, false)
+}
+
 async function run() {
 	const storage = new Map()
 	const calls = []
@@ -743,6 +800,7 @@ async function run() {
 	await testPreferenceOfflineRetry()
 	await testBatchScheduling()
 	await testEmptyFlushDoesNotLogin()
+	await testMembershipPreferenceDowngrade()
 
 	console.log('user-practice service tests passed')
 }

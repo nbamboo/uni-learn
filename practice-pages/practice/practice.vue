@@ -63,7 +63,7 @@
 			</view>
 
 			<!-- #ifdef MP-WEIXIN -->
-			<view class="result-ad-container">
+			<view class="result-ad-container" v-if="showAds">
 				<ad-custom
 					unit-id="adunit-085cc7635227d1e5"
 					@load="adLoad"
@@ -262,6 +262,11 @@
 		getPracticeStateSnapshot,
 		savePracticeProgress
 	} from '@/services/user-practice.js'
+	import {
+		getCachedMembership,
+		getMembership,
+		showMembershipRequired
+	} from '@/services/membership.js'
 	import FinanceCalculator from '@/components/finance-calculator/finance-calculator.vue'
 
 	export default {
@@ -271,6 +276,8 @@
 		data() {
 			const localPreferences = getLocalPracticePreferences()
 			return {
+				membership: getCachedMembership(),
+				membershipLoaded: false,
 				questionList: [],
 				practiceConfig: null,
 				currentIndex: 0,
@@ -302,6 +309,9 @@
 			}
 		},
 		computed: {
+			showAds() {
+				return this.membershipLoaded && !this.membership.isMember
+			},
 			currentQuestion() {
 				return this.questionList[this.currentIndex] || null
 			},
@@ -357,6 +367,7 @@
 		},
 		onLoad(options) {
 			if (options.sharedResult) {
+				this.loadMembershipState()
 				this.openSharedExamResult(options.sharedResult)
 				return
 			}
@@ -373,7 +384,7 @@
 			}
 			this.setNavigationTitle()
 			this.applyNavigationTheme()
-			this.loadQuestions()
+			this.initializePractice()
 		},
 		onShow() {
 			this.progressSavedOnLeave = false
@@ -395,6 +406,25 @@
 			}
 		},
 		methods: {
+			async initializePractice() {
+				await this.loadMembershipState()
+				if ((this.mode === 'wrong' || this.mode === 'favorite') && !this.membership.isMember) {
+					this.loading = false
+					this.loadError = `${this.mode === 'wrong' ? '错题集' : '收藏夹'}为会员权益`
+					showMembershipRequired(this.mode === 'wrong' ? '错题集' : '收藏夹')
+					return
+				}
+				this.loadQuestions()
+			},
+			async loadMembershipState() {
+				try {
+					this.membership = await getMembership()
+				} catch (error) {
+					this.membership = getCachedMembership()
+				} finally {
+					this.membershipLoaded = true
+				}
+			},
 			parseSharedExamResult(payload) {
 				const serialized = String(payload || '')
 				const candidates = [serialized]
@@ -506,7 +536,11 @@
 			},
 			async loadAnswerPreferences() {
 				const preferences = await getPracticePreferences()
-				this.answerMode = preferences.answerMode
+				await this.loadMembershipState()
+				this.answerMode = !this.membership.isMember
+					&& (preferences.answerMode === 'exam' || preferences.answerMode === 'review')
+					? 'practice'
+					: preferences.answerMode
 				this.nightMode = Boolean(preferences.nightMode)
 				this.applyNavigationTheme()
 			},
@@ -521,7 +555,8 @@
 				this.loadError = ''
 				this.questionList = []
 				this.currentIndex = 0
-				this.draftAnswers = {}
+						this.draftAnswers = {}
+						this.sessionAnswers = {}
 				this.visitedQuestionIds = []
 				this.examSubmitted = false
 				this.showExamResult = false
@@ -553,7 +588,7 @@
 					} catch (syncError) {
 						this.favoriteQuestionIds = []
 					}
-					this.restoreSessionAnswers(snapshot)
+					this.resetSessionAnswers()
 					if (this.questionList.length) {
 						this.loadQuestion(initialQuestionIndex)
 					}
@@ -579,44 +614,10 @@
 				}
 				uni.setNavigationBarTitle({ title: titles[this.mode] || '顺序练习' })
 			},
-			restoreSessionAnswers(snapshot) {
-				if (this.answerMode !== 'practice') {
-					this.sessionAnswers = {}
-					this.correctCount = 0
-					this.wrongCount = 0
-					return
-				}
-				const questionById = {}
-				this.questionList.forEach(question => {
-					questionById[question.id] = question
-				})
-				const restored = {}
-				const cloudSelections = snapshot && snapshot.answerSelections || {}
-				Object.keys(cloudSelections).forEach(questionId => {
-					const question = questionById[questionId]
-					const selected = cloudSelections[questionId]
-					if (!question || !Array.isArray(selected) || !selected.length) return
-					restored[questionId] = {
-						selected: selected.slice(),
-						correct: isCorrectAnswer(selected, question.answer)
-					}
-				})
-
-				const localAnswers = getPracticeState().answers
-				Object.keys(localAnswers).forEach(questionId => {
-					const question = questionById[questionId]
-					const answer = localAnswers[questionId]
-					if (!question || !answer || !Array.isArray(answer.selected) || !answer.selected.length) return
-					restored[questionId] = {
-						selected: answer.selected.slice(),
-						correct: isCorrectAnswer(answer.selected, question.answer)
-					}
-				})
-
-				this.sessionAnswers = restored
-				const answers = Object.keys(restored).map(questionId => restored[questionId])
-				this.correctCount = answers.filter(answer => answer.correct).length
-				this.wrongCount = answers.length - this.correctCount
+			resetSessionAnswers() {
+				this.sessionAnswers = {}
+				this.correctCount = 0
+				this.wrongCount = 0
 			},
 			loadQuestion(index) {
 				this.currentIndex = index
@@ -755,7 +756,9 @@
 			},
 			submitAnswer() {
 				if (!this.currentQuestion || !this.selectedAnswers.length || this.submitted) return
-				const correct = recordAnswer(this.currentQuestion, this.selectedAnswers)
+				const correct = recordAnswer(this.currentQuestion, this.selectedAnswers, {
+					practiceMode: this.mode
+				})
 				this.$set(this.sessionAnswers, this.currentQuestion.id, {
 					selected: this.selectedAnswers.slice(),
 					correct
@@ -899,7 +902,12 @@
 					success: () => uni.navigateBack()
 				})
 			},
-			favoriteCurrent() {
+			async favoriteCurrent() {
+				await this.loadMembershipState()
+				if (!this.membership.isMember) {
+					showMembershipRequired('收藏夹')
+					return
+				}
 				this.favorite = toggleFavorite(this.currentQuestion)
 				const questionId = this.currentQuestion.id
 				const index = this.favoriteQuestionIds.indexOf(questionId)
