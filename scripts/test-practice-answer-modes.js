@@ -82,8 +82,8 @@ async function run() {
 		}],
 		isCorrectAnswer: (selected, answer) => selected.slice().sort().join(',') === answer.slice().sort().join(','),
 		isFavorite: () => false,
-		recordAnswer(question, selected) {
-			recordCalls.push({ question, selected: selected.slice() })
+		recordAnswer(question, selected, options) {
+			recordCalls.push({ question, selected: selected.slice(), options })
 			return selected.slice().sort().join(',') === question.answer.slice().sort().join(',')
 		},
 		toggleFavorite: () => {
@@ -206,9 +206,14 @@ async function run() {
 	practice.loadQuestion(0)
 	practice.chooseOption('A')
 	assert.equal(recordCalls.length, 1)
+	assert.equal(recordCalls[0].options.practiceMode, 'sequence')
 	assert.equal(practice.sessionAnswers[single.id].correct, true)
 	assert.equal(practice.visibleSlides[1].revealed, true)
 	assert.match(practice.answerNumberClass(0), /(?:^|\s)answered(?:\s|$)/)
+	const freshSession = createContext('practice', [single])
+	freshSession.sessionAnswers[single.id] = { selected: ['A'], correct: true }
+	freshSession.resetSessionAnswers()
+	assert.deepEqual(JSON.parse(JSON.stringify(freshSession.sessionAnswers)), {})
 
 	const multiple = createQuestion('multiple-1', 'multiple', ['A', 'B'])
 	const multiplePractice = createContext('practice', [multiple])

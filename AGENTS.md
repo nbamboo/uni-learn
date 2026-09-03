@@ -1,3 +1,11 @@
+# 注意事项
+
+1. 微信小程序体验版相关操作无需使用 computer use。需要构建、预览、上传或发布体验版时，列出操作提示并提醒用户自行在微信开发者工具或相关管理后台完成。
+2. uniCloud 的云函数上传和 database schema 上传无需使用 computer use。涉及这些操作时，只列出清单并提醒用户自行完成：
+   - [ ] 上传并部署 uniCloud 云函数。
+   - [ ] 上传 database schema。
+   - [ ] 检查云函数部署结果及 database schema 上传结果。
+
 # 题库导入流程
 
 本项目使用 `scripts/generate-question-bank-import.py` 将指定路径的题目整理 Excel 转换为可导入 uniCloud 的题库文件。

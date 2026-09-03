@@ -1,10 +1,17 @@
 <template>
 	<view class="membership-page">
 		<view class="hero-card" :class="{ active: membership.isMember }">
-			<view>
-				<text class="hero-kicker">UNI LEARN 会员</text>
-				<text class="hero-title">{{ membership.isMember ? '会员权益已生效' : '专注学习，少一点打扰' }}</text>
-				<text class="hero-caption">{{ membershipCaption }}</text>
+			<view class="hero-copy">
+				<text class="hero-caption hero-caption-top">{{ membershipCaption }}</text>
+				<view class="countdown-line">
+					<text class="hero-title">考试倒计时</text>
+					<view class="countdown-row">
+						<view class="countdown-block">
+							<text class="countdown-value">{{ examCountdown.days }}</text>
+							<text class="countdown-unit">天</text>
+						</view>
+					</view>
+				</view>
 			</view>
 			<view class="member-badge">{{ membership.isMember ? '有效' : '未开通' }}</view>
 		</view>
@@ -66,6 +73,13 @@
 		{ productId: 'membership_12m', name: '1年会员', months: 12, priceFen: 1500 }
 	]
 
+	function getNextExamTargetAt() {
+		const now = new Date()
+		const target = new Date(now.getFullYear(), 11, 31, 23, 59, 59, 999)
+		if (target.getTime() <= now.getTime()) target.setFullYear(target.getFullYear() + 1)
+		return target.getTime()
+	}
+
 	export default {
 		data() {
 			const cached = getCachedMembership()
@@ -75,6 +89,9 @@
 				selectedProductId: 'membership_12m',
 				loading: false,
 				purchasing: false,
+				examTargetAt: getNextExamTargetAt(),
+				examCountdown: { days: '0' },
+				countdownTimer: null,
 				benefits: [
 					{ title: '屏蔽全部广告', desc: '学习和查看成绩时不再展示广告', icon: 'eye-slash' },
 					{ title: '错题集与收藏夹', desc: '集中回顾薄弱题目和重点内容', icon: 'star' },
@@ -88,7 +105,7 @@
 				return this.plans.find(item => item.productId === this.selectedProductId) || this.plans[0]
 			},
 			membershipCaption() {
-				if (!this.membership.isMember) return '开通会员即可解锁完整刷题体验'
+				if (!this.membership.isMember) return '开通会员即可解锁完整答题体验'
 				return `有效期至 ${this.formatDate(this.membership.expiresAt)}`
 			},
 			purchaseButtonText() {
@@ -98,9 +115,32 @@
 			}
 		},
 		onShow() {
+			this.startExamCountdown()
 			this.loadMembership()
 		},
+		onHide() {
+			this.stopExamCountdown()
+		},
+		onUnload() {
+			this.stopExamCountdown()
+		},
 		methods: {
+			updateExamCountdown() {
+				const remainingSeconds = Math.max(0, Math.floor((this.examTargetAt - Date.now()) / 1000))
+				this.examCountdown = {
+					days: String(Math.max(0, Math.floor(remainingSeconds / 86400)))
+				}
+			},
+			startExamCountdown() {
+				this.stopExamCountdown()
+				this.updateExamCountdown()
+				this.countdownTimer = setInterval(() => this.updateExamCountdown(), 1000)
+			},
+			stopExamCountdown() {
+				if (!this.countdownTimer) return
+				clearInterval(this.countdownTimer)
+				this.countdownTimer = null
+			},
 			formatPrice(priceFen) {
 				const value = Number(priceFen) || 0
 				return value % 100 ? (value / 100).toFixed(2) : String(value / 100)
@@ -161,10 +201,15 @@
 	.membership-page { min-height: 100vh; padding: 24rpx 24rpx calc(48rpx + env(safe-area-inset-bottom)); box-sizing: border-box; }
 	.hero-card { display: flex; align-items: flex-start; justify-content: space-between; min-height: 196rpx; padding: 32rpx; border-radius: 22rpx; box-sizing: border-box; background: linear-gradient(135deg, #253447, #465c76); color: #ffffff; box-shadow: 0 12rpx 34rpx rgba(35, 51, 70, 0.18); }
 	.hero-card.active { background: linear-gradient(135deg, #006bb3, #19a2ff); }
-	.hero-card > view:first-child { display: flex; flex-direction: column; min-width: 0; }
-	.hero-kicker { color: rgba(255,255,255,0.72); font-size: 21rpx; letter-spacing: 3rpx; }
-	.hero-title { margin-top: 16rpx; font-size: 38rpx; font-weight: 650; }
-	.hero-caption { margin-top: 13rpx; color: rgba(255,255,255,0.82); font-size: 23rpx; line-height: 1.5; }
+	.hero-copy { display: flex; flex-direction: column; min-width: 0; }
+	.hero-title { margin-right: 14rpx; font-size: 23rpx; font-weight: 600; white-space: nowrap; }
+	.countdown-line { display: flex; align-items: baseline; margin-top: 10rpx; }
+	.countdown-row { display: flex; align-items: baseline; }
+	.countdown-block { display: flex; align-items: baseline; }
+	.countdown-value { font-size: 42rpx; font-weight: 700; font-variant-numeric: tabular-nums; }
+	.countdown-unit { margin-left: 3rpx; color: rgba(255,255,255,0.8); font-size: 20rpx; }
+	.hero-caption { color: rgba(255,255,255,0.82); font-size: 23rpx; line-height: 1.5; }
+	.hero-caption-top { margin: 0; font-size: 31rpx; font-weight: 600; line-height: 1.35; }
 	.member-badge { padding: 8rpx 16rpx; border: 1rpx solid rgba(255,255,255,0.48); border-radius: 22rpx; background: rgba(255,255,255,0.12); font-size: 21rpx; white-space: nowrap; }
 	.section-card { margin-top: 22rpx; padding: 28rpx; border-radius: 18rpx; background: #ffffff; box-shadow: 0 6rpx 24rpx rgba(33, 45, 58, 0.055); }
 	.section-heading { display: flex; align-items: baseline; justify-content: space-between; }

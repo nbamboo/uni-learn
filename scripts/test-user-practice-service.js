@@ -612,6 +612,7 @@ async function run() {
 	)
 	service.queuePracticeAnswer(question, ['B'], {
 		eventId: 'answer-event-one',
+		practiceMode: 'chapter',
 		occurredAt: Date.now()
 	})
 	service.queuePracticeFavorite(question, true, {
@@ -627,6 +628,7 @@ async function run() {
 	assert.equal(eventOnlyCall.data.events[0].correct, false)
 	assert.equal(eventOnlyCall.data.events[0].chapterId, question.chapterId)
 	assert.equal(eventOnlyCall.data.events[0].knowledge, question.knowledge)
+	assert.equal(eventOnlyCall.data.events[0].practiceMode, 'chapter')
 	await service.flushPracticeEvents()
 	assert.equal(service.pendingPracticeEventCount(), 0)
 	assert.equal(calls.filter(item => item.data.action === 'syncEvents').length, 2)
@@ -751,11 +753,11 @@ async function run() {
 	const progressReadCall = calls.filter(item => item.data.action === 'getProgress')[0]
 	assert.equal(progressReadCall.data.mode, 'chapter')
 	assert.equal(calls.filter(item => item.data.action === 'getProgress').length, 1)
-	storage.set('uni-learn-practice-cloud-outbox-v1', {
+	storage.set(`uni-learn-practice-cloud-outbox-v1:${user.uid}`, {
 		version: 1,
 		events: [{ eventId: 'answer-pending-one', subjectId: question.subjectId }]
 	})
-	storage.set('uni-learn-practice-cloud-progress-v1', {
+	storage.set(`uni-learn-practice-cloud-progress-v1:${user.uid}`, {
 		version: 2,
 		progresses: {
 			current: {
@@ -768,7 +770,7 @@ async function run() {
 			}
 		}
 	})
-	storage.set('uni-learn-practice-chapter-position-v1', {
+	storage.set(`uni-learn-practice-chapter-position-v1:${user.uid}`, {
 		version: 1,
 		positions: {
 			[`${question.subjectId}|${question.chapterId}`]: {
@@ -788,10 +790,10 @@ async function run() {
 	const cleared = await service.clearCurrentSubjectPracticeData(question.subjectId)
 	assert.equal(cleared.cleared, true)
 	assert.equal(calls.filter(item => item.data.action === 'clearCurrentSubjectData').length, 1)
-	assert.equal(storage.has('uni-learn-practice-cloud-outbox-v1'), false)
-	assert.equal(storage.has('uni-learn-practice-cloud-progress-v1'), false)
+	assert.equal(storage.has(`uni-learn-practice-cloud-outbox-v1:${user.uid}`), false)
+	assert.equal(storage.has(`uni-learn-practice-cloud-progress-v1:${user.uid}`), false)
 	assert.equal(
-		storage.get('uni-learn-practice-chapter-position-v1').positions['junior-law|1'].questionId,
+		storage.get(`uni-learn-practice-chapter-position-v1:${user.uid}`).positions['junior-law|1'].questionId,
 		'law-1'
 	)
 	assert.equal(storage.has(`uni-learn-practice-preferences-v1:${user.uid}`), true)

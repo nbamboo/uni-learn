@@ -305,11 +305,6 @@ function normalizeStats(stats, userId, subjectId, timestamp, todayKey) {
 	const result = stats || emptyStats(userId, subjectId, timestamp, todayKey)
 	result.chapterAttempts = normalizeAggregateEntries(result.chapterAttempts)
 	result.knowledgeAttempts = normalizeAggregateEntries(result.knowledgeAttempts)
-	if (Number(result.stateAggregateVersion) !== 2) {
-		result.chapterAttempts = []
-		result.knowledgeAttempts = []
-		result.stateAggregateVersion = 2
-	}
 	if (result.todayKey !== todayKey) {
 		result.todayKey = todayKey
 		result.todayAttempts = 0
@@ -646,7 +641,13 @@ function createQuestionBankUserService(db, options) {
 				const id = statsDocumentId(userId, subjectId)
 				if (!statsCache.has(id)) {
 					const saved = await getDocument(store, STATS_COLLECTION, id)
-					statsCache.set(id, normalizeStats(saved, userId, subjectId, currentTime, todayKey))
+					const stats = normalizeStats(saved, userId, subjectId, currentTime, todayKey)
+					if (stats.stateAggregateVersion !== 2) {
+						stats.chapterAttempts = []
+						stats.knowledgeAttempts = []
+						stats.stateAggregateVersion = 2
+					}
+					statsCache.set(id, stats)
 				}
 				return statsCache.get(id)
 			}
@@ -693,12 +694,6 @@ function createQuestionBankUserService(db, options) {
 						stats.attempted += 1
 						if (correct) stats.correct += 1
 						else stats.wrong += 1
-						if (!wasChapterPractice && state.practiceModes.indexOf('chapter') > -1) {
-							incrementAggregate(stats.chapterAttempts, state.chapterId)
-						}
-						if (!wasKnowledgePractice && state.practiceModes.indexOf('knowledge') > -1) {
-							incrementAggregate(stats.knowledgeAttempts, state.knowledge)
-						}
 					} else if (wasCorrect !== correct) {
 						if (correct) {
 							stats.correct += 1
@@ -707,6 +702,12 @@ function createQuestionBankUserService(db, options) {
 							stats.wrong += 1
 							stats.correct = Math.max(0, stats.correct - 1)
 						}
+					}
+					if (!wasChapterPractice && state.practiceModes.indexOf('chapter') > -1) {
+						incrementAggregate(stats.chapterAttempts, state.chapterId)
+					}
+					if (!wasKnowledgePractice && state.practiceModes.indexOf('knowledge') > -1) {
+						incrementAggregate(stats.knowledgeAttempts, state.knowledge)
 					}
 					stats.totalAttempts += 1
 					if (chinaDayKey(item.occurredAt) === todayKey) stats.todayAttempts += 1
@@ -898,13 +899,13 @@ function createQuestionBankUserService(db, options) {
 		const todayKey = chinaDayKey(currentTime)
 		const saved = await getDocument(db, STATS_COLLECTION, statsDocumentId(userId, subjectId))
 		const stats = normalizeStats(saved, userId, subjectId, currentTime, todayKey)
-		if (!saved || stats.stateAggregateVersion === 1) return stats
+		if (saved && stats.stateAggregateVersion === 2) return stats
 
 		// Existing users are backfilled once. Later snapshots read these bounded
 		// maps from the stats document instead of returning every answered state.
 		const response = await db.collection(STATE_COLLECTION)
 			.where({ userId, subjectId, attempted: true })
-			.field({ chapterId: true, knowledge: true })
+			.field({ chapterId: true, knowledge: true, practiceModes: true })
 			.limit(MAX_STATE_ROWS + 1)
 			.get()
 		const rows = getRows(response)
@@ -914,10 +915,11 @@ function createQuestionBankUserService(db, options) {
 		stats.chapterAttempts = []
 		stats.knowledgeAttempts = []
 		rows.forEach(item => {
-			incrementAggregate(stats.chapterAttempts, item.chapterId)
-			incrementAggregate(stats.knowledgeAttempts, item.knowledge)
+			const modes = normalizePracticeModes(item.practiceModes)
+			if (modes.indexOf('chapter') > -1) incrementAggregate(stats.chapterAttempts, item.chapterId)
+			if (modes.indexOf('knowledge') > -1) incrementAggregate(stats.knowledgeAttempts, item.knowledge)
 		})
-		stats.stateAggregateVersion = 1
+		stats.stateAggregateVersion = 2
 		stats.updatedAt = serverDate()
 		await setDocument(db, STATS_COLLECTION, stats._id, stats)
 		return stats

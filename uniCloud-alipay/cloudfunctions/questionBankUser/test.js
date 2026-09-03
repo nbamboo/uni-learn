@@ -241,6 +241,7 @@ async function run() {
 			subjectId,
 			questionId: question.questionId,
 			selected: [wrongAlias],
+			practiceMode: 'smart',
 			judgedLocally: true,
 			correct: false,
 			chapterId: question.chapterId,
@@ -257,6 +258,35 @@ async function run() {
 	}, 'user-nonmember')
 	assert.deepEqual(nonMemberSync.acceptedEventIds, ['answer-nonmember'])
 	assert.deepEqual(nonMemberSync.rejectedEventIds, ['favorite-nonmember'])
+	const smartOnlyQuestion = Array.from(environment.collections.question_bank_questions.values())[1]
+	await service.execute({
+		action: 'syncEvents',
+		events: [{
+			type: 'answer',
+			eventId: 'answer-smart-only',
+			subjectId: smartOnlyQuestion.subjectId,
+			questionId: smartOnlyQuestion.questionId,
+			selected: smartOnlyQuestion.answer,
+			practiceMode: 'smart',
+			judgedLocally: true,
+			correct: true,
+			chapterId: smartOnlyQuestion.chapterId,
+			knowledge: smartOnlyQuestion.knowledge,
+			occurredAt: currentTime.getTime()
+		}]
+	}, 'user-smart')
+	const smartOnlySnapshot = await service.execute({
+		action: 'getStateSnapshot',
+		subjectId: smartOnlyQuestion.subjectId,
+		includeProgress: false
+	}, 'user-smart')
+	assert.deepEqual(smartOnlySnapshot.chapterAttempts, {})
+	assert.deepEqual(smartOnlySnapshot.knowledgeAttempts, {})
+	;['question_bank_user_states', 'question_bank_user_stats'].forEach(collectionName => {
+		for (const [id, document] of environment.collections[collectionName]) {
+			if (document.userId === 'user-smart') environment.collections[collectionName].delete(id)
+		}
+	})
 	;['question_bank_user_states', 'question_bank_user_stats'].forEach(collectionName => {
 		for (const [id, document] of environment.collections[collectionName]) {
 			if (document.userId === 'user-nonmember') environment.collections[collectionName].delete(id)
@@ -316,6 +346,7 @@ async function run() {
 			subjectId,
 			questionId: question.questionId,
 			selected: [wrongAlias],
+			practiceMode: 'chapter',
 			judgedLocally: true,
 			correct: false,
 			chapterId: question.chapterId,
@@ -346,6 +377,7 @@ async function run() {
 			subjectId,
 			questionId: question.questionId,
 			selected: [wrongAlias],
+			practiceMode: 'chapter',
 			judgedLocally: true,
 			correct: false,
 			chapterId: question.chapterId,
@@ -364,6 +396,7 @@ async function run() {
 				subjectId,
 				questionId: question.questionId,
 				selected: question.answer,
+				practiceMode: 'chapter',
 				judgedLocally: true,
 				correct: true,
 				chapterId: question.chapterId,

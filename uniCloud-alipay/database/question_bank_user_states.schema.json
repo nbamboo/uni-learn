@@ -77,6 +77,15 @@
       "bsonType": "int",
       "minimum": 0
     },
+    "practiceModes": {
+      "bsonType": "array",
+      "arrayType": "string",
+      "items": {
+        "bsonType": "string",
+        "enum": ["smart", "chapter", "knowledge", "wrong", "favorite", "search", "sequence"]
+      },
+      "maxLength": 7
+    },
     "favorite": {
       "bsonType": "bool"
     },
