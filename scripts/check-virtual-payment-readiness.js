@@ -137,6 +137,7 @@ const adLocations = firstPartyVueFiles.flatMap(relativePath => {
 })
 const expectedAdLocations = [
 	'practice-pages/answer-settings/answer-settings.vue',
+	'practice-pages/chapter/chapter.vue',
 	'practice-pages/practice/practice.vue',
 	'practice-pages/question-search/question-search.vue'
 ]

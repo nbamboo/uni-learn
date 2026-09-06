@@ -889,6 +889,16 @@
 			previousQuestion() {
 				if (this.currentIndex > 0) this.animateToQuestion(this.currentIndex - 1)
 			},
+			findFirstUnansweredQuestionIndex() {
+				if (this.answerMode === 'review') return -1
+				return this.questionList.findIndex(question => {
+					if (this.examInProgress) {
+						const draft = this.draftAnswers[question.id]
+						return !draft || !draft.length
+					}
+					return !this.sessionAnswers[question.id]
+				})
+			},
 			nextQuestion() {
 				if (this.currentIndex < this.questionList.length - 1) {
 					this.animateToQuestion(this.currentIndex + 1)
@@ -896,14 +906,25 @@
 				}
 				const isReview = this.answerMode === 'review'
 				const unanswered = this.questionList.length - this.answeredCount
+				const firstUnansweredIndex = this.findFirstUnansweredQuestionIndex()
+				const canContinue = !isReview && firstUnansweredIndex > -1
 				uni.showModal({
 					title: isReview ? '本组背题完成' : '本组练习完成',
 					content: isReview
 						? `已浏览 ${this.questionList.length} 道题`
 						: `答对 ${this.correctCount} 题，答错 ${this.wrongCount} 题${unanswered ? `，未答 ${unanswered} 题` : ''}`,
-					showCancel: false,
+					showCancel: canContinue,
+					cancelText: '继续答题',
 					confirmText: '返回首页',
-					success: () => uni.navigateBack()
+					success: result => {
+						if (result.confirm) {
+							uni.navigateBack()
+							return
+						}
+						if (result.cancel && canContinue) {
+							this.animateToQuestion(firstUnansweredIndex)
+						}
+					}
 				})
 			},
 			async favoriteCurrent() {

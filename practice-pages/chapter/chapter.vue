@@ -31,22 +31,35 @@
 		</view>
 
 		<view class="catalog-list" v-else-if="filteredItems.length">
-			<view class="catalog-item" v-for="(item, index) in filteredItems" :key="item.id" @tap="startItem(item)">
-				<view class="item-index">{{ index + 1 }}</view>
-				<view class="item-content">
-					<text class="item-title">{{ item.name }}</text>
-					<text class="item-meta" v-if="view === 'knowledge'">{{ item.chapter }}</text>
-					<view class="item-progress-row" v-if="answerMode !== 'exam'">
-						<view class="item-progress">
-							<view class="item-progress-fill" :style="{ width: item.progress.percent + '%' }"></view>
+			<block v-for="(item, index) in filteredItems" :key="item.id">
+				<view class="catalog-item" @tap="startItem(item)">
+					<view class="item-index">{{ index + 1 }}</view>
+					<view class="item-content">
+						<text class="item-title">{{ item.name }}</text>
+						<text class="item-meta" v-if="view === 'knowledge'">{{ item.chapter }}</text>
+						<view class="item-progress-row" v-if="answerMode !== 'exam'">
+							<view class="item-progress">
+								<view class="item-progress-fill" :style="{ width: item.progress.percent + '%' }"></view>
+							</view>
+							<text>{{ item.progress.attempted }}/{{ item.progress.total }}</text>
 						</view>
-						<text>{{ item.progress.attempted }}/{{ item.progress.total }}</text>
+					</view>
+					<view class="item-action">
+						<uni-icons type="right" size="18" color="#008cff"></uni-icons>
 					</view>
 				</view>
-				<view class="item-action">
-					<uni-icons type="right" size="18" color="#008cff"></uni-icons>
+
+				<!-- #ifdef MP-WEIXIN -->
+				<view class="knowledge-ad-container" v-if="shouldShowKnowledgeAd(index)">
+					<ad-custom
+						unit-id="adunit-e55002bf7256a6bb"
+						@load="adLoad(index + 1)"
+						@error="adError($event, index + 1)"
+						@close="adClose(index + 1)"
+					></ad-custom>
 				</view>
-			</view>
+				<!-- #endif -->
+			</block>
 		</view>
 
 		<view class="empty-state" v-else>
@@ -79,6 +92,8 @@
 		data() {
 			const localPreferences = getLocalPracticePreferences()
 			return {
+				membership: getCachedMembership(),
+				membershipLoaded: false,
 				subjectId: '',
 				view: 'chapter',
 				keyword: '',
@@ -89,6 +104,7 @@
 				answerMode: localPreferences.answerMode,
 				nightMode: Boolean(localPreferences.nightMode),
 				pageActive: false,
+				hiddenKnowledgeAdPositions: {},
 				practiceProgressUpdatedHandler: null
 			}
 		},
@@ -109,7 +125,8 @@
 			this.pageActive = true
 			this.subjectId = options.subjectId
 			this.view = options.view === 'knowledge' ? 'knowledge' : 'chapter'
-			this.showChapterInterstitialAd()
+			if (this.view === 'knowledge') this.refreshMembership()
+			else this.showChapterInterstitialAd()
 			if (typeof uni.$on === 'function') {
 				this.practiceProgressUpdatedHandler = event => this.handlePracticeProgressUpdated(event)
 				uni.$on(PRACTICE_PROGRESS_UPDATED_EVENT, this.practiceProgressUpdatedHandler)
@@ -142,14 +159,19 @@
 			this.destroyChapterInterstitialAd()
 		},
 		methods: {
+			async refreshMembership() {
+				try {
+					this.membership = await getMembership()
+				} catch (error) {
+					this.membership = getCachedMembership()
+				} finally {
+					this.membershipLoaded = true
+				}
+				return this.membership
+			},
 			async showChapterInterstitialAd() {
 				if (this.view !== 'chapter') return
-				let membership
-				try {
-					membership = await getMembership()
-				} catch (error) {
-					membership = getCachedMembership()
-				}
+				const membership = await this.refreshMembership()
 				if (!this.pageActive || membership.isMember) return
 
 				// #ifdef MP-WEIXIN
@@ -174,6 +196,29 @@
 					interstitialAd.destroy()
 				}
 				interstitialAd = null
+			},
+			shouldShowKnowledgeAd(index) {
+				const position = Number(index) + 1
+				return this.view === 'knowledge'
+					&& this.membershipLoaded
+					&& !this.membership.isMember
+					&& (position === 10 || position === 30)
+					&& !this.hiddenKnowledgeAdPositions[position]
+			},
+			adLoad(position) {
+				console.log(`第 ${position} 个知识点后的原生模板广告加载成功`)
+			},
+			adError(error, position) {
+				console.error(`第 ${position} 个知识点后的原生模板广告加载失败`, error)
+				this.hiddenKnowledgeAdPositions = Object.assign({}, this.hiddenKnowledgeAdPositions, {
+					[position]: true
+				})
+			},
+			adClose(position) {
+				console.log(`第 ${position} 个知识点后的原生模板广告关闭`)
+				this.hiddenKnowledgeAdPositions = Object.assign({}, this.hiddenKnowledgeAdPositions, {
+					[position]: true
+				})
 			},
 			handlePracticeProgressUpdated(event) {
 				if (!event
@@ -379,6 +424,7 @@
 	.catalog-search input { flex: 1; height: 100%; margin-left: 12rpx; font-size: 27rpx; }
 	.catalog-list { padding: 20rpx 24rpx 0; }
 	.catalog-item { display: flex; align-items: center; min-height: 142rpx; margin-bottom: 16rpx; padding: 22rpx 22rpx; border-radius: 8rpx; box-sizing: border-box; background: #ffffff; }
+	.knowledge-ad-container { margin-bottom: 16rpx; overflow: hidden; border-radius: 8rpx; }
 	.item-index { display: flex; align-items: center; justify-content: center; width: 54rpx; height: 54rpx; flex: 0 0 54rpx; margin-right: 20rpx; border-radius: 8rpx; background: #eaf5ff; color: #008cff; font-size: 25rpx; font-weight: 600; }
 	.item-content { display: flex; flex: 1; flex-direction: column; min-width: 0; }
 	.item-title { font-size: 29rpx; font-weight: 500; line-height: 1.45; }

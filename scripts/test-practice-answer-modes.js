@@ -317,6 +317,33 @@ async function run() {
 	assert.equal(multiplePractice.sessionAnswers[multiple.id].correct, true)
 
 	const following = createQuestion('single-2', 'single', ['B'])
+	const incompletePractice = createContext('practice', [single, multiple, following])
+	incompletePractice.currentIndex = 2
+	incompletePractice.sessionAnswers = {
+		[following.id]: { selected: ['B'], correct: true }
+	}
+	incompletePractice.correctCount = 1
+	let continuedAt = -1
+	incompletePractice.animateToQuestion = index => { continuedAt = index }
+	incompletePractice.nextQuestion()
+	const incompleteModal = modalOptions.slice(-1)[0]
+	assert.equal(incompleteModal.showCancel, true)
+	assert.equal(incompleteModal.cancelText, '继续答题')
+	assert.equal(incompleteModal.confirmText, '返回首页')
+	assert.match(incompleteModal.content, /未答 2 题/)
+	incompleteModal.success({ confirm: false, cancel: true })
+	assert.equal(continuedAt, 0)
+
+	const completedPractice = createContext('practice', [single, following])
+	completedPractice.currentIndex = 1
+	completedPractice.sessionAnswers = {
+		[single.id]: { selected: ['A'], correct: true },
+		[following.id]: { selected: ['B'], correct: true }
+	}
+	completedPractice.correctCount = 2
+	completedPractice.nextQuestion()
+	assert.equal(modalOptions.slice(-1)[0].showCancel, false)
+
 	const swipe = createContext('practice', [single, multiple, following])
 	swipe.loadQuestion(0)
 	swipe.animateToQuestion(1)
@@ -525,6 +552,23 @@ async function run() {
 	await freeKnowledgeList.showChapterInterstitialAd()
 	assert.equal(interstitialCreateCalls, 1)
 	assert.equal(interstitialShowCalls, 1)
+	assert.equal(freeKnowledgeList.shouldShowKnowledgeAd(9), false)
+	await freeKnowledgeList.refreshMembership()
+	assert.equal(freeKnowledgeList.membershipLoaded, true)
+	assert.equal(freeKnowledgeList.shouldShowKnowledgeAd(8), false)
+	assert.equal(freeKnowledgeList.shouldShowKnowledgeAd(9), true)
+	assert.equal(freeKnowledgeList.shouldShowKnowledgeAd(29), true)
+	assert.equal(freeKnowledgeList.shouldShowKnowledgeAd(30), false)
+	freeKnowledgeList.hiddenKnowledgeAdPositions = { 10: true }
+	assert.equal(freeKnowledgeList.shouldShowKnowledgeAd(9), false)
+
+	const memberKnowledgeList = Object.assign(chapterComponent.data(), chapterComponent.methods, {
+		view: 'knowledge',
+		membershipLoaded: true,
+		membership: activeMembership
+	})
+	assert.equal(memberKnowledgeList.shouldShowKnowledgeAd(9), false)
+	assert.equal(memberKnowledgeList.shouldShowKnowledgeAd(29), false)
 	membershipResponse = activeMembership
 	const catalogItem = {
 		id: '1',
@@ -873,6 +917,9 @@ async function run() {
 	const searchPageSource = fs.readFileSync(path.resolve(__dirname, '../practice-pages/question-search/question-search.vue'), 'utf8')
 	assert.match(searchPageSource, /unit-id="adunit-482241fd0b438f17"/)
 	assert.match(searchPageSource, /v-if="showAds"/)
+	const chapterPageSource = fs.readFileSync(path.resolve(__dirname, '../practice-pages/chapter/chapter.vue'), 'utf8')
+	assert.match(chapterPageSource, /unit-id="adunit-e55002bf7256a6bb"/)
+	assert.match(chapterPageSource, /position === 10 \|\| position === 30/)
 
 	console.log('practice answer mode tests passed')
 }
