@@ -25,9 +25,21 @@ const RECORD_TYPES = ['wrong', 'favorite']
 const PROGRESS_MODES = ['chapter', 'knowledge']
 const ANSWER_MODES = ['exam', 'practice', 'review']
 const PRACTICE_ENTRY_MODES = ['smart', 'chapter', 'knowledge', 'wrong', 'favorite', 'search', 'sequence']
+const MEMBER_SYNC_ACTIONS = new Set([
+	'syncEvents',
+	'getSummary',
+	'getStateSnapshot',
+	'getProgress',
+	'getSmartPractice',
+	'getRecords',
+	'getPreferences',
+	'updatePreferences',
+	'clearCurrentSubjectData'
+])
 const CHINA_OFFSET_MS = 8 * 60 * 60 * 1000
 const MIN_EVENT_TIME = new Date('2020-01-01T00:00:00.000Z').getTime()
 const MAX_FUTURE_TIME = 5 * 60 * 1000
+const MEMBER_EXPIRY_GRACE_MS = 6 * 60 * 60 * 1000
 
 class QuestionBankUserError extends Error {
 	constructor(errCode, errMsg) {
@@ -173,11 +185,6 @@ function getRows(response) {
 	return []
 }
 
-function getTotal(response) {
-	const total = Number(response && response.total)
-	return Number.isFinite(total) ? total : 0
-}
-
 function getDateValue(value) {
 	if (value instanceof Date) return value.getTime()
 	if (value && typeof value === 'object' && value.$date !== undefined) return Number(value.$date) || 0
@@ -216,6 +223,11 @@ function progressDocumentId(userId, subjectId, mode, scopeKey) {
 	return `${userId}|${subjectId}|${mode}|${scopeHash}`
 }
 
+function knowledgeScopeKey(chapterId, knowledge) {
+	if (!chapterId || !knowledge) return ''
+	return `${String(chapterId)}|${String(knowledge)}`
+}
+
 function defaultPreferences() {
 	return {
 		answerMode: 'practice',
@@ -227,7 +239,11 @@ function defaultPreferences() {
 async function requireActiveMembership(store, userId, currentTime, featureName) {
 	const saved = await getDocument(store, MEMBERSHIP_COLLECTION, userId)
 	const expiresAt = getDateValue(saved && saved.expiresAt)
-	if (!saved || saved.status === 'revoked' || expiresAt <= currentTime.getTime()) {
+	if (
+		!saved
+		|| saved.status === 'revoked'
+		|| expiresAt + MEMBER_EXPIRY_GRACE_MS <= currentTime.getTime()
+	) {
 		throw new QuestionBankUserError(
 			'QUESTION_BANK_MEMBERSHIP_REQUIRED',
 			`${featureName || '该功能'}为会员权益，请先开通会员`
@@ -281,6 +297,18 @@ function aggregateEntriesToObject(entries) {
 	return result
 }
 
+function addLegacyKnowledgeAliases(knowledgeAttempts) {
+	const result = Object.assign({}, knowledgeAttempts)
+	Object.keys(knowledgeAttempts).forEach(scopeKey => {
+		const separator = scopeKey.indexOf('|')
+		if (separator < 1 || separator >= scopeKey.length - 1) return
+		const knowledge = scopeKey.slice(separator + 1)
+		result[knowledge] = (Number(result[knowledge]) || 0)
+			+ (Number(knowledgeAttempts[scopeKey]) || 0)
+	})
+	return result
+}
+
 function emptyStats(userId, subjectId, timestamp, todayKey) {
 	return {
 		_id: statsDocumentId(userId, subjectId),
@@ -295,7 +323,7 @@ function emptyStats(userId, subjectId, timestamp, todayKey) {
 		todayAttempts: 0,
 		chapterAttempts: [],
 		knowledgeAttempts: [],
-		stateAggregateVersion: 2,
+		stateAggregateVersion: 3,
 		createdAt: timestamp,
 		updatedAt: timestamp
 	}
@@ -446,7 +474,7 @@ function readProgress(rawProgress, currentTime) {
 		progressId: readEventId(progress.progressId),
 		subjectId: readSubjectId(progress.subjectId),
 		mode,
-		scopeKey: mode === 'chapter' ? chapterId : knowledge,
+		scopeKey: mode === 'chapter' ? chapterId : knowledgeScopeKey(chapterId, knowledge),
 		chapterId,
 		knowledge,
 		questionId: readQuestionId(progress.questionId),
@@ -596,17 +624,8 @@ function createQuestionBankUserService(db, options) {
 			? null
 			: readProgress(event.progress, currentTime)
 		if (!rawEvents.length && !progress) invalidArgument('events和progress不能同时为空')
-		let events = rawEvents.map((item, index) => readSyncEvent(item, currentTime, index))
-		let rejectedEventIds = []
-		if (events.some(item => item.type === 'favorite')) {
-			try {
-				await requireActiveMembership(db, userId, currentTime, '收藏夹')
-			} catch (error) {
-				if (error && error.errCode !== 'QUESTION_BANK_MEMBERSHIP_REQUIRED') throw error
-				rejectedEventIds = events.filter(item => item.type === 'favorite').map(item => item.eventId)
-				events = events.filter(item => item.type !== 'favorite')
-			}
-		}
+		const events = rawEvents.map((item, index) => readSyncEvent(item, currentTime, index))
+		const rejectedEventIds = []
 		events.sort((left, right) => {
 			const timeDiff = left.occurredAt.getTime() - right.occurredAt.getTime()
 			return timeDiff || left.originalIndex - right.originalIndex
@@ -640,13 +659,7 @@ function createQuestionBankUserService(db, options) {
 			async function getStats(subjectId) {
 				const id = statsDocumentId(userId, subjectId)
 				if (!statsCache.has(id)) {
-					const saved = await getDocument(store, STATS_COLLECTION, id)
-					const stats = normalizeStats(saved, userId, subjectId, currentTime, todayKey)
-					if (stats.stateAggregateVersion !== 2) {
-						stats.chapterAttempts = []
-						stats.knowledgeAttempts = []
-						stats.stateAggregateVersion = 2
-					}
+					const stats = await loadStateAggregates(userId, subjectId, currentTime, store)
 					statsCache.set(id, stats)
 				}
 				return statsCache.get(id)
@@ -707,7 +720,10 @@ function createQuestionBankUserService(db, options) {
 						incrementAggregate(stats.chapterAttempts, state.chapterId)
 					}
 					if (!wasKnowledgePractice && state.practiceModes.indexOf('knowledge') > -1) {
-						incrementAggregate(stats.knowledgeAttempts, state.knowledge)
+						incrementAggregate(
+							stats.knowledgeAttempts,
+							knowledgeScopeKey(state.chapterId, state.knowledge)
+						)
 					}
 					stats.totalAttempts += 1
 					if (chinaDayKey(item.occurredAt) === todayKey) stats.todayAttempts += 1
@@ -819,17 +835,9 @@ function createQuestionBankUserService(db, options) {
 	async function getPreferences(event, userId) {
 		const saved = await getDocument(db, PREFERENCES_COLLECTION, userId)
 		if (!saved) return defaultPreferences()
-		let answerMode = ANSWER_MODES.indexOf(saved.answerMode) > -1
+		const answerMode = ANSWER_MODES.indexOf(saved.answerMode) > -1
 			? saved.answerMode
 			: 'practice'
-		if (answerMode === 'exam' || answerMode === 'review') {
-			try {
-				await requireActiveMembership(db, userId, now(), '考试模式和背题模式')
-			} catch (error) {
-				if (error && error.errCode !== 'QUESTION_BANK_MEMBERSHIP_REQUIRED') throw error
-				answerMode = 'practice'
-			}
-		}
 		return {
 			answerMode,
 			nightMode: Boolean(saved.nightMode),
@@ -844,9 +852,6 @@ function createQuestionBankUserService(db, options) {
 		})
 		const nightMode = readBoolean(event.nightMode, 'nightMode')
 		const currentTime = now()
-		if (answerMode === 'exam' || answerMode === 'review') {
-			await requireActiveMembership(db, userId, currentTime, '考试模式和背题模式')
-		}
 		const saved = await getDocument(db, PREFERENCES_COLLECTION, userId)
 		await setDocument(db, PREFERENCES_COLLECTION, userId, {
 			_id: userId,
@@ -895,15 +900,16 @@ function createQuestionBankUserService(db, options) {
 		})
 	}
 
-	async function loadStateAggregates(userId, subjectId, currentTime) {
+	async function loadStateAggregates(userId, subjectId, currentTime, targetStore) {
+		const store = targetStore || db
 		const todayKey = chinaDayKey(currentTime)
-		const saved = await getDocument(db, STATS_COLLECTION, statsDocumentId(userId, subjectId))
+		const saved = await getDocument(store, STATS_COLLECTION, statsDocumentId(userId, subjectId))
 		const stats = normalizeStats(saved, userId, subjectId, currentTime, todayKey)
-		if (saved && stats.stateAggregateVersion === 2) return stats
+		if (saved && stats.stateAggregateVersion === 3) return stats
 
 		// Existing users are backfilled once. Later snapshots read these bounded
 		// maps from the stats document instead of returning every answered state.
-		const response = await db.collection(STATE_COLLECTION)
+		const response = await store.collection(STATE_COLLECTION)
 			.where({ userId, subjectId, attempted: true })
 			.field({ chapterId: true, knowledge: true, practiceModes: true })
 			.limit(MAX_STATE_ROWS + 1)
@@ -917,11 +923,13 @@ function createQuestionBankUserService(db, options) {
 		rows.forEach(item => {
 			const modes = normalizePracticeModes(item.practiceModes)
 			if (modes.indexOf('chapter') > -1) incrementAggregate(stats.chapterAttempts, item.chapterId)
-			if (modes.indexOf('knowledge') > -1) incrementAggregate(stats.knowledgeAttempts, item.knowledge)
+			if (modes.indexOf('knowledge') > -1) {
+				incrementAggregate(stats.knowledgeAttempts, knowledgeScopeKey(item.chapterId, item.knowledge))
+			}
 		})
-		stats.stateAggregateVersion = 2
+		stats.stateAggregateVersion = 3
 		stats.updatedAt = serverDate()
-		await setDocument(db, STATS_COLLECTION, stats._id, stats)
+		await setDocument(store, STATS_COLLECTION, stats._id, stats)
 		return stats
 	}
 
@@ -980,7 +988,9 @@ function createQuestionBankUserService(db, options) {
 		const favoriteRows = rows.filter(item => item.favorite)
 			.sort((left, right) => getDateValue(right.favoriteUpdatedAt) - getDateValue(left.favoriteUpdatedAt))
 		const chapterAttempts = stats ? aggregateEntriesToObject(stats.chapterAttempts) : {}
-		const knowledgeAttempts = stats ? aggregateEntriesToObject(stats.knowledgeAttempts) : {}
+		const knowledgeAttempts = stats
+			? addLegacyKnowledgeAliases(aggregateEntriesToObject(stats.knowledgeAttempts))
+			: {}
 		const answerSelections = {}
 		const progressPositions = { chapter: {}, knowledge: {} }
 		answeredRows.forEach(item => {
@@ -992,6 +1002,8 @@ function createQuestionBankUserService(db, options) {
 			.sort((left, right) => getDateValue(left.progressAt) - getDateValue(right.progressAt))
 			.forEach(item => {
 				if (item.mode === 'knowledge' && item.knowledge && item.questionId) {
+					const scopeKey = knowledgeScopeKey(item.chapterId, item.knowledge)
+					if (scopeKey) progressPositions.knowledge[scopeKey] = item.questionId
 					progressPositions.knowledge[item.knowledge] = item.questionId
 					return
 				}
@@ -1022,12 +1034,19 @@ function createQuestionBankUserService(db, options) {
 			required: mode === 'knowledge',
 			maxLength: 128
 		})
-		const scopeKey = mode === 'chapter' ? chapterId : knowledge
-		const saved = await getDocument(
+		const scopeKey = mode === 'chapter' ? chapterId : knowledgeScopeKey(chapterId, knowledge)
+		let saved = await getDocument(
 			db,
 			PROGRESS_COLLECTION,
 			progressDocumentId(userId, subjectId, mode, scopeKey)
 		)
+		if (!saved && mode === 'knowledge') {
+			saved = await getDocument(
+				db,
+				PROGRESS_COLLECTION,
+				progressDocumentId(userId, subjectId, mode, knowledge)
+			)
+		}
 		if (!saved) return null
 		const catalog = await loadCatalog(db, subjectId)
 		const response = await db.collection(QUESTION_COLLECTION)
@@ -1152,11 +1171,12 @@ function createQuestionBankUserService(db, options) {
 			minimum: 1,
 			maximum: MAX_PAGE_SIZE
 		})
-		await requireActiveMembership(db, userId, now(), type === 'favorite' ? '收藏夹' : '错题集')
 		const condition = recordTypeCondition(userId, subjectId, type)
 		const collection = db.collection(STATE_COLLECTION)
 		const responses = await Promise.all([
-			page === 1 ? collection.where(condition).count() : Promise.resolve(null),
+			page === 1
+				? getDocument(db, STATS_COLLECTION, statsDocumentId(userId, subjectId))
+				: Promise.resolve(null),
 			collection.where(condition)
 				.field({
 					questionId: true,
@@ -1169,7 +1189,9 @@ function createQuestionBankUserService(db, options) {
 				.limit(pageSize + 1)
 				.get()
 		])
-		const total = responses[0] ? getTotal(responses[0]) : null
+		const total = responses[0]
+			? Math.max(0, Number(responses[0][type === 'favorite' ? 'favorite' : 'wrong']) || 0)
+			: (page === 1 ? 0 : null)
 		const rows = getRows(responses[1])
 		const hasMore = rows.length > pageSize
 		const states = hasMore ? rows.slice(0, pageSize) : rows
@@ -1215,6 +1237,9 @@ function createQuestionBankUserService(db, options) {
 		const handler = handlers[action]
 		if (!handler) {
 			throw new QuestionBankUserError('QUESTION_BANK_USER_UNSUPPORTED_ACTION', `不支持的action: ${action}`)
+		}
+		if (MEMBER_SYNC_ACTIONS.has(action)) {
+			await requireActiveMembership(db, uid, now(), '云端学习数据同步')
 		}
 		return handler(event, uid)
 	}

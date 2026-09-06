@@ -10,7 +10,7 @@ const ANSWER_CACHE_TTL = 30 * 60 * 1000
 const MAX_PAGE_CACHE_ENTRIES = 30
 const MAX_QUESTION_CACHE_ENTRIES = 300
 const MAX_ANSWER_CACHE_ENTRIES = 300
-const MAX_PERSISTED_CHAPTER_ENTRIES = 24
+const MAX_PERSISTED_CHAPTER_ENTRIES = 64
 const MAX_PERSISTED_CHAPTER_BYTES = 6 * 1024 * 1024
 const MAX_PAGE_SIZE = 50
 const MAX_BATCH_SIZE = 100
@@ -257,6 +257,12 @@ function getCachedCatalog(subjectId) {
 	return cloneValue(entry.data)
 }
 
+function getStoredCatalog(subjectId) {
+	loadPersistedCatalogs()
+	const entry = persistedCatalogs[subjectId]
+	return entry && entry.data ? cloneValue(entry.data) : null
+}
+
 function setCachedCatalog(subjectId, catalog) {
 	setBoundedCache(catalogMemoryCache, subjectId, catalog, CATALOG_CACHE_TTL, 20)
 	loadPersistedCatalogs()
@@ -264,6 +270,14 @@ function setCachedCatalog(subjectId, catalog) {
 		data: cloneValue(catalog),
 		expiresAt: Date.now() + CATALOG_CACHE_TTL
 	}
+	savePersistedCatalogs()
+}
+
+function invalidateCachedCatalog(subjectId) {
+	catalogMemoryCache.delete(subjectId)
+	loadPersistedCatalogs()
+	if (!Object.prototype.hasOwnProperty.call(persistedCatalogs, subjectId)) return
+	delete persistedCatalogs[subjectId]
 	savePersistedCatalogs()
 }
 
@@ -420,6 +434,95 @@ function getPersistedChapter(subjectId, version, chapterId, expectedTotal) {
 	}
 }
 
+function getCatalogChapter(catalog, chapterId) {
+	return Array.isArray(catalog && catalog.chapters)
+		? catalog.chapters.find(item => String(item.id) === String(chapterId))
+		: null
+}
+
+function getPersistedSubjectQuestions(catalog) {
+	if (!catalog || !catalog.subjectId || !catalog.activeVersion || !Array.isArray(catalog.chapters)) return null
+	const items = []
+	const seen = new Set()
+	for (let index = 0; index < catalog.chapters.length; index += 1) {
+		const chapter = catalog.chapters[index]
+		const expectedTotal = Number(chapter.count)
+		const persisted = getPersistedChapter(
+			catalog.subjectId,
+			catalog.activeVersion,
+			String(chapter.id),
+			Number.isInteger(expectedTotal) ? expectedTotal : undefined
+		)
+		if (!persisted) return null
+		persisted.items.forEach(question => {
+			const questionId = question && (question.questionId || question.id)
+			if (!questionId || seen.has(questionId)) return
+			seen.add(questionId)
+			items.push(question)
+		})
+	}
+	const expectedSubjectTotal = Number(catalog.questionCount)
+	if (Number.isInteger(expectedSubjectTotal) && expectedSubjectTotal !== items.length) return null
+	return items.sort((left, right) => (Number(left.sortOrder) || 0) - (Number(right.sortOrder) || 0))
+}
+
+function resolveKnowledgeChapterId(catalog, chapterId, knowledge) {
+	if (chapterId) return String(chapterId)
+	const matches = Array.isArray(catalog && catalog.knowledgeGroups)
+		? catalog.knowledgeGroups.filter(item => item.name === knowledge)
+		: []
+	const chapterIds = Array.from(new Set(matches.map(item => String(item.chapterId))))
+	return chapterIds.length === 1 ? chapterIds[0] : ''
+}
+
+function getPersistedKnowledgeQuestions(catalog, chapterId, knowledge) {
+	const resolvedChapterId = resolveKnowledgeChapterId(catalog, chapterId, knowledge)
+	if (!resolvedChapterId || !knowledge) return null
+	const catalogChapter = getCatalogChapter(catalog, resolvedChapterId)
+	if (!catalogChapter) return null
+	const expectedChapterTotal = Number(catalogChapter.count)
+	const persisted = getPersistedChapter(
+		catalog.subjectId,
+		catalog.activeVersion,
+		resolvedChapterId,
+		Number.isInteger(expectedChapterTotal) ? expectedChapterTotal : undefined
+	)
+	if (!persisted) return null
+	const items = persisted.items.filter(question => (
+		String(question.chapterId) === resolvedChapterId && question.knowledge === knowledge
+	))
+	const group = Array.isArray(catalog.knowledgeGroups)
+		? catalog.knowledgeGroups.find(item => (
+			String(item.chapterId) === resolvedChapterId && item.name === knowledge
+		))
+		: null
+	const expectedTotal = group && Number(group.count)
+	if (Number.isInteger(expectedTotal) && expectedTotal !== items.length) return null
+	return items.sort((left, right) => (Number(left.sortOrder) || 0) - (Number(right.sortOrder) || 0))
+}
+
+function getPersistedQuestionsByIds(catalog, questionIds) {
+	const requested = new Set(questionIds)
+	const found = new Map()
+	if (!requested.size || !catalog || !Array.isArray(catalog.chapters)) return found
+	for (let index = 0; index < catalog.chapters.length && found.size < requested.size; index += 1) {
+		const chapter = catalog.chapters[index]
+		const expectedTotal = Number(chapter.count)
+		const persisted = getPersistedChapter(
+			catalog.subjectId,
+			catalog.activeVersion,
+			String(chapter.id),
+			Number.isInteger(expectedTotal) ? expectedTotal : undefined
+		)
+		if (!persisted) continue
+		persisted.items.forEach(question => {
+			const questionId = question && (question.questionId || question.id)
+			if (requested.has(questionId)) found.set(questionId, question)
+		})
+	}
+	return found
+}
+
 function setPersistedChapter(subjectId, version, chapterId, data) {
 	if (!storageAvailable() || !version || !Array.isArray(data && data.items)) return false
 	const total = Number(data.total)
@@ -526,6 +629,141 @@ function questionCacheKey(subjectId, version, questionId) {
 
 function answerCacheKey(subjectId, version, questionId, selected) {
 	return `${subjectId}|${version}|${questionId}|${selected.slice().sort().join(',')}`
+}
+
+function questionMatchesKeyword(question, keyword) {
+	const normalized = String(keyword || '').trim().toLowerCase()
+	if (!normalized) return false
+	const optionText = Array.isArray(question && question.options)
+		? question.options.map(option => option && option.text || '').join(' ')
+		: ''
+	return [
+		question && question.title,
+		question && question.chapter,
+		question && question.section,
+		question && question.knowledge,
+		optionText
+	].some(value => String(value || '').toLowerCase().indexOf(normalized) > -1)
+}
+
+function paginateLocalQuestions(items, cursor, pageSize) {
+	const eligible = items.filter(question => (Number(question.sortOrder) || 0) > cursor)
+	const pageItems = eligible.slice(0, pageSize)
+	const hasMore = eligible.length > pageItems.length
+	return {
+		items: pageItems,
+		hasMore,
+		nextCursor: hasMore && pageItems.length
+			? Number(pageItems[pageItems.length - 1].sortOrder) || null
+			: null
+	}
+}
+
+function hashSeed(value) {
+	let hash = 2166136261
+	for (let index = 0; index < value.length; index += 1) {
+		hash ^= value.charCodeAt(index)
+		hash = Math.imul(hash, 16777619)
+	}
+	return hash >>> 0
+}
+
+function createRandom(seed) {
+	let state = seed >>> 0
+	return function random() {
+		state += 0x6D2B79F5
+		let value = state
+		value = Math.imul(value ^ value >>> 15, value | 1)
+		value ^= value + Math.imul(value ^ value >>> 7, value | 61)
+		return ((value ^ value >>> 14) >>> 0) / 4294967296
+	}
+}
+
+function shuffle(list, random) {
+	const result = list.slice()
+	for (let index = result.length - 1; index > 0; index -= 1) {
+		const target = Math.floor(random() * (index + 1))
+		const current = result[index]
+		result[index] = result[target]
+		result[target] = current
+	}
+	return result
+}
+
+function buildLocalSmartPage(catalog, items, payload) {
+	const answered = new Set(payload.answeredQuestionIds || [])
+	const wrong = new Set(payload.wrongQuestionIds || [])
+	const groups = { fresh: [], wrong: [], mastered: [] }
+	items.forEach(question => {
+		const questionId = question && (question.questionId || question.id)
+		if (wrong.has(questionId)) groups.wrong.push(question)
+		else if (answered.has(questionId)) groups.mastered.push(question)
+		else groups.fresh.push(question)
+	})
+	const seed = payload.seed
+		|| `${catalog.subjectId}:${catalog.activeVersion}:${new Date().toISOString().slice(0, 10)}`
+	const random = createRandom(hashSeed(seed))
+	const selected = shuffle(groups.fresh, random)
+		.concat(shuffle(groups.wrong, random), shuffle(groups.mastered, random))
+		.slice(0, payload.pageSize)
+	return {
+		subjectId: catalog.subjectId,
+		version: catalog.activeVersion,
+		mode: 'smart',
+		seed,
+		total: items.length,
+		pageSize: payload.pageSize,
+		cursor: 0,
+		nextCursor: null,
+		hasMore: false,
+		stateCounts: {
+			fresh: groups.fresh.length,
+			wrong: groups.wrong.length,
+			mastered: groups.mastered.length,
+			sampled: items.length
+		},
+		items: cloneValue(selected),
+		_localOnly: true
+	}
+}
+
+function buildLocalPracticePage(catalog, mode, payload) {
+	if (!catalog || !catalog.activeVersion) return null
+	if (mode === 'knowledge') {
+		const knowledgeItems = getPersistedKnowledgeQuestions(
+			catalog,
+			payload.chapterId,
+			payload.knowledge
+		)
+		if (!knowledgeItems) return null
+		const page = paginateLocalQuestions(knowledgeItems, payload.cursor, payload.pageSize)
+		return Object.assign({
+			subjectId: catalog.subjectId,
+			version: catalog.activeVersion,
+			mode,
+			total: knowledgeItems.length,
+			pageSize: payload.pageSize,
+			cursor: payload.cursor,
+			_localOnly: true
+		}, page)
+	}
+	const subjectItems = getPersistedSubjectQuestions(catalog)
+	if (!subjectItems) return null
+	if (mode === 'smart') return buildLocalSmartPage(catalog, subjectItems, payload)
+	const filtered = mode === 'search'
+		? subjectItems.filter(question => questionMatchesKeyword(question, payload.keyword))
+		: subjectItems
+	if (mode !== 'sequence' && mode !== 'search') return null
+	const page = paginateLocalQuestions(filtered, payload.cursor, payload.pageSize)
+	return Object.assign({
+		subjectId: catalog.subjectId,
+		version: catalog.activeVersion,
+		mode,
+		total: filtered.length,
+		pageSize: payload.pageSize,
+		cursor: payload.cursor,
+		_localOnly: true
+	}, page)
 }
 
 function ensureCloudAvailable() {
@@ -635,6 +873,8 @@ function buildPracticePayload(input, subjectId, mode) {
 			required: true,
 			maxLength: 128
 		})
+		const chapterId = normalizeString(input.chapterId, 'chapterId', { maxLength: 32 })
+		if (chapterId) payload.chapterId = chapterId
 	}
 	if (mode === 'search') {
 		payload.keyword = normalizeString(input.keyword, 'keyword', {
@@ -710,20 +950,59 @@ export async function getPracticePage(params, options) {
 		values: PRACTICE_MODES
 	})
 	const payload = buildPracticePayload(input, subjectId, mode)
-	const catalog = await getQuestionCatalog(subjectId)
 	const config = options || {}
-	const key = pageCacheKey(subjectId, catalog.activeVersion, 'getPracticePage', payload)
+	const versionFromResponse = config.versionFromResponse === true
+	let catalog = versionFromResponse
+		? getCachedCatalog(subjectId)
+		: await getQuestionCatalog(subjectId)
+	let storedLocalPage = null
+	if (versionFromResponse && !catalog && !config.forceRefresh) {
+		const storedCatalog = getStoredCatalog(subjectId)
+		storedLocalPage = buildLocalPracticePage(storedCatalog, mode, payload)
+		if (storedLocalPage) {
+			catalog = await getQuestionCatalog(subjectId)
+			if (!catalog || catalog.activeVersion !== storedCatalog.activeVersion) storedLocalPage = null
+		}
+	}
+	const expectedVersion = catalog && catalog.activeVersion || ''
+	const cacheVersion = versionFromResponse ? 'response-version' : expectedVersion
+	const key = pageCacheKey(subjectId, cacheVersion, 'getPracticePage', payload)
 	if (!config.forceRefresh) {
 		const cached = getBoundedCache(pageMemoryCache, key)
 		if (cached) return cached
+		const localPage = storedLocalPage || buildLocalPracticePage(catalog, mode, payload)
+		if (localPage) {
+			setBoundedCache(pageMemoryCache, key, localPage, PAGE_CACHE_TTL, MAX_PAGE_CACHE_ENTRIES)
+			return cloneValue(localPage)
+		}
 	}
 	const data = await callQuestionBank('getPracticePage', payload, config)
-	const version = data && data.version || catalog.activeVersion
-	await syncCatalogVersion(subjectId, catalog.activeVersion, version)
+	const returnedVersion = data && data.version
+	const version = returnedVersion || (versionFromResponse ? '' : expectedVersion)
+	if (!version) {
+		throw new QuestionBankServiceError(
+			'QUESTION_BANK_INVALID_RESPONSE',
+			'题库练习数据缺少有效版本'
+		)
+	}
+	if (versionFromResponse) {
+		if (expectedVersion && expectedVersion !== version) {
+			clearSubjectMemory(subjectId)
+			invalidateCachedCatalog(subjectId)
+		}
+		removePersistedChapterVersions(subjectId, version)
+	} else {
+		await syncCatalogVersion(subjectId, expectedVersion, version)
+	}
 	cacheQuestions(subjectId, version, data && data.items)
 	setBoundedCache(
 		pageMemoryCache,
-		pageCacheKey(subjectId, version, 'getPracticePage', payload),
+		pageCacheKey(
+			subjectId,
+			versionFromResponse ? cacheVersion : version,
+			'getPracticePage',
+			payload
+		),
 		data,
 		PAGE_CACHE_TTL,
 		MAX_PAGE_CACHE_ENTRIES
@@ -746,32 +1025,43 @@ export async function getAllPracticeQuestions(params, options) {
 	const firstCursor = mode === 'smart' ? 0 : normalizeCursor(input.cursor)
 	const chapterId = mode === 'chapter'
 		? normalizeString(input.chapterId, 'chapterId', { required: true, maxLength: 32 })
-		: ''
+		: (mode === 'knowledge'
+			? normalizeString(input.chapterId, 'chapterId', { maxLength: 32 })
+			: '')
 	const config = options || {}
-	if (mode === 'chapter' && firstCursor === 0 && !config.forceRefresh) {
+	if ((mode === 'chapter' || mode === 'knowledge' || mode === 'sequence')
+		&& firstCursor === 0
+		&& !config.forceRefresh) {
 		const catalog = await getQuestionCatalog(subjectId)
-		const catalogChapter = Array.isArray(catalog.chapters)
-			? catalog.chapters.find(item => item.id === chapterId)
-			: null
-		const expectedTotal = catalogChapter && Number(catalogChapter.count)
-		const persisted = getPersistedChapter(
-			subjectId,
-			catalog.activeVersion,
-			chapterId,
-			Number.isInteger(expectedTotal) ? expectedTotal : undefined
-		)
-		if (persisted) {
-			cacheQuestions(subjectId, catalog.activeVersion, persisted.items)
+		let persistedItems = null
+		if (mode === 'chapter') {
+			const catalogChapter = getCatalogChapter(catalog, chapterId)
+			const expectedTotal = catalogChapter && Number(catalogChapter.count)
+			const persisted = getPersistedChapter(
+				subjectId,
+				catalog.activeVersion,
+				chapterId,
+				Number.isInteger(expectedTotal) ? expectedTotal : undefined
+			)
+			persistedItems = persisted && persisted.items
+		} else if (mode === 'knowledge') {
+			persistedItems = getPersistedKnowledgeQuestions(catalog, chapterId, input.knowledge)
+		} else {
+			persistedItems = getPersistedSubjectQuestions(catalog)
+		}
+		if (persistedItems) {
+			cacheQuestions(subjectId, catalog.activeVersion, persistedItems)
 			return {
 				subjectId,
 				version: catalog.activeVersion,
 				mode,
-				total: persisted.total,
+				total: persistedItems.length,
 				pageSize,
 				cursor: 0,
 				nextCursor: null,
 				hasMore: false,
-				items: cloneValue(persisted.items)
+				items: cloneValue(persistedItems),
+				_localOnly: true
 			}
 		}
 	}
@@ -865,6 +1155,36 @@ export async function searchQuestionBank(params, options) {
 	if (!config.forceRefresh) {
 		const cached = getBoundedCache(pageMemoryCache, key)
 		if (cached) return cached
+		const subjectItems = getPersistedSubjectQuestions(catalog)
+		if (subjectItems) {
+			const matches = subjectItems.filter(question => questionMatchesKeyword(question, payload.keyword))
+			const page = paginateLocalQuestions(matches, payload.cursor, payload.pageSize)
+			const localResult = {
+				subjectId,
+				version: catalog.activeVersion,
+				keyword: payload.keyword,
+				total: matches.length,
+				pageSize: payload.pageSize,
+				cursor: payload.cursor,
+				items: page.items.map(question => ({
+					id: question.questionId || question.id,
+					questionId: question.questionId || question.id,
+					subjectId: question.subjectId,
+					chapterId: question.chapterId,
+					chapter: question.chapter,
+					section: question.section,
+					knowledge: question.knowledge,
+					type: question.type,
+					title: question.title,
+					sortOrder: question.sortOrder
+				})),
+				nextCursor: page.nextCursor,
+				hasMore: page.hasMore,
+				_localOnly: true
+			}
+			setBoundedCache(pageMemoryCache, key, localResult, PAGE_CACHE_TTL, MAX_PAGE_CACHE_ENTRIES)
+			return cloneValue(localResult)
+		}
 	}
 	const data = await callQuestionBank('searchQuestions', payload, config)
 	const version = data && data.version || catalog.activeVersion
@@ -911,7 +1231,7 @@ export async function getQuestionsByIds(params, options) {
 	const catalog = await getQuestionCatalog(subjectId)
 	const config = options || {}
 	const found = new Map()
-	const uncachedIds = []
+	let uncachedIds = []
 	questionIds.forEach(questionId => {
 		const cached = config.forceRefresh ? null : getBoundedCache(
 			questionMemoryCache,
@@ -920,6 +1240,12 @@ export async function getQuestionsByIds(params, options) {
 		if (cached) found.set(questionId, cached)
 		else uncachedIds.push(questionId)
 	})
+	if (uncachedIds.length && !config.forceRefresh) {
+		const persisted = getPersistedQuestionsByIds(catalog, uncachedIds)
+		persisted.forEach((question, questionId) => found.set(questionId, question))
+		cacheQuestions(subjectId, catalog.activeVersion, Array.from(persisted.values()))
+		uncachedIds = uncachedIds.filter(questionId => !persisted.has(questionId))
+	}
 	const missing = new Set()
 	if (uncachedIds.length) {
 		const fetched = await fetchQuestionBatches(

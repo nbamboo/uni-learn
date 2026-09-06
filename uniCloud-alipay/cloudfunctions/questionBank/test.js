@@ -236,10 +236,12 @@ async function run() {
 		action: 'getPracticePage',
 		subjectId,
 		mode: 'knowledge',
+		chapterId: '1',
 		knowledge: '银行个人理财业务分类',
 		pageSize: 50
 	})
 	assert.equal(knowledgePage.total, 21)
+	assert.ok(knowledgePage.items.every(item => item.chapterId === '1'))
 	assert.ok(knowledgePage.items.every(item => item.knowledge === '银行个人理财业务分类'))
 
 	const searchPage = await service.execute({

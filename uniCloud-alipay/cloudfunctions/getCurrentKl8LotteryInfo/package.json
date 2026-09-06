@@ -1,0 +1,7 @@
+{
+  "name": "getCurrentKl8LotteryInfo",
+  "dependencies": {},
+  "extensions": {
+    "uni-cloud-jql": {}
+  }
+}

@@ -123,7 +123,7 @@ node scripts/verify-virtual-payment-callback.js "https://实际云函数域名/v
 4. 小程序调用 `wx.requestVirtualPayment`。iOS 会校验微信版本不低于 8.0.68。
 5. 支付成功后，以 `xpay_goods_deliver_notify` 为主路径发货；服务端校验消息签名、用户、环境、道具、数量和金额，以 `wx_order_id` 幂等发放会员。
 6. 前端支付回调只触发服务端查单，不直接开通会员。定时器每 5 分钟调用 `query_order` 补发漏单。微信连续返回“订单不存在”至少 3 次且本地订单已超过 30 分钟时，系统关闭该次未拉起支付的无效订单，避免永久重复查单；若之后仍收到有效发货推送，会照常幂等发货。
-7. `questionBankUser` 在服务端限制错题集、收藏夹、收藏写入、考试模式和背题模式；会员过期后无法绕过前端直接调用这些接口。
+7. `questionBankUser` 除安全资料摘要外全部要求有效会员；会员过期后无法绕过前端读写云端做题数据，后续行为只保存在本机。
 8. 会员在答题结果页不渲染广告；非会员仍显示原有广告。
 
 ## 6. 本地自动验收
@@ -164,4 +164,6 @@ node scripts/check-virtual-payment-readiness.js
 - [x] 已在本文说明退款规则、结算周期和费率（Android 等 1%、iOS 12%）。
 - [ ] 上线后已用小额真单核对“支付 → 推送 → 发货 → 会员生效 → 后台账单金额”。
 
-真单验证时购买最低价的 `membership_1m`，确认 `question_bank_payment_orders.status` 为 `delivered`、`question_bank_memberships.expiresAt` 延长一个月，并验证广告、错题集/收藏夹、考试/背题模式三类权益。随后从 MP 后台执行一笔退款，确认订单变为 `refunded` 且相应时长被撤销。
+真单验证时购买最低价的 `membership_1m`，确认 `question_bank_payment_orders.status` 为 `delivered`、`question_bank_memberships.expiresAt` 延长一个月，并验证广告、错题集/收藏夹、考试/背题模式三类权益。自然到期允许最多 6 小时宽限，普通页面的会员状态缓存同样为 6 小时；会员中心始终强制刷新，本地仍显示会员时进入会员权益也会强制刷新。
+
+随后从 MP 后台执行一笔退款，确认订单变为 `refunded` 且相应时长被立即撤销。后台人工撤销必须将 `question_bank_memberships.status` 设为 `revoked`，不能仅修改为 `expired`；`revoked` 与退款撤销均不享有到期宽限。验证撤销后再次进入任一会员功能时，本地会员缓存立即变为非会员，并确认 `questionBankUser` 的会员 action 返回 `QUESTION_BANK_MEMBERSHIP_REQUIRED`。

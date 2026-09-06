@@ -71,9 +71,9 @@ console.log(result.data)
 
 - `sequence`：整科顺序练习。
 - `chapter`：必须传 `chapterId`。
-- `knowledge`：必须传 `knowledge`。
+- `knowledge`：必须传 `chapterId` 和 `knowledge`，避免不同章节的同名知识点混题。
 - `search`：必须传 `keyword`，返回完整题目。
-- `smart`：旧客户端兼容入口；只抽取最多 100 个随机候选题号，不再遍历整科题号。新版客户端使用 `questionBankUser.getSmartPractice`。
+- `smart`：非会员智能练习入口；客户端传入本机的已答和错题 ID，仅用于本次候选排序且不写入云数据库。服务端最多抽取 100 个随机候选题号。会员使用 `questionBankUser.getSmartPractice` 读取云端状态。
 
 普通分页响应包含 `total`、`nextCursor`、`hasMore` 和 `items`；只有首屏执行 `count()` 并返回精确 `total`，后续页的 `total` 为 `null`。当前试点版本会在完整题目中返回
 `answer` 与 `explanation`，后续切换服务端判题时可从练习响应中移除这两个字段。

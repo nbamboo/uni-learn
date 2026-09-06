@@ -9,6 +9,7 @@ const {
 	calculateUserSignature,
 	createVirtualPaymentService,
 	parseNotificationBody,
+	publicMembership,
 	recomputeMembership
 } = require('./service')
 
@@ -225,6 +226,19 @@ async function run() {
 		]
 	}, new Date('2026-01-20T00:00:00.000Z').getTime())
 	assert.equal(new Date(computed.expiresAt).toISOString(), '2026-05-01T00:00:00.000Z')
+	const graceReference = new Date('2026-05-01T05:00:00.000Z').getTime()
+	assert.equal(publicMembership({
+		status: 'expired',
+		expiresAt: new Date('2026-05-01T00:00:00.000Z')
+	}, graceReference).isMember, true)
+	assert.equal(publicMembership({
+		status: 'revoked',
+		expiresAt: new Date('2026-06-01T00:00:00.000Z')
+	}, graceReference).isMember, false)
+	assert.equal(publicMembership({
+		status: 'expired',
+		expiresAt: new Date('2026-04-30T22:00:00.000Z')
+	}, graceReference).isMember, false)
 
 	const parsed = parseNotificationBody(`
 		<xml>
@@ -370,6 +384,7 @@ async function run() {
 	assert.match(refundResult.body, /<ErrCode>0<\/ErrCode>/)
 	assert.equal(environment.collections.question_bank_payment_orders.get(created.order.outTradeNo).status, 'refunded')
 	assert.equal(environment.collections.question_bank_memberships.get('user-one').status, 'expired')
+	assert.equal((await service.execute({ action: 'getMembership' }, 'user-one')).isMember, false)
 	await testReconcileFairness()
 	await testMissingOrderCleanup()
 

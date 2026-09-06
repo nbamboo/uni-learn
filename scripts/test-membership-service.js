@@ -30,9 +30,19 @@ async function run() {
 	let queryShouldFail = true
 	let paymentCalls = 0
 	let queryCalls = 0
+	let membershipCalls = 0
+	let syncScheduleCalls = 0
+	let cloudMembership = {
+		isMember: true,
+		expiresAt: Date.now() + 30 * 24 * 60 * 60 * 1000
+	}
 	const environment = {
 		ensurePracticeUser: async () => user,
 		getCurrentPracticeUser: () => user,
+		schedulePracticeSync: options => {
+			syncScheduleCalls += 1
+			assert.equal(options.immediate, true)
+		},
 		uni: {
 			getStorageSync: key => storage.get(key),
 			setStorageSync: (key, value) => storage.set(key, value),
@@ -42,6 +52,15 @@ async function run() {
 		},
 		uniCloud: {
 			async callFunction(request) {
+				if (request.data.action === 'getMembership') {
+					membershipCalls += 1
+					return {
+						result: {
+							errCode: 0,
+							data: cloudMembership
+						}
+					}
+				}
 				if (request.data.action === 'createOrder') {
 					assert.equal(request.data.productId, 'membership_1m')
 					assert.equal(request.data.code, 'payment-login-code')
@@ -117,6 +136,43 @@ async function run() {
 	assert.equal(restored.order.status, 'delivered')
 	assert.equal(restored.membership.isMember, true)
 	assert.equal(service.getCachedMembership().isMember, true)
+	assert.equal(syncScheduleCalls, 1)
+
+	const membershipStorageKey = 'uni-learn-membership-v1:member-user'
+	const cachedMembership = storage.get(membershipStorageKey)
+	const currentTime = Date.now()
+	storage.set(membershipStorageKey, Object.assign({}, cachedMembership, {
+		cachedAt: currentTime - 5 * 60 * 60 * 1000
+	}))
+	await service.getMembership()
+	assert.equal(membershipCalls, 0)
+	storage.set(membershipStorageKey, Object.assign({}, cachedMembership, {
+		cachedAt: currentTime - 7 * 60 * 60 * 1000
+	}))
+	await service.getMembership()
+	assert.equal(membershipCalls, 1)
+
+	storage.set(membershipStorageKey, Object.assign({}, cachedMembership, {
+		isMember: true,
+		expiresAt: currentTime - 60 * 60 * 1000,
+		cachedAt: currentTime
+	}))
+	assert.equal(service.getCachedMembership().isMember, true)
+	storage.set(membershipStorageKey, Object.assign({}, cachedMembership, {
+		isMember: true,
+		expiresAt: currentTime - 7 * 60 * 60 * 1000,
+		cachedAt: currentTime
+	}))
+	assert.equal(service.getCachedMembership().isMember, false)
+
+	storage.set(membershipStorageKey, Object.assign({}, cachedMembership, {
+		isMember: true,
+		cachedAt: currentTime
+	}))
+	cloudMembership = { isMember: false, status: 'inactive', expiresAt: 0 }
+	const revoked = await service.getMembership({ forceRefresh: true })
+	assert.equal(revoked.isMember, false)
+	assert.equal(service.getCachedMembership().isMember, false)
 
 	console.log('membership service tests passed')
 }

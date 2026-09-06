@@ -155,6 +155,7 @@
 	} from '@/data/practice.js'
 	import { getCatalog, getCatalogSummaries } from '@/services/question-bank.js'
 	import {
+		getCachedPracticeSummary,
 		getLocalPracticePreferences,
 		getPracticePreferences,
 		getPracticeSummary
@@ -224,16 +225,17 @@
 				return this.currentCatalogPending ? '--' : this.stats.total
 			}
 		},
-		onShow() {
-			this.refreshNightMode()
-			this.refreshMembership()
+		async onShow() {
+			await this.refreshMembership()
+			try {
+				await this.refreshNightMode()
+			} catch (error) {
+				this.applyNightMode(getLocalPracticePreferences())
+			}
 			const state = getPracticeState()
 			this.currentSubjectId = state.currentSubjectId
 			this.refreshStats(this.subjectQuestionCount(this.currentSubjectId))
-			const subjectId = this.currentSubjectId
-			this.loadCatalogSummaries().then(() => {
-				if (subjectId === this.currentSubjectId) this.loadCloudStats(subjectId)
-			})
+			await this.loadCatalog(this.currentSubjectId)
 		},
 		onHide() {
 			this.applyTabBarTheme(false)
@@ -281,26 +283,33 @@
 			async loadCloudStats(subjectId) {
 				const requestId = ++this.nextUserDataRequestId
 				this.userDataError = ''
+				const cachedSummary = getCachedPracticeSummary(subjectId)
+				if (cachedSummary && subjectId === this.currentSubjectId) {
+					this.applyCloudSummary(cachedSummary)
+				}
 				try {
 					const summary = await getPracticeSummary(subjectId, {
 						localState: getPracticeState()
 					})
 					if (requestId !== this.nextUserDataRequestId || subjectId !== this.currentSubjectId) return
-					const total = this.stats.total
-					this.stats = Object.assign({}, this.stats, summary, {
-						total,
-						completion: total
-							? Math.min(100, Math.round(summary.attempted / total * 100))
-							: 0
-					})
-					this.today = Object.assign({}, this.today, {
-						attempts: summary.todayAttempts,
-						percent: Math.min(100, Math.round(summary.todayAttempts / this.today.goal * 100))
-					})
+					this.applyCloudSummary(summary)
 				} catch (error) {
 					if (requestId !== this.nextUserDataRequestId || subjectId !== this.currentSubjectId) return
 					this.userDataError = (error && (error.errMsg || error.message)) || '做题记录同步失败'
 				}
+			},
+			applyCloudSummary(summary) {
+				const total = this.stats.total
+				this.stats = Object.assign({}, this.stats, summary, {
+					total,
+					completion: total
+						? Math.min(100, Math.round(summary.attempted / total * 100))
+						: 0
+				})
+				this.today = Object.assign({}, this.today, {
+					attempts: summary.todayAttempts,
+					percent: Math.min(100, Math.round(summary.todayAttempts / this.today.goal * 100))
+				})
 			},
 			retryUserData() {
 				this.loadCloudStats(this.currentSubjectId)
@@ -422,14 +431,12 @@
 				}
 			},
 			retryCatalog() {
-				this.catalogSummariesLoaded = false
-				this.loadCatalogSummaries({ forceRefresh: true }).then(() => {
-					this.loadCloudStats(this.currentSubjectId)
-				})
+				this.loadCatalog(this.currentSubjectId, { forceRefresh: true })
 			},
 			openSubjectPicker() {
-				this.loadCatalogSummaries()
+				const request = this.loadCatalogSummaries()
 				this.$refs.subjectPopup.open()
+				return request
 			},
 			closeSubjectPicker() {
 				this.$refs.subjectPopup.close()
@@ -500,7 +507,9 @@
 				}
 				if (item.memberOnly) {
 					try {
-						this.membership = await getMembership()
+						this.membership = await getMembership({
+							forceRefresh: this.membership.isMember
+						})
 					} catch (error) {
 						this.membership = getCachedMembership()
 					}

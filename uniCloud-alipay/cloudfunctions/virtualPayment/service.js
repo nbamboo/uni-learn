@@ -13,6 +13,7 @@ const MAX_GRANTS = 200
 const MISSING_ORDER_ERRCODE = 268490002
 const MISSING_ORDER_CLOSE_ATTEMPTS = 3
 const MISSING_ORDER_CLOSE_AGE_MS = 30 * 60 * 1000
+const MEMBER_EXPIRY_GRACE_MS = 6 * 60 * 60 * 1000
 
 const PRODUCTS = Object.freeze({
 	'membership_1m': Object.freeze({ productId: 'membership_1m', name: '1个月会员', months: 1, priceFen: 300 }),
@@ -132,21 +133,26 @@ function recomputeMembership(membership, timestamp) {
 	return {
 		grants,
 		expiresAt,
-		status: expiresAt > timestamp ? 'active' : 'expired'
+		status: expiresAt + MEMBER_EXPIRY_GRACE_MS > timestamp ? 'active' : 'expired'
 	}
 }
 
 function publicMembership(membership, timestamp) {
 	const expiresAt = dateValue(membership && membership.expiresAt)
-	const isMember = expiresAt > timestamp && membership && membership.status !== 'revoked'
+	const isMember = Boolean(
+		expiresAt
+		&& expiresAt + MEMBER_EXPIRY_GRACE_MS > timestamp
+		&& membership
+		&& membership.status !== 'revoked'
+	)
 	return {
 		isMember,
 		status: isMember ? 'active' : 'inactive',
 		expiresAt: isMember ? expiresAt : 0,
 		entitlements: {
-		adFree: isMember,
-		practiceRecords: isMember,
-		advancedAnswerModes: isMember
+			adFree: isMember,
+			practiceRecords: isMember,
+			advancedAnswerModes: isMember
 		}
 	}
 }

@@ -222,6 +222,26 @@ async function run() {
 		nightMode: false,
 		updatedAt: 0
 	})
+	environment.collections.question_bank_memberships.set('user-grace', {
+		_id: 'user-grace',
+		userId: 'user-grace',
+		status: 'expired',
+		expiresAt: new Date(currentTime.getTime() - 5 * 60 * 60 * 1000)
+	})
+	assert.equal(
+		(await service.execute({ action: 'getPreferences' }, 'user-grace')).answerMode,
+		'practice'
+	)
+	environment.collections.question_bank_memberships.set('user-revoked', {
+		_id: 'user-revoked',
+		userId: 'user-revoked',
+		status: 'revoked',
+		expiresAt: new Date(currentTime.getTime() + 30 * 24 * 60 * 60 * 1000)
+	})
+	await assert.rejects(
+		() => service.execute({ action: 'getPreferences' }, 'user-revoked'),
+		error => error && error.errCode === 'QUESTION_BANK_MEMBERSHIP_REQUIRED'
+	)
 
 	await assert.rejects(
 		() => service.execute({
@@ -233,32 +253,48 @@ async function run() {
 		}, 'user-two'),
 		error => error && error.errCode === 'QUESTION_BANK_MEMBERSHIP_REQUIRED'
 	)
-	const nonMemberSync = await service.execute({
-		action: 'syncEvents',
-		events: [{
-			type: 'answer',
-			eventId: 'answer-nonmember',
-			subjectId,
-			questionId: question.questionId,
-			selected: [wrongAlias],
-			practiceMode: 'smart',
-			judgedLocally: true,
-			correct: false,
-			chapterId: question.chapterId,
-			knowledge: question.knowledge,
-			occurredAt: currentTime.getTime()
-		}, {
-			type: 'favorite',
-			eventId: 'favorite-nonmember',
-			subjectId,
-			questionId: question.questionId,
-			favorite: true,
-			occurredAt: currentTime.getTime()
-		}]
-	}, 'user-nonmember')
-	assert.deepEqual(nonMemberSync.acceptedEventIds, ['answer-nonmember'])
-	assert.deepEqual(nonMemberSync.rejectedEventIds, ['favorite-nonmember'])
+	await assert.rejects(
+		() => service.execute({
+			action: 'syncEvents',
+			events: [{
+				type: 'answer',
+				eventId: 'answer-nonmember',
+				subjectId,
+				questionId: question.questionId,
+				selected: [wrongAlias],
+				practiceMode: 'smart',
+				judgedLocally: true,
+				correct: false,
+				chapterId: question.chapterId,
+				knowledge: question.knowledge,
+				occurredAt: currentTime.getTime()
+			}]
+		}, 'user-nonmember'),
+		error => error && error.errCode === 'QUESTION_BANK_MEMBERSHIP_REQUIRED'
+	)
+	for (const action of [
+		'getSummary',
+		'getStateSnapshot',
+		'getProgress',
+		'getSmartPractice',
+		'getPreferences',
+		'updatePreferences',
+		'clearCurrentSubjectData'
+	]) {
+		await assert.rejects(
+			() => service.execute({ action }, 'user-nonmember'),
+			error => error && error.errCode === 'QUESTION_BANK_MEMBERSHIP_REQUIRED'
+		)
+	}
+	assert.equal(Array.from(environment.collections.question_bank_user_states.values())
+		.some(item => item.userId === 'user-nonmember'), false)
 	const smartOnlyQuestion = Array.from(environment.collections.question_bank_questions.values())[1]
+	environment.collections.question_bank_memberships.set('user-smart', {
+		_id: 'user-smart',
+		userId: 'user-smart',
+		status: 'active',
+		expiresAt: new Date('2027-08-28T04:00:00.000Z')
+	})
 	await service.execute({
 		action: 'syncEvents',
 		events: [{
@@ -315,9 +351,9 @@ async function run() {
 		await service.execute({ action: 'getPreferences' }, userId),
 		updatedPreferences
 	)
-	assert.deepEqual(
-		await service.execute({ action: 'getPreferences' }, 'user-two'),
-		{ answerMode: 'practice', nightMode: false, updatedAt: 0 }
+	await assert.rejects(
+		() => service.execute({ action: 'getPreferences' }, 'user-two'),
+		error => error && error.errCode === 'QUESTION_BANK_MEMBERSHIP_REQUIRED'
 	)
 	await assert.rejects(
 		service.execute({
@@ -449,6 +485,31 @@ async function run() {
 	}, userId)
 	assert.deepEqual(aggregateOnlySnapshot.answeredQuestionIds, [])
 	assert.equal(aggregateOnlySnapshot.chapterAttempts[question.chapterId], 1)
+	await service.execute({
+		action: 'syncEvents',
+		events: [{
+			type: 'answer',
+			eventId: 'answer-knowledge-one',
+			subjectId,
+			questionId: question.questionId,
+			selected: question.answer,
+			practiceMode: 'knowledge',
+			judgedLocally: true,
+			correct: true,
+			chapterId: question.chapterId,
+			knowledge: question.knowledge,
+			occurredAt: currentTime.getTime() + 2500
+		}]
+	}, userId)
+	const knowledgeAggregateSnapshot = await service.execute({
+		action: 'getStateSnapshot',
+		subjectId,
+		includeProgress: false
+	}, userId)
+	assert.equal(
+		knowledgeAggregateSnapshot.knowledgeAttempts[`${question.chapterId}|${question.knowledge}`],
+		1
+	)
 
 	const smartPractice = await service.execute({
 		action: 'getSmartPractice',
@@ -526,23 +587,95 @@ async function run() {
 	assert.equal(environment.collections.question_bank_user_progress.size, 2)
 	const scopedSnapshot = await service.execute({ action: 'getStateSnapshot', subjectId }, userId)
 	assert.equal(scopedSnapshot.progressPositions.chapter[question.chapterId], nextQuestion.questionId)
-	assert.equal(scopedSnapshot.progressPositions.knowledge[question.knowledge], question.questionId)
+	assert.equal(
+		scopedSnapshot.progressPositions.knowledge[`${question.chapterId}|${question.knowledge}`],
+		question.questionId
+	)
 
+	const stateReadsBeforeWrongRecords = environment.reads.question_bank_user_states || 0
+	const statsReadsBeforeWrongRecords = environment.reads.question_bank_user_stats || 0
 	const wrongRecords = await service.execute({
 		action: 'getRecords', subjectId, type: 'wrong', page: 1, pageSize: 20
 	}, userId)
 	assert.equal(wrongRecords.total, 0)
+	assert.equal(environment.reads.question_bank_user_states, stateReadsBeforeWrongRecords + 1)
+	assert.equal(environment.reads.question_bank_user_stats, statsReadsBeforeWrongRecords + 1)
 
+	const stateReadsBeforeFavoriteRecords = environment.reads.question_bank_user_states || 0
+	const statsReadsBeforeFavoriteRecords = environment.reads.question_bank_user_stats || 0
 	const favoriteRecords = await service.execute({
 		action: 'getRecords', subjectId, type: 'favorite', page: 1, pageSize: 20
 	}, userId)
 	assert.equal(favoriteRecords.total, 1)
+	assert.equal(environment.reads.question_bank_user_states, stateReadsBeforeFavoriteRecords + 1)
+	assert.equal(environment.reads.question_bank_user_stats, statsReadsBeforeFavoriteRecords + 1)
 	assert.equal(favoriteRecords.items[0].recordId, `favorite-${question.questionId}`)
 	assert.equal(favoriteRecords.items[0].question.id, question.questionId)
 
-	const isolated = await service.execute({ action: 'getSummary', subjectId }, 'user-two')
+	environment.collections.question_bank_memberships.set('user-other-member', {
+		_id: 'user-other-member',
+		userId: 'user-other-member',
+		status: 'active',
+		expiresAt: new Date('2027-08-28T04:00:00.000Z')
+	})
+	const isolated = await service.execute({ action: 'getSummary', subjectId }, 'user-other-member')
 	assert.equal(isolated.attempted, 0)
 	assert.equal(isolated.favorite, 0)
+	const migrationUserId = 'user-aggregate-migration'
+	environment.collections.question_bank_memberships.set(migrationUserId, {
+		_id: migrationUserId,
+		userId: migrationUserId,
+		status: 'active',
+		expiresAt: new Date('2027-08-28T04:00:00.000Z')
+	})
+	;['5', '6'].forEach((chapterId, index) => {
+		const questionId = `migration-question-${index + 1}`
+		environment.collections.question_bank_user_states.set(`${migrationUserId}|${subjectId}|${questionId}`, {
+			_id: `${migrationUserId}|${subjectId}|${questionId}`,
+			userId: migrationUserId,
+			subjectId,
+			questionId,
+			chapterId,
+			knowledge: '相关管理要求',
+			attempted: true,
+			practiceModes: ['knowledge']
+		})
+	})
+	environment.collections.question_bank_user_stats.set(`${migrationUserId}|${subjectId}`, {
+		_id: `${migrationUserId}|${subjectId}`,
+		userId: migrationUserId,
+		subjectId,
+		attempted: 2,
+		correct: 2,
+		wrong: 0,
+		favorite: 0,
+		totalAttempts: 2,
+		todayKey: '2026-08-28',
+		todayAttempts: 2,
+		chapterAttempts: [],
+		knowledgeAttempts: [{ key: '相关管理要求', count: 2 }],
+		stateAggregateVersion: 2,
+		createdAt: currentTime,
+		updatedAt: currentTime
+	})
+	const migratedSnapshot = await service.execute({
+		action: 'getStateSnapshot',
+		subjectId,
+		includeProgress: false
+	}, migrationUserId)
+	assert.equal(migratedSnapshot.knowledgeAttempts['5|相关管理要求'], 1)
+	assert.equal(migratedSnapshot.knowledgeAttempts['6|相关管理要求'], 1)
+	assert.equal(migratedSnapshot.knowledgeAttempts['相关管理要求'], 2)
+	assert.equal(
+		environment.collections.question_bank_user_stats.get(`${migrationUserId}|${subjectId}`).stateAggregateVersion,
+		3
+	)
+	for (const collectionName of ['question_bank_user_states', 'question_bank_user_stats']) {
+		for (const [id, document] of environment.collections[collectionName]) {
+			if (document.userId === migrationUserId) environment.collections[collectionName].delete(id)
+		}
+	}
+	environment.collections.question_bank_memberships.delete(migrationUserId)
 	const otherSubjectId = 'junior-law'
 	environment.collections.question_bank_user_states.set('other-subject-state', {
 		_id: 'other-subject-state', userId, subjectId: otherSubjectId, questionId: 'law-1'

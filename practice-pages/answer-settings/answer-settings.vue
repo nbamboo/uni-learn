@@ -82,6 +82,17 @@
 			<uni-icons type="cloud-upload" size="17" color="#b36a1d"></uni-icons>
 			<text>{{ syncError }}，点击重试</text>
 		</view>
+
+		<!-- #ifdef MP-WEIXIN -->
+		<view class="settings-ad-container" v-if="showAds">
+			<ad-custom
+				unit-id="adunit-a5cd0c36c24ffd76"
+				@load="adLoad"
+				@error="adError"
+				@close="adClose"
+			></ad-custom>
+		</view>
+		<!-- #endif -->
 	</view>
 </template>
 
@@ -122,6 +133,7 @@
 			const practiceState = getPracticeState()
 			return {
 				membership: getCachedMembership(),
+				membershipLoaded: false,
 				answerMode: localPreferences.answerMode,
 				nightMode: Boolean(localPreferences.nightMode),
 				saving: false,
@@ -161,19 +173,24 @@
 		computed: {
 			currentSubjectName() {
 				return getSubjectById(this.currentSubjectId).name
+			},
+			showAds() {
+				return this.membershipLoaded && !this.membership.isMember
 			}
 		},
 		async onLoad() {
 			this.applyPreferences(getLocalPracticePreferences())
 			await this.refreshMembership()
-			await this.loadPreferences()
+			await this.loadPreferences({ forceRefresh: true })
 		},
 		methods: {
-			async refreshMembership() {
+			async refreshMembership(options) {
 				try {
-					this.membership = await getMembership()
+					this.membership = await getMembership(options)
 				} catch (error) {
 					this.membership = getCachedMembership()
+				} finally {
+					this.membershipLoaded = true
 				}
 				if (!this.membership.isMember && (this.answerMode === 'exam' || this.answerMode === 'review')) {
 					this.answerMode = 'practice'
@@ -183,19 +200,23 @@
 				if (this.clearingSubjectData) return
 				const confirmed = await showConfirm(
 					'清除当前科目数据',
-					`将永久删除“${this.currentSubjectName}”的答题记录、错题、收藏、统计和练习进度。微信账号、答题偏好及其他科目不受影响。`,
+					this.membership.isMember
+						? `将永久删除“${this.currentSubjectName}”的本地及云端答题记录、错题、收藏、统计和练习进度。微信账号、答题偏好及其他科目不受影响。`
+						: `将永久删除“${this.currentSubjectName}”保存在本机的答题记录、错题、收藏、统计和练习进度。微信账号、答题偏好及其他科目不受影响。`,
 					'确认清除'
 				)
 				if (!confirmed) return
 				this.clearingSubjectData = true
 				uni.showLoading({ title: '正在清除', mask: true })
 				try {
-					await clearCurrentSubjectPracticeData(this.currentSubjectId)
+					const cleared = await clearCurrentSubjectPracticeData(this.currentSubjectId)
 					clearSubjectPracticeState(this.currentSubjectId)
 					uni.hideLoading()
 					uni.showModal({
 						title: '清除完成',
-						content: `“${this.currentSubjectName}”的本地和云端做题数据已清除。`,
+						content: cleared.localOnly
+							? `“${this.currentSubjectName}”的本地做题数据已清除。`
+							: `“${this.currentSubjectName}”的本地和云端做题数据已清除。`,
 						showCancel: false
 					})
 				} catch (error) {
@@ -219,12 +240,12 @@
 					backgroundColor: this.nightMode ? '#171c22' : '#ffffff'
 				})
 			},
-			async loadPreferences() {
+			async loadPreferences(options) {
 				if (this.saving) return
 				this.saving = true
 				this.syncError = ''
 				try {
-					const preferences = await getPracticePreferences()
+					const preferences = await getPracticePreferences(options)
 					const answerMode = !this.membership.isMember
 						&& (preferences.answerMode === 'exam' || preferences.answerMode === 'review')
 						? 'practice'
@@ -238,7 +259,9 @@
 			async selectAnswerMode(answerMode) {
 				if (this.saving || answerMode === this.answerMode) return
 				if (answerMode === 'exam' || answerMode === 'review') {
-					await this.refreshMembership()
+					await this.refreshMembership({
+						forceRefresh: this.membership.isMember
+					})
 					if (!this.membership.isMember) {
 						showMembershipRequired(answerMode === 'exam' ? '考试模式' : '背题模式')
 						return
@@ -261,7 +284,10 @@
 				try {
 					const saved = await updatePracticePreferences(next)
 					this.applyPreferences(saved)
-					uni.showToast({ title: '设置已同步', icon: 'success' })
+					uni.showToast({
+						title: saved._localOnly ? '设置已保存本机' : '设置已同步',
+						icon: 'success'
+					})
 				} catch (error) {
 					this.applyPreferences(getLocalPracticePreferences())
 					this.syncError = '设置已保存本机，云端同步失败'
@@ -272,6 +298,15 @@
 			},
 			retrySync() {
 				this.loadPreferences()
+			},
+			adLoad() {
+				console.log('原生模板广告加载成功')
+			},
+			adError(error) {
+				console.error('原生模板广告加载失败', error)
+			},
+			adClose() {
+				console.log('原生模板广告关闭')
 			}
 		}
 	}
@@ -322,6 +357,7 @@
 	.clear-title { color: #262a30; font-size: 28rpx; font-weight: 600; }
 	.clear-desc { margin-top: 8rpx; color: #858c95; font-size: 21rpx; line-height: 1.45; }
 	.sync-note { display: flex; align-items: center; justify-content: center; gap: 8rpx; margin-top: 24rpx; color: #a86218; font-size: 22rpx; }
+	.settings-ad-container { margin-top: 28rpx; overflow: hidden; border-radius: 14rpx; }
 
 	.settings-page.night-mode { background: #12171d; color: #e6e9ed; }
 	.night-mode .section-desc,

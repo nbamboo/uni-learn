@@ -265,7 +265,8 @@ function buildModeCondition(db, catalog, mode, event) {
 			required: true,
 			maxLength: 128
 		})
-		return Object.assign({}, base, { knowledge })
+		const chapterId = readString(event.chapterId, 'chapterId', { maxLength: 32 })
+		return Object.assign({}, base, chapterId ? { chapterId, knowledge } : { knowledge })
 	}
 	if (mode === 'search') {
 		const keyword = readString(event.keyword, 'keyword', {

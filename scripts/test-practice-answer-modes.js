@@ -50,10 +50,22 @@ async function run() {
 	let snapshotCalls = 0
 	let chapterPositionCalls = 0
 	let knowledgePositionCalls = 0
+	let catalogCalls = 0
 	let catalogSummaryCalls = 0
 	let favoriteToggleCalls = 0
+	let interstitialCreateCalls = 0
+	let interstitialShowCalls = 0
+	let interstitialDestroyCalls = 0
+	const membershipRequestOptions = []
 	const membershipPrompts = []
 	let preferenceResponse = { answerMode: 'practice', nightMode: false }
+	let practiceAnswers = {}
+	const practiceProgressEvent = 'uni-learn-practice-progress-updated'
+	const eventListeners = new Map()
+	const emitEvent = (name, payload) => {
+		const listeners = eventListeners.get(name) || []
+		listeners.slice().forEach(listener => listener(payload))
+	}
 	const activeMembership = {
 		isMember: true,
 		status: 'active',
@@ -64,9 +76,30 @@ async function run() {
 	let membershipResponse = activeMembership
 	const environment = {
 		FinanceCalculator: {},
+		wx: {
+			createInterstitialAd(options) {
+				interstitialCreateCalls += 1
+				assert.equal(options.adUnitId, 'adunit-4ea7a830fe0d7db2')
+				return {
+					onLoad() {},
+					onError() {},
+					onClose() {},
+					show: async () => {
+						interstitialShowCalls += 1
+					},
+					destroy() {
+						interstitialDestroyCalls += 1
+					}
+				}
+			}
+		},
+		PRACTICE_PROGRESS_UPDATED_EVENT: practiceProgressEvent,
 		buildPracticeQuestions: async () => [],
 		getAllPracticeQuestions: async () => ({ items: [] }),
-		getPracticeState: () => ({ answers: {} }),
+		getPracticeState: () => ({
+			currentSubjectId: 'junior-personal-finance',
+			answers: practiceAnswers
+		}),
 		getChapterProgress: (subjectId, chapterId, total) => ({ attempted: 2, total, percent: 20 }),
 		getSubjectById: subjectId => ({ id: subjectId, name: '测试科目' }),
 		getSubjectStats: () => ({ attempted: 0, correct: 0, wrong: 0, favorite: 0, accuracy: 0 }),
@@ -84,6 +117,31 @@ async function run() {
 		isFavorite: () => false,
 		recordAnswer(question, selected, options) {
 			recordCalls.push({ question, selected: selected.slice(), options })
+			const practiceMode = options && options.practiceMode
+			const previous = practiceAnswers[question.id]
+			const practiceModes = previous && Array.isArray(previous.practiceModes)
+				? previous.practiceModes.slice()
+				: []
+			if (practiceMode && practiceModes.indexOf(practiceMode) === -1) {
+				practiceModes.push(practiceMode)
+			}
+			practiceAnswers[question.id] = {
+				subjectId: question.subjectId,
+				chapterId: question.chapterId,
+				knowledge: question.knowledge,
+				practiceModes,
+				selected: selected.slice(),
+				attempts: previous ? previous.attempts + 1 : 1
+			}
+			if (practiceMode === 'chapter' || practiceMode === 'knowledge') {
+				emitEvent(practiceProgressEvent, {
+					subjectId: question.subjectId,
+					mode: practiceMode,
+					chapterId: question.chapterId,
+					knowledge: question.knowledge,
+					questionId: question.id
+				})
+			}
 			return selected.slice().sort().join(',') === question.answer.slice().sort().join(',')
 		},
 		toggleFavorite: () => {
@@ -94,10 +152,14 @@ async function run() {
 			flushCalls += 1
 			return { synced: true }
 		},
-		getLocalPracticePreferences: () => preferenceResponse,
-		getPracticePreferences: async () => preferenceResponse,
+			getLocalPracticePreferences: () => preferenceResponse,
+			getPracticePreferences: async () => preferenceResponse,
+			getCachedPracticeSummary: () => null,
 		getCachedMembership: () => membershipResponse,
-		getMembership: async () => membershipResponse,
+		getMembership: async options => {
+			membershipRequestOptions.push(options || {})
+			return membershipResponse
+		},
 		showMembershipRequired: async feature => {
 			membershipPrompts.push(feature)
 			return true
@@ -110,6 +172,9 @@ async function run() {
 			chapterPositionCalls += 1
 			return { questionId: 'saved-chapter-question' }
 		},
+		getKnowledgeScopeKey: (chapterId, knowledge) => chapterId && knowledge
+			? `${chapterId}|${knowledge}`
+			: '',
 		getKnowledgePracticePosition: () => {
 			knowledgePositionCalls += 1
 			return { questionId: 'saved-knowledge-question' }
@@ -118,20 +183,23 @@ async function run() {
 			snapshotCalls += 1
 			return {
 				chapterAttempts: { '1': 4 },
-				knowledgeAttempts: { '测试知识点': 3 },
+				knowledgeAttempts: { '1|测试知识点': 3 },
 				progressPositions: {
 					chapter: { '1': 'cloud-chapter-question' },
-					knowledge: { '测试知识点': 'cloud-knowledge-question' }
+					knowledge: { '1|测试知识点': 'cloud-knowledge-question' }
 				}
 			}
 		},
 		getPracticeSummary: async () => ({ attempted: 0, todayAttempts: 0 }),
-		getCatalog: async () => ({
-			name: '测试科目',
-			questionCount: 10,
-			chapters: [{ id: '1', name: '第一章', count: 10 }],
-			knowledgeGroups: [{ chapterId: '1', chapter: '第一章', name: '测试知识点', count: 5 }]
-		}),
+		getCatalog: async () => {
+			catalogCalls += 1
+			return {
+				name: '测试科目',
+				questionCount: 10,
+				chapters: [{ id: '1', name: '第一章', count: 10 }],
+				knowledgeGroups: [{ chapterId: '1', chapter: '第一章', name: '测试知识点', count: 5 }]
+			}
+		},
 		getCatalogSummaries: async () => {
 			catalogSummaryCalls += 1
 			return [{
@@ -149,6 +217,16 @@ async function run() {
 			return null
 		},
 		uni: {
+			$on: (name, listener) => {
+				const listeners = eventListeners.get(name) || []
+				listeners.push(listener)
+				eventListeners.set(name, listeners)
+			},
+			$off: (name, listener) => {
+				const listeners = eventListeners.get(name) || []
+				eventListeners.set(name, listeners.filter(item => item !== listener))
+			},
+			$emit: emitEvent,
 			getSystemInfoSync: () => ({ windowWidth: 375 }),
 			setNavigationBarColor: options => navigationColors.push(options),
 			setNavigationBarTitle: options => navigationTitles.push(options.title),
@@ -404,6 +482,37 @@ async function run() {
 	assert.equal(answerSheetExam.showExamResult, true)
 
 	const chapterComponent = loadComponent(environment, '../practice-pages/chapter/chapter.vue')
+	const memberChapterList = Object.assign(chapterComponent.data(), chapterComponent.methods, {
+		view: 'chapter',
+		pageActive: true
+	})
+	membershipResponse = activeMembership
+	await memberChapterList.showChapterInterstitialAd()
+	assert.equal(interstitialCreateCalls, 0)
+
+	const freeChapterList = Object.assign(chapterComponent.data(), chapterComponent.methods, {
+		view: 'chapter',
+		pageActive: true
+	})
+	membershipResponse = {
+		isMember: false,
+		status: 'inactive',
+		expiresAt: 0,
+		entitlements: { adFree: false }
+	}
+	await freeChapterList.showChapterInterstitialAd()
+	assert.equal(interstitialCreateCalls, 1)
+	assert.equal(interstitialShowCalls, 1)
+	freeChapterList.destroyChapterInterstitialAd()
+	assert.equal(interstitialDestroyCalls, 1)
+	const freeKnowledgeList = Object.assign(chapterComponent.data(), chapterComponent.methods, {
+		view: 'knowledge',
+		pageActive: true
+	})
+	await freeKnowledgeList.showChapterInterstitialAd()
+	assert.equal(interstitialCreateCalls, 1)
+	assert.equal(interstitialShowCalls, 1)
+	membershipResponse = activeMembership
 	const catalogItem = {
 		id: '1',
 		name: '第一章',
@@ -440,7 +549,7 @@ async function run() {
 	const knowledgeCallsBeforeExam = knowledgePositionCalls
 	knowledgeExam.startItem(knowledgeExam.items[0])
 	assert.equal(knowledgePositionCalls, knowledgeCallsBeforeExam)
-	assert.equal(navigationUrls.slice(-1)[0], '/practice-pages/practice/practice?subjectId=junior-personal-finance&mode=knowledge&knowledge=%E6%B5%8B%E8%AF%95%E7%9F%A5%E8%AF%86%E7%82%B9')
+	assert.equal(navigationUrls.slice(-1)[0], '/practice-pages/practice/practice?subjectId=junior-personal-finance&mode=knowledge&chapterId=1&knowledge=%E6%B5%8B%E8%AF%95%E7%9F%A5%E8%AF%86%E7%82%B9')
 
 	const chapterPractice = Object.assign(chapterComponent.data(), chapterComponent.methods, {
 		subjectId: 'junior-personal-finance',
@@ -455,11 +564,123 @@ async function run() {
 		view: 'knowledge',
 		answerMode: 'review'
 	})
-	knowledgeReview.startItem({
-		name: '测试知识点',
+		knowledgeReview.startItem({
+			chapterId: '1',
+			name: '测试知识点',
 		progress: catalogItem.progress
 	})
 	assert.match(navigationUrls.slice(-1)[0], /startId=saved-knowledge-question/)
+
+	// Returning from a knowledge session must refresh local progress without
+	// reloading the catalog or requesting another cloud snapshot.
+	preferenceResponse = { answerMode: 'practice', nightMode: false }
+	const knowledgePractice = Object.assign(chapterComponent.data(), chapterComponent.methods, {
+		subjectId: 'junior-personal-finance',
+		view: 'knowledge',
+			items: [{
+				chapterId: '1',
+				name: '测试知识点',
+			count: 5,
+			progress: { attempted: 0, total: 5, percent: 0, positionQuestionId: '' }
+		}]
+	})
+	const knowledgeAnswer = {
+		subjectId: knowledgePractice.subjectId,
+		chapterId: '1',
+		knowledge: '测试知识点',
+		practiceModes: ['knowledge'],
+		selected: ['A'],
+		attempts: 2
+	}
+	practiceAnswers = {
+		'knowledge-one': knowledgeAnswer,
+		'chapter-only': { ...knowledgeAnswer, practiceModes: ['chapter'] },
+		'other-subject': { ...knowledgeAnswer, subjectId: 'junior-law' },
+		'other-knowledge': { ...knowledgeAnswer, knowledge: '另一个知识点' }
+	}
+	const snapshotsBeforeReturn = snapshotCalls
+	const catalogsBeforeReturn = catalogCalls
+	chapterComponent.onShow.call(knowledgePractice)
+	assert.equal(knowledgePractice.items[0].progress.attempted, 1)
+	assert.equal(knowledgePractice.items[0].progress.percent, 20)
+	assert.equal(knowledgePractice.items[0].progress.total, 5)
+	chapterComponent.onShow.call(knowledgePractice)
+	assert.equal(knowledgePractice.items[0].progress.attempted, 1)
+	practiceAnswers['knowledge-two'] = { ...knowledgeAnswer }
+	chapterComponent.onShow.call(knowledgePractice)
+	assert.equal(knowledgePractice.items[0].progress.attempted, 2)
+	assert.equal(knowledgePractice.items[0].progress.percent, 40)
+	knowledgePractice.startItem(knowledgePractice.items[0])
+	assert.match(navigationUrls.slice(-1)[0], /startId=saved-knowledge-question/)
+	// A member's larger cloud progress must survive a local-only refresh.
+	knowledgePractice.items[0].progress = {
+		attempted: 4, total: 5, percent: 80, positionQuestionId: 'cloud-knowledge-question'
+	}
+	chapterComponent.onShow.call(knowledgePractice)
+	assert.equal(knowledgePractice.items[0].progress.attempted, 4)
+	assert.equal(knowledgePractice.items[0].progress.percent, 80)
+	assert.equal(knowledgePractice.items[0].progress.positionQuestionId, 'cloud-knowledge-question')
+	assert.equal(snapshotCalls, snapshotsBeforeReturn)
+	assert.equal(catalogCalls, catalogsBeforeReturn)
+	const duplicateNameCatalog = Object.assign(chapterComponent.data(), chapterComponent.methods, {
+		subjectId: 'junior-law',
+		view: 'knowledge',
+		items: [{
+			chapterId: '5',
+			name: '相关管理要求',
+			progress: { attempted: 0, total: 2, percent: 0, positionQuestionId: '' }
+		}, {
+			chapterId: '6',
+			name: '相关管理要求',
+			progress: { attempted: 0, total: 2, percent: 0, positionQuestionId: '' }
+		}]
+	})
+	practiceAnswers = {
+		'law-five': {
+			subjectId: 'junior-law', chapterId: '5', knowledge: '相关管理要求', practiceModes: ['knowledge']
+		},
+		'law-six': {
+			subjectId: 'junior-law', chapterId: '6', knowledge: '相关管理要求', practiceModes: ['knowledge']
+		}
+	}
+	chapterComponent.onShow.call(duplicateNameCatalog)
+	assert.equal(duplicateNameCatalog.items[0].progress.attempted, 1)
+	assert.equal(duplicateNameCatalog.items[1].progress.attempted, 1)
+
+	// The hidden knowledge catalog receives the local answer notification before
+	// navigateBack/onShow ordering can affect what the user sees.
+	practiceAnswers = {}
+	const liveKnowledgeCatalog = Object.assign(chapterComponent.data(), chapterComponent.methods, {
+		items: [{
+			chapterId: '1',
+			name: '测试知识点',
+			count: 5,
+			progress: { attempted: 0, total: 5, percent: 0, positionQuestionId: '' }
+		}],
+		loadItems: () => {}
+	})
+	chapterComponent.onLoad.call(liveKnowledgeCatalog, {
+		subjectId: 'junior-personal-finance',
+		view: 'knowledge'
+	})
+	const liveKnowledgeSession = createContext('practice', [createQuestion('knowledge-live', 'single', ['A'])])
+	liveKnowledgeSession.mode = 'knowledge'
+	liveKnowledgeSession.practiceConfig = {
+		chapterId: '1',
+		knowledge: '测试知识点'
+	}
+	liveKnowledgeSession.loadQuestion(0)
+	liveKnowledgeSession.chooseOption('A')
+	assert.equal(liveKnowledgeCatalog.items[0].progress.attempted, 1)
+	assert.equal(liveKnowledgeCatalog.items[0].progress.percent, 20)
+	assert.equal((eventListeners.get(practiceProgressEvent) || []).length, 1)
+	chapterComponent.onUnload.call(liveKnowledgeCatalog)
+	assert.equal((eventListeners.get(practiceProgressEvent) || []).length, 0)
+
+	preferenceResponse = { answerMode: 'exam', nightMode: false }
+	chapterComponent.onShow.call(knowledgeExam)
+	assert.equal(knowledgeExam.items[0].progress.attempted, 0)
+	practiceAnswers = {}
 
 	preferenceResponse = { answerMode: 'review', nightMode: true }
 	await review.loadAnswerPreferences()
@@ -503,6 +724,17 @@ async function run() {
 		'../practice-pages/answer-settings/answer-settings.vue'
 	)
 	const settings = Object.assign(settingsComponent.data(), settingsComponent.methods)
+	assert.equal(settingsComponent.computed.showAds.call(settings), false)
+	settings.membershipLoaded = true
+	settings.membership = activeMembership
+	assert.equal(settingsComponent.computed.showAds.call(settings), false)
+	settings.membership = {
+		isMember: false,
+		status: 'inactive',
+		entitlements: { adFree: false }
+	}
+	assert.equal(settingsComponent.computed.showAds.call(settings), true)
+	settings.membership = activeMembership
 	settings.applyPreferences({ answerMode: 'practice', nightMode: false })
 	await settings.persistPreferences({ answerMode: 'exam' })
 	assert.equal(settings.answerMode, 'exam')
@@ -517,9 +749,21 @@ async function run() {
 
 	const homeComponent = loadComponent(environment, '../pages/exam/exam.vue')
 	const home = Object.assign(homeComponent.data(), homeComponent.methods, {
-		currentSubjectId: 'junior-personal-finance'
+		currentSubjectId: 'junior-personal-finance',
+		$refs: {
+			subjectPopup: {
+				open() {},
+				close() {}
+			}
+		}
 	})
-	await home.loadCatalogSummaries()
+	const catalogCallsBeforeHomeShow = catalogCalls
+	const summaryCallsBeforeHomeShow = catalogSummaryCalls
+	await homeComponent.onShow.call(home)
+	assert.equal(catalogCalls, catalogCallsBeforeHomeShow + 1)
+	assert.equal(catalogSummaryCalls, summaryCallsBeforeHomeShow)
+	assert.equal(home.stats.total, 10)
+	await home.openSubjectPicker()
 	assert.equal(catalogSummaryCalls, 1)
 	assert.equal(home.subjectCatalogStatusText('junior-law'), '1250题')
 	assert.equal(home.subjectCatalogStatusText('junior-personal-finance'), '822题')
@@ -562,10 +806,12 @@ async function run() {
 	assert.equal(lockedPractice.sessionAnswers[single.id].correct, false)
 	const togglesBeforeLockedFavorite = favoriteToggleCalls
 	await lockedPractice.favoriteCurrent()
+	assert.equal(membershipRequestOptions.slice(-1)[0].forceRefresh, false)
 	assert.equal(favoriteToggleCalls, togglesBeforeLockedFavorite)
 	assert.equal(membershipPrompts.slice(-1)[0], '收藏夹')
 	lockedPractice.mode = 'wrong'
 	await lockedPractice.initializePractice()
+	assert.equal(membershipRequestOptions.slice(-1)[0].forceRefresh, false)
 	assert.equal(lockedPractice.loadError, '错题集为会员权益')
 	assert.equal(membershipPrompts.slice(-1)[0], '错题集')
 
@@ -573,8 +819,15 @@ async function run() {
 	lockedSettings.answerMode = 'practice'
 	lockedSettings.saving = false
 	await lockedSettings.selectAnswerMode('exam')
+	assert.equal(membershipRequestOptions.slice(-1)[0].forceRefresh, false)
 	assert.equal(lockedSettings.answerMode, 'practice')
 	assert.equal(membershipPrompts.slice(-1)[0], '考试模式')
+
+	const staleMemberPractice = createContext('practice', [single])
+	staleMemberPractice.membership = activeMembership
+	await staleMemberPractice.favoriteCurrent()
+	assert.equal(membershipRequestOptions.slice(-1)[0].forceRefresh, true)
+	assert.equal(staleMemberPractice.membership.isMember, false)
 
 	const pagesConfig = JSON.parse(fs.readFileSync(path.resolve(__dirname, '../pages.json'), 'utf8'))
 	assert.equal(pagesConfig.pages.some(page => page.path === 'pages/privacy/privacy'), false)
@@ -582,10 +835,34 @@ async function run() {
 	const membershipEntry = aboutPageSource.match(/<uni-list-item[\s\S]*?title="会员中心"[\s\S]*?\/>/)
 	assert.ok(membershipEntry, '个人中心应包含会员中心入口')
 	assert.match(membershipEntry[0], /\bto="\/pages\/membership\/membership"/)
+	assert.doesNotMatch(aboutPageSource, /getPracticeUserProfile|getUserProfile|loadAccount/)
+	assert.match(aboutPageSource, /做题数据仅保存在本机/)
+	assert.match(aboutPageSource, /做题数据已开启云同步/)
 	const membershipPageSource = fs.readFileSync(path.resolve(__dirname, '../pages/membership/membership.vue'), 'utf8')
 	assert.doesNotMatch(membershipPageSource, /支付后权益未到账|class="notice-card"/)
 	assert.match(membershipPageSource, /云端学习数据同步/)
 	assert.match(membershipPageSource, /同一微信账号跨设备登录，答题记录与学习进度自动同步/)
+	const settingsPageSource = fs.readFileSync(path.resolve(__dirname, '../practice-pages/answer-settings/answer-settings.vue'), 'utf8')
+	assert.match(settingsPageSource, /unit-id="adunit-a5cd0c36c24ffd76"/)
+	assert.match(settingsPageSource, /v-if="showAds"/)
+	const searchComponent = loadComponent(
+		environment,
+		'../practice-pages/question-search/question-search.vue'
+	)
+	const searchPage = Object.assign(searchComponent.data(), searchComponent.methods)
+	assert.equal(searchComponent.computed.showAds.call(searchPage), false)
+	searchPage.membershipLoaded = true
+	searchPage.membership = activeMembership
+	assert.equal(searchComponent.computed.showAds.call(searchPage), false)
+	searchPage.membership = {
+		isMember: false,
+		status: 'inactive',
+		entitlements: { adFree: false }
+	}
+	assert.equal(searchComponent.computed.showAds.call(searchPage), true)
+	const searchPageSource = fs.readFileSync(path.resolve(__dirname, '../practice-pages/question-search/question-search.vue'), 'utf8')
+	assert.match(searchPageSource, /unit-id="adunit-482241fd0b438f17"/)
+	assert.match(searchPageSource, /v-if="showAds"/)
 
 	console.log('practice answer mode tests passed')
 }

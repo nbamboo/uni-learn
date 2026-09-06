@@ -1,4 +1,4 @@
-import { DAILY_GOAL, DEFAULT_SUBJECT_ID } from './practice.js'
+import { DAILY_GOAL, DEFAULT_SUBJECT_ID, getPracticeState } from './practice.js'
 import {
 	getAllPracticeQuestions,
 	getCatalog,
@@ -7,8 +7,11 @@ import {
 } from '@/services/question-bank.js'
 import {
 	getPracticeRecords,
-	getSmartPracticeQuestions
+	getSmartPracticeQuestions,
+	practiceCloudSyncEnabled
 } from '@/services/user-practice.js'
+
+const MAX_SMART_STATE_IDS = 2000
 
 export async function getQuestionsBySubject(subjectId) {
 	const result = await getAllPracticeQuestions({
@@ -56,10 +59,34 @@ export async function buildPracticeQuestions(options) {
 	if (mode === 'wrong' || mode === 'favorite') {
 		list = await loadRecordedQuestions(subjectId, mode)
 	} else if (mode === 'smart') {
-		const result = await getSmartPracticeQuestions({
-			subjectId,
-			pageSize: Number(config.limit) || DAILY_GOAL
-		})
+		const pageSize = Number(config.limit) || DAILY_GOAL
+		let result
+		if (practiceCloudSyncEnabled()) {
+			result = await getSmartPracticeQuestions({ subjectId, pageSize })
+		} else {
+			const state = getPracticeState()
+			const localStates = Object.keys(state.answers).map(questionId => {
+				const answer = state.answers[questionId]
+				return { questionId, answer }
+			}).filter(item => item.answer && item.answer.subjectId === subjectId)
+				.sort((left, right) => {
+					return (Number(right.answer.timestamp) || 0) - (Number(left.answer.timestamp) || 0)
+				})
+			const answeredQuestionIds = localStates.slice(0, MAX_SMART_STATE_IDS)
+				.map(item => item.questionId)
+			const wrongQuestionIds = localStates.filter(item => item.answer.correct === false)
+				.slice(0, MAX_SMART_STATE_IDS)
+				.map(item => item.questionId)
+			result = await getPracticePage({
+				subjectId,
+				mode: 'smart',
+				pageSize,
+				answeredQuestionIds,
+				wrongQuestionIds
+			}, {
+				versionFromResponse: true
+			})
+		}
 		list = result.items
 	} else if (mode === 'search') {
 		const result = await getPracticePage({
@@ -81,7 +108,10 @@ export async function buildPracticeQuestions(options) {
 			pageSize: 50
 		}
 		if (mode === 'chapter') query.chapterId = config.chapterId
-		if (mode === 'knowledge') query.knowledge = config.knowledge
+		if (mode === 'knowledge') {
+			query.chapterId = config.chapterId
+			query.knowledge = config.knowledge
+		}
 		const result = await getAllPracticeQuestions(query)
 		list = result.items
 	}

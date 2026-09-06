@@ -4,27 +4,30 @@ const PROGRESS_STORAGE_KEY = 'uni-learn-practice-cloud-progress-v1'
 const CHAPTER_POSITION_STORAGE_KEY = 'uni-learn-practice-chapter-position-v1'
 const KNOWLEDGE_POSITION_STORAGE_KEY = 'uni-learn-practice-knowledge-position-v1'
 const PREFERENCES_STORAGE_KEY = 'uni-learn-practice-preferences-v1'
+const PRACTICE_STATE_STORAGE_KEY = 'uni-learn-practice-state-v1'
+const SUMMARY_STORAGE_KEY = 'uni-learn-practice-summary-v1'
+const MEMBERSHIP_STORAGE_KEY = 'uni-learn-membership-v1'
 const MIGRATION_KEY_PREFIX = 'uni-learn-practice-cloud-migration-v1:'
 const UNI_ID_STORAGE_KEYS = ['uni_id_token', 'uni_id_token_expired', 'uniIdToken', 'uniIdTokenExpired']
-const MAX_OUTBOX_EVENTS = 2000
 const SYNC_BATCH_SIZE = 50
 const SNAPSHOT_CACHE_TTL = 2 * 60 * 1000
-const SUMMARY_CACHE_TTL = 30 * 1000
+const SUMMARY_CACHE_TTL = 10 * 60 * 1000
 const PROFILE_CACHE_TTL = 5 * 60 * 1000
-const RECORDS_CACHE_TTL = 2 * 60 * 1000
+const RECORDS_CACHE_TTL = 10 * 60 * 1000
 const SMART_CACHE_TTL = 5 * 60 * 1000
 const PREFERENCES_CACHE_TTL = 6 * 60 * 60 * 1000
+const MEMBER_EXPIRY_GRACE_MS = 6 * 60 * 60 * 1000
 const MAX_SNAPSHOT_QUESTION_IDS = 100
 const SYNC_BATCH_TRIGGER = 10
 const SYNC_DELAY = 15 * 1000
 const RETRY_DELAY = 180
-const MAX_PRACTICE_POSITIONS = 200
-const MAX_PENDING_PROGRESS = 500
 const ANSWER_MODES = ['exam', 'practice', 'review']
 const PRACTICE_ENTRY_MODES = ['smart', 'chapter', 'knowledge', 'wrong', 'favorite', 'search', 'sequence']
+const MAX_PERSISTED_SUMMARIES = 20
 
 const snapshotCache = new Map()
 const summaryCache = new Map()
+const summaryRefreshRequiredKeys = new Set()
 const userProfileCache = new Map()
 const recordsCache = new Map()
 const smartCache = new Map()
@@ -35,6 +38,8 @@ let scheduledFlush = null
 let scheduledSyncOptions = null
 let progressFlushRequested = false
 let eventSequence = 0
+let observedPreferencesUserId = getCurrentPracticeUser().uid || ''
+let preferencesRefreshRequired = false
 
 export class UserPracticeServiceError extends Error {
 	constructor(errCode, errMsg, options) {
@@ -87,11 +92,70 @@ function userScopedStorageKey(baseKey) {
 	return `${baseKey}:${user.uid || 'guest'}`
 }
 
+function summaryCacheKey(subjectId) {
+	const user = getCurrentPracticeUser()
+	return `${user.uid || 'guest'}|${subjectId}`
+}
+
+export function getKnowledgeScopeKey(chapterId, knowledge) {
+	if (chapterId === undefined || chapterId === null || !String(chapterId) || !knowledge) return ''
+	return `${String(chapterId)}|${String(knowledge)}`
+}
+
+function readPersistedSummaries() {
+	const saved = getStorage(userScopedStorageKey(SUMMARY_STORAGE_KEY))
+	return saved && saved.version === 1 && isObject(saved.summaries)
+		? saved.summaries
+		: {}
+}
+
+function getPersistedSummaryEntry(subjectId) {
+	const entry = readPersistedSummaries()[subjectId]
+	if (!entry || !isObject(entry.data)) return null
+	const syncedAt = Number(entry.syncedAt) || 0
+	const data = cloneValue(entry.data)
+	const todayKey = localDayKey()
+	const summaryDayKey = data.todayKey || (syncedAt ? localDayKey(syncedAt) : '')
+	if (summaryDayKey && summaryDayKey !== todayKey) {
+		data.todayAttempts = 0
+		data.todayKey = todayKey
+	}
+	return {
+		data,
+		syncedAt
+	}
+}
+
+function savePersistedSummary(subjectId, summary, syncedAt) {
+	if (!subjectId || !isObject(summary)) return
+	const summaries = Object.assign({}, readPersistedSummaries(), {
+		[subjectId]: {
+			data: cloneValue(summary),
+			syncedAt: Number(syncedAt) || Date.now()
+		}
+	})
+	Object.keys(summaries)
+		.sort((left, right) => Number(summaries[right].syncedAt) - Number(summaries[left].syncedAt))
+		.slice(MAX_PERSISTED_SUMMARIES)
+		.forEach(key => delete summaries[key])
+	setStorage(userScopedStorageKey(SUMMARY_STORAGE_KEY), { version: 1, summaries })
+}
+
+function removePersistedSummary(subjectId) {
+	const storageKey = userScopedStorageKey(SUMMARY_STORAGE_KEY)
+	const summaries = Object.assign({}, readPersistedSummaries())
+	if (!summaries[subjectId]) return
+	delete summaries[subjectId]
+	if (Object.keys(summaries).length) setStorage(storageKey, { version: 1, summaries })
+	else removeStorage(storageKey)
+}
+
 function clearPracticeLogin() {
 	UNI_ID_STORAGE_KEYS.forEach(removeStorage)
 	loginRequest = null
 	preferencesRequest = null
 	userProfileCache.clear()
+	summaryRefreshRequiredKeys.clear()
 	invalidateUserPracticeCache()
 }
 
@@ -115,6 +179,49 @@ function cloneValue(value) {
 		result[key] = cloneValue(value[key])
 	})
 	return result
+}
+
+function normalizeLocalPracticeState(value) {
+	const source = isObject(value) ? value : {}
+	return {
+		answers: isObject(source.answers) ? source.answers : {},
+		favorites: Array.isArray(source.favorites) ? source.favorites : [],
+		favoriteSubjects: isObject(source.favoriteSubjects) ? source.favoriteSubjects : {},
+		favoriteUpdatedAt: isObject(source.favoriteUpdatedAt) ? source.favoriteUpdatedAt : {},
+		dailyAttempts: isObject(source.dailyAttempts) ? source.dailyAttempts : {}
+	}
+}
+
+function readLocalPracticeState(value) {
+	if (isObject(value)) return normalizeLocalPracticeState(value)
+	return normalizeLocalPracticeState(getStorage(userScopedStorageKey(PRACTICE_STATE_STORAGE_KEY)))
+}
+
+export function practiceCloudSyncEnabled() {
+	const membership = getStorage(userScopedStorageKey(MEMBERSHIP_STORAGE_KEY))
+	const expiresAt = Number(membership && membership.expiresAt) || 0
+	return Boolean(
+		membership
+		&& membership.isMember
+		&& membership.status !== 'revoked'
+		&& expiresAt + MEMBER_EXPIRY_GRACE_MS > Date.now()
+	)
+}
+
+function deactivateCachedMembership() {
+	const storageKey = userScopedStorageKey(MEMBERSHIP_STORAGE_KEY)
+	const membership = getStorage(storageKey)
+	setStorage(storageKey, Object.assign({}, isObject(membership) ? membership : {}, {
+		isMember: false,
+		status: 'inactive',
+		expiresAt: 0,
+		entitlements: {
+			adFree: false,
+			practiceRecords: false,
+			advancedAnswerModes: false
+		},
+		cachedAt: Date.now()
+	}))
 }
 
 function normalizePracticePreferences(value) {
@@ -197,14 +304,16 @@ function readOutbox() {
 function saveOutbox(events) {
 	return setStorage(userScopedStorageKey(OUTBOX_STORAGE_KEY), {
 		version: 1,
-		events: events.slice(-MAX_OUTBOX_EVENTS)
+		events: events.slice()
 	})
 }
 
 function progressScopeKey(progress) {
 	if (!progress || !progress.subjectId) return ''
 	const mode = progress.mode === 'knowledge' ? 'knowledge' : 'chapter'
-	const scope = mode === 'knowledge' ? progress.knowledge : progress.chapterId
+	const scope = mode === 'knowledge'
+		? getKnowledgeScopeKey(progress.chapterId, progress.knowledge)
+		: progress.chapterId
 	return scope === undefined || scope === null || scope === ''
 		? ''
 		: `${progress.subjectId}|${mode}|${scope}`
@@ -238,7 +347,6 @@ function writePendingProgresses(progresses) {
 	const limited = progresses
 		.slice()
 		.sort((left, right) => Number(right.occurredAt) - Number(left.occurredAt))
-		.slice(0, MAX_PENDING_PROGRESS)
 	if (!limited.length) {
 		const storageKey = userScopedStorageKey(PROGRESS_STORAGE_KEY)
 		if (removeStorage(storageKey)) return true
@@ -287,10 +395,6 @@ function savePracticePosition(storageKey, positionKey, progress) {
 		questionId: progress.questionId,
 		updatedAt: progress.occurredAt
 	}
-	const positionKeys = Object.keys(positions).sort((left, right) => {
-		return Number(positions[right].updatedAt) - Number(positions[left].updatedAt)
-	})
-	positionKeys.slice(MAX_PRACTICE_POSITIONS).forEach(key => delete positions[key])
 	setStorage(userScopedStorageKey(storageKey), { version: 1, positions })
 }
 
@@ -310,10 +414,12 @@ function enqueueEvent(event) {
 	}
 	events.push(cloneValue(event))
 	saveOutbox(events)
-	schedulePracticeSync({
-		includeProgress: false,
-		immediate: events.length >= SYNC_BATCH_TRIGGER
-	})
+	if (practiceCloudSyncEnabled()) {
+		schedulePracticeSync({
+			includeProgress: false,
+			immediate: events.length >= SYNC_BATCH_TRIGGER
+		})
+	}
 	return event.eventId
 }
 
@@ -389,7 +495,7 @@ export function savePracticeProgress(question, options) {
 	if (mode === 'knowledge') {
 		savePracticePosition(
 			KNOWLEDGE_POSITION_STORAGE_KEY,
-			`${progress.subjectId}|${progress.knowledge}`,
+			`${progress.subjectId}|${getKnowledgeScopeKey(progress.chapterId, progress.knowledge)}`,
 			progress
 		)
 	} else {
@@ -410,10 +516,20 @@ export function getChapterPracticePosition(subjectId, chapterId) {
 	return position && position.questionId ? cloneValue(position) : null
 }
 
-export function getKnowledgePracticePosition(subjectId, knowledge) {
+export function getKnowledgePracticePosition(subjectId, chapterId, knowledge) {
+	if (knowledge === undefined) {
+		knowledge = chapterId
+		chapterId = ''
+	}
 	if (!subjectId || !knowledge) return null
 	const positions = readPracticePositions(KNOWLEDGE_POSITION_STORAGE_KEY)
-	const position = positions[`${subjectId}|${knowledge}`]
+	const scopedKey = getKnowledgeScopeKey(chapterId, knowledge)
+	const scopedPosition = scopedKey && positions[`${subjectId}|${scopedKey}`]
+	const legacyPosition = positions[`${subjectId}|${knowledge}`]
+	const position = scopedPosition || (legacyPosition
+		&& (!chapterId || !legacyPosition.chapterId || String(legacyPosition.chapterId) === String(chapterId))
+		? legacyPosition
+		: null)
 	return position && position.questionId ? cloneValue(position) : null
 }
 
@@ -428,6 +544,33 @@ export function getCurrentPracticeUser() {
 		role: Array.isArray(user.role) ? user.role : [],
 		permission: Array.isArray(user.permission) ? user.permission : []
 	}
+}
+
+function observePracticePreferencesUser() {
+	const userId = getCurrentPracticeUser().uid || ''
+	if (userId !== observedPreferencesUserId) {
+		observedPreferencesUserId = userId
+		preferencesRequest = null
+		preferencesRefreshRequired = Boolean(userId)
+		markPracticeSummaryRefreshRequired()
+	}
+	return userId
+}
+
+export function markPracticePreferencesRefreshRequired() {
+	preferencesRefreshRequired = true
+}
+
+export function markPracticeRecordsRefreshRequired() {
+	recordsCache.clear()
+}
+
+export function markPracticeSummaryRefreshRequired() {
+	summaryCache.clear()
+	summaryRefreshRequiredKeys.clear()
+	Object.keys(readPersistedSummaries()).forEach(subjectId => {
+		summaryRefreshRequiredKeys.add(summaryCacheKey(subjectId))
+	})
 }
 
 export function practiceUserLoggedIn() {
@@ -535,6 +678,9 @@ async function executeCloudCall(action, payload, options) {
 					await ensurePracticeUser()
 					continue
 				}
+				if (result.errCode === 'QUESTION_BANK_MEMBERSHIP_REQUIRED') {
+					deactivateCachedMembership()
+				}
 				throw new UserPracticeServiceError(
 					result.errCode || 'QUESTION_BANK_USER_CLOUD_ERROR',
 					result.errMsg || '用户题库服务请求失败',
@@ -627,6 +773,13 @@ function markMigrationComplete(userId, remainingEvents) {
 
 export async function flushPracticeEvents(options) {
 	const config = options || {}
+	if (!practiceCloudSyncEnabled()) {
+		if (scheduledFlush) clearTimeout(scheduledFlush)
+		scheduledFlush = null
+		scheduledSyncOptions = null
+		progressFlushRequested = false
+		return { synced: false, localOnly: true, pending: 0 }
+	}
 	if (scheduledFlush) {
 		clearTimeout(scheduledFlush)
 		scheduledFlush = null
@@ -673,7 +826,7 @@ export async function flushPracticeEvents(options) {
 			const summaries = result && result.summaries
 			if (isObject(summaries)) {
 				Object.keys(summaries).forEach(subjectId => {
-					setCached(summaryCache, subjectId, summaries[subjectId], SUMMARY_CACHE_TTL)
+					cacheCloudSummary(subjectId, summaries[subjectId])
 				})
 			}
 		}
@@ -700,6 +853,7 @@ export async function flushPracticeEvents(options) {
 }
 
 export function schedulePracticeSync(options) {
+	if (!practiceCloudSyncEnabled()) return
 	const input = options || {}
 	const nextOptions = {
 		includeProgress: input.includeProgress !== false,
@@ -740,6 +894,124 @@ function setCached(cache, key, data, ttl) {
 	return cloneValue(data)
 }
 
+function cacheCloudSummary(subjectId, summary) {
+	const cacheKey = summaryCacheKey(subjectId)
+	const saved = setCached(summaryCache, cacheKey, summary, SUMMARY_CACHE_TTL)
+	savePersistedSummary(subjectId, saved, Date.now())
+	summaryRefreshRequiredKeys.delete(cacheKey)
+	return saved
+}
+
+function localDayKey(value) {
+	const date = value ? new Date(value) : new Date()
+	const pad = number => number < 10 ? `0${number}` : String(number)
+	return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`
+}
+
+function localAnswersForSubject(subjectId, localState) {
+	const state = readLocalPracticeState(localState)
+	return Object.keys(state.answers).map(questionId => ({
+		questionId,
+		answer: state.answers[questionId]
+	})).filter(item => item.answer && item.answer.subjectId === subjectId)
+}
+
+function getLocalPracticeSummary(subjectId, localState) {
+	const state = readLocalPracticeState(localState)
+	const answers = localAnswersForSubject(subjectId, state)
+	const correct = answers.filter(item => Boolean(item.answer.correct)).length
+	const favorites = state.favorites.filter(questionId => state.favoriteSubjects[questionId] === subjectId)
+	const todayKey = localDayKey()
+	const daily = state.dailyAttempts[subjectId]
+	return {
+		subjectId,
+		attempted: answers.length,
+		correct,
+		wrong: answers.length - correct,
+		favorite: favorites.length,
+		totalAttempts: answers.reduce((total, item) => total + (Number(item.answer.attempts) || 0), 0),
+		todayAttempts: daily && daily.dayKey === todayKey ? (Number(daily.attempts) || 0) : 0,
+		todayKey,
+		accuracy: answers.length ? Math.round(correct / answers.length * 100) : 0,
+		_localOnly: true
+	}
+}
+
+function getLocalPracticeSnapshot(subjectId, options) {
+	const config = options || {}
+	const state = readLocalPracticeState(config.localState)
+	const answers = localAnswersForSubject(subjectId, state)
+	const requestedIds = Array.isArray(config.questionIds)
+		? Array.from(new Set(config.questionIds.filter(Boolean))).slice(0, MAX_SNAPSHOT_QUESTION_IDS)
+		: []
+	const requested = new Set(requestedIds)
+	const rows = requestedIds.length
+		? answers.filter(item => requested.has(item.questionId))
+		: []
+	const answeredRows = rows.slice().sort((left, right) => {
+		return (Number(right.answer.timestamp) || 0) - (Number(left.answer.timestamp) || 0)
+	})
+	const favoriteIds = requestedIds.length
+		? state.favorites.filter(questionId => requested.has(questionId)
+			&& state.favoriteSubjects[questionId] === subjectId)
+			.sort((left, right) => {
+				return (Number(state.favoriteUpdatedAt[right]) || 0)
+					- (Number(state.favoriteUpdatedAt[left]) || 0)
+			})
+		: []
+	const answerSelections = {}
+	answeredRows.forEach(item => {
+		if (Array.isArray(item.answer.selected) && item.answer.selected.length) {
+			answerSelections[item.questionId] = item.answer.selected.slice()
+		}
+	})
+	const chapterAttempts = {}
+	const knowledgeAttempts = {}
+	if (config.includeAggregates !== false) {
+		answers.forEach(item => {
+			const modes = Array.isArray(item.answer.practiceModes) ? item.answer.practiceModes : []
+			if (modes.indexOf('chapter') > -1 && item.answer.chapterId) {
+				chapterAttempts[item.answer.chapterId] = (chapterAttempts[item.answer.chapterId] || 0) + 1
+			}
+			if (modes.indexOf('knowledge') > -1 && item.answer.knowledge) {
+				const scopeKey = getKnowledgeScopeKey(item.answer.chapterId, item.answer.knowledge)
+				const key = scopeKey || item.answer.knowledge
+				knowledgeAttempts[key] = (knowledgeAttempts[key] || 0) + 1
+			}
+		})
+	}
+	const progressPositions = { chapter: {}, knowledge: {} }
+	if (config.includeProgress !== false) {
+		const chapterPositions = readPracticePositions(CHAPTER_POSITION_STORAGE_KEY)
+		Object.keys(chapterPositions).forEach(key => {
+			const position = chapterPositions[key]
+			if (position && position.subjectId === subjectId && position.chapterId && position.questionId) {
+				progressPositions.chapter[position.chapterId] = position.questionId
+			}
+		})
+		const knowledgePositions = readPracticePositions(KNOWLEDGE_POSITION_STORAGE_KEY)
+		Object.keys(knowledgePositions).forEach(key => {
+			const position = knowledgePositions[key]
+			if (position && position.subjectId === subjectId && position.knowledge && position.questionId) {
+				const scopeKey = getKnowledgeScopeKey(position.chapterId, position.knowledge)
+				progressPositions.knowledge[scopeKey || position.knowledge] = position.questionId
+			}
+		})
+	}
+	return {
+		subjectId,
+		answeredQuestionIds: answeredRows.map(item => item.questionId),
+		answerSelections,
+		wrongQuestionIds: answeredRows.filter(item => item.answer.correct === false)
+			.map(item => item.questionId),
+		favoriteQuestionIds: favoriteIds,
+		chapterAttempts,
+		knowledgeAttempts,
+		progressPositions,
+		_localOnly: true
+	}
+}
+
 export function invalidateUserPracticeCache(subjectId) {
 	if (subjectId) {
 		Array.from(snapshotCache.keys()).forEach(key => {
@@ -751,7 +1023,9 @@ export function invalidateUserPracticeCache(subjectId) {
 		Array.from(smartCache.keys()).forEach(key => {
 			if (key.indexOf(`${subjectId}|`) === 0) smartCache.delete(key)
 		})
-		summaryCache.delete(subjectId)
+		Array.from(summaryCache.keys()).forEach(key => {
+			if (key.endsWith(`|${subjectId}`)) summaryCache.delete(key)
+		})
 		return
 	}
 	snapshotCache.clear()
@@ -760,24 +1034,52 @@ export function invalidateUserPracticeCache(subjectId) {
 	smartCache.clear()
 }
 
+export function getCachedPracticeSummary(subjectId) {
+	observePracticePreferencesUser()
+	if (!practiceCloudSyncEnabled() || pendingPracticeEventCount() > 0) return null
+	const cacheKey = summaryCacheKey(subjectId)
+	const memorySummary = getCached(summaryCache, cacheKey)
+	if (memorySummary) return memorySummary
+	const persisted = getPersistedSummaryEntry(subjectId)
+	return persisted ? cloneValue(persisted.data) : null
+}
+
 export async function getPracticeSummary(subjectId, options) {
 	const config = options || {}
-	if (!config.forceRefresh && pendingPracticeEventCount() === 0) {
-		const cached = getCached(summaryCache, subjectId)
+	observePracticePreferencesUser()
+	if (!practiceCloudSyncEnabled()) {
+		return getLocalPracticeSummary(subjectId, config.localState)
+	}
+	const cacheKey = summaryCacheKey(subjectId)
+	const refreshRequired = config.forceRefresh || summaryRefreshRequiredKeys.has(cacheKey)
+	if (!refreshRequired && pendingPracticeEventCount() === 0) {
+		const cached = getCached(summaryCache, cacheKey)
 		if (cached) return cached
+		const persisted = getPersistedSummaryEntry(subjectId)
+		if (persisted && persisted.syncedAt + SUMMARY_CACHE_TTL > Date.now()) {
+			return setCached(
+				summaryCache,
+				cacheKey,
+				persisted.data,
+				persisted.syncedAt + SUMMARY_CACHE_TTL - Date.now()
+			)
+		}
 	}
 	if (config.localState) await flushPracticeEvents({ localState: config.localState })
 	else await ensurePracticeUser()
-	if (!config.forceRefresh) {
-		const cached = getCached(summaryCache, subjectId)
+	if (!config.forceRefresh && !summaryRefreshRequiredKeys.has(cacheKey)) {
+		const cached = getCached(summaryCache, cacheKey)
 		if (cached) return cached
 	}
 	const result = await executeCloudCall('getSummary', { subjectId })
-	return setCached(summaryCache, subjectId, result, SUMMARY_CACHE_TTL)
+	return cacheCloudSummary(subjectId, result)
 }
 
 export async function getPracticeStateSnapshot(subjectId, options) {
 	const config = options || {}
+	if (!practiceCloudSyncEnabled()) {
+		return getLocalPracticeSnapshot(subjectId, config)
+	}
 	const questionIds = Array.isArray(config.questionIds)
 		? Array.from(new Set(config.questionIds.filter(Boolean))).slice(0, MAX_SNAPSHOT_QUESTION_IDS)
 		: []
@@ -805,6 +1107,12 @@ export async function getPracticeStateSnapshot(subjectId, options) {
 
 export async function getPracticeRecords(params) {
 	const input = params || {}
+	if (!practiceCloudSyncEnabled()) {
+		throw new UserPracticeServiceError(
+			'QUESTION_BANK_MEMBERSHIP_REQUIRED',
+			`${input.type === 'favorite' ? '收藏夹' : '错题集'}为会员权益，请先开通会员`
+		)
+	}
 	const subjectId = input.subjectId
 	const type = input.type || 'wrong'
 	const page = input.page || 1
@@ -830,6 +1138,12 @@ export async function getPracticeRecords(params) {
 
 export async function getSmartPracticeQuestions(options) {
 	const input = options || {}
+	if (!practiceCloudSyncEnabled()) {
+		throw new UserPracticeServiceError(
+			'QUESTION_BANK_LOCAL_SMART_REQUIRED',
+			'非会员智能练习应使用本地状态与题库服务生成'
+		)
+	}
 	const subjectId = input.subjectId
 	const pageSize = Number(input.pageSize) || 20
 	const seed = input.seed || ''
@@ -849,6 +1163,21 @@ export async function getSmartPracticeQuestions(options) {
 
 export async function getPracticeProgress(options) {
 	const input = options || {}
+	if (!practiceCloudSyncEnabled()) {
+		const position = input.mode === 'knowledge'
+			? getKnowledgePracticePosition(input.subjectId, input.chapterId, input.knowledge)
+			: getChapterPracticePosition(input.subjectId, input.chapterId)
+		if (!position) return null
+		return {
+			subjectId: input.subjectId,
+			mode: input.mode === 'knowledge' ? 'knowledge' : 'chapter',
+			chapterId: String(input.chapterId || position.chapterId || ''),
+			knowledge: input.mode === 'knowledge' ? input.knowledge || position.knowledge || '' : '',
+			questionId: position.questionId,
+			progressAt: Number(position.updatedAt) || 0,
+			_localOnly: true
+		}
+	}
 	await flushPracticeEvents()
 	return executeCloudCall('getProgress', {
 		subjectId: input.subjectId,
@@ -891,6 +1220,8 @@ function clearSubjectLocalSyncData(subjectId) {
 	)
 	removeSubjectPracticePositions(CHAPTER_POSITION_STORAGE_KEY, subjectId)
 	removeSubjectPracticePositions(KNOWLEDGE_POSITION_STORAGE_KEY, subjectId)
+	removePersistedSummary(subjectId)
+	summaryRefreshRequiredKeys.delete(summaryCacheKey(subjectId))
 	invalidateUserPracticeCache(subjectId)
 	return {
 		remainingEvents: remainingEvents.length,
@@ -910,6 +1241,15 @@ export async function clearCurrentSubjectPracticeData(subjectId) {
 	scheduledFlush = null
 	scheduledSyncOptions = null
 	if (flushRequest) await flushRequest
+	if (!practiceCloudSyncEnabled()) {
+		clearSubjectLocalSyncData(normalizedSubjectId)
+		return {
+			cleared: true,
+			subjectId: normalizedSubjectId,
+			deletedRecords: 0,
+			localOnly: true
+		}
+	}
 	const result = await executeCloudCall('clearCurrentSubjectData', {
 		subjectId: normalizedSubjectId,
 		confirmation: 'CLEAR_CURRENT_SUBJECT'
@@ -925,6 +1265,7 @@ export async function clearCurrentSubjectPracticeData(subjectId) {
 }
 
 export function getLocalPracticePreferences() {
+	observePracticePreferencesUser()
 	const entry = readPreferencesEntry()
 	return Object.assign({}, entry.preferences, {
 		_syncPending: entry.dirty
@@ -933,9 +1274,17 @@ export function getLocalPracticePreferences() {
 
 export async function getPracticePreferences(options) {
 	const config = options || {}
+	const userId = observePracticePreferencesUser()
+	const forceRefresh = Boolean(config.forceRefresh || preferencesRefreshRequired)
 	const localEntry = readPreferencesEntry()
+	if (!practiceCloudSyncEnabled()) {
+		return Object.assign({}, localEntry.preferences, {
+			_syncPending: false,
+			_localOnly: true
+		})
+	}
 	if (!localEntry.dirty
-		&& !config.forceRefresh
+		&& !forceRefresh
 		&& localEntry.syncedAt + PREFERENCES_CACHE_TTL > Date.now()) {
 		return Object.assign({}, localEntry.preferences, { _syncPending: false })
 	}
@@ -946,6 +1295,9 @@ export async function getPracticePreferences(options) {
 				? await executeCloudCall('updatePreferences', localEntry.preferences)
 				: await executeCloudCall('getPreferences')
 			const saved = savePreferencesEntry(result, false, Date.now())
+			if (userId && getCurrentPracticeUser().uid === userId) {
+				preferencesRefreshRequired = false
+			}
 			return Object.assign({}, saved, { _syncPending: false })
 		} catch (error) {
 			if (error && error.errCode === 'QUESTION_BANK_MEMBERSHIP_REQUIRED') {
@@ -981,6 +1333,12 @@ export async function updatePracticePreferences(preferences) {
 	))
 	const previous = readPreferencesEntry()
 	savePreferencesEntry(next, true, previous.syncedAt)
+	if (!practiceCloudSyncEnabled()) {
+		return Object.assign({}, next, {
+			_syncPending: false,
+			_localOnly: true
+		})
+	}
 	let result
 	try {
 		result = await executeCloudCall('updatePreferences', next)
@@ -994,10 +1352,14 @@ export async function updatePracticePreferences(preferences) {
 		throw error
 	}
 	const saved = savePreferencesEntry(result, false, Date.now())
+	if (getCurrentPracticeUser().uid === observedPreferencesUserId) {
+		preferencesRefreshRequired = false
+	}
 	return Object.assign({}, saved, { _syncPending: false })
 }
 
 export function pendingPracticeEventCount() {
+	if (!practiceCloudSyncEnabled()) return 0
 	return readOutbox().length + readPendingProgresses().length
 }
 
@@ -1006,8 +1368,10 @@ export default {
 	ensurePracticeUser,
 	flushPracticeEvents,
 	getChapterPracticePosition,
+	getKnowledgeScopeKey,
 	getKnowledgePracticePosition,
 	getCurrentPracticeUser,
+	getCachedPracticeSummary,
 	getPracticeProgress,
 	getPracticePreferences,
 	getPracticeRecords,
@@ -1016,7 +1380,11 @@ export default {
 	getPracticeSummary,
 	getPracticeUserProfile,
 	getLocalPracticePreferences,
+	markPracticePreferencesRefreshRequired,
+	markPracticeRecordsRefreshRequired,
+	markPracticeSummaryRefreshRequired,
 	pendingPracticeEventCount,
+	practiceCloudSyncEnabled,
 	practiceUserLoggedIn,
 	queuePracticeAnswer,
 	queuePracticeFavorite,

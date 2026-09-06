@@ -59,16 +59,21 @@
 <script>
 	import {
 		getChapterProgress,
+		PRACTICE_PROGRESS_UPDATED_EVENT,
 		getPracticeState,
 		getSubjectById
 	} from '@/data/practice.js'
 	import { getCatalog } from '@/services/question-bank.js'
 	import {
 		getChapterPracticePosition,
+		getKnowledgeScopeKey,
 		getLocalPracticePreferences,
 		getKnowledgePracticePosition,
 		getPracticeStateSnapshot
 	} from '@/services/user-practice.js'
+	import { getCachedMembership, getMembership } from '@/services/membership.js'
+
+	let interstitialAd = null
 
 	export default {
 		data() {
@@ -82,7 +87,9 @@
 				loadError: '',
 				catalogName: '',
 				answerMode: localPreferences.answerMode,
-				nightMode: Boolean(localPreferences.nightMode)
+				nightMode: Boolean(localPreferences.nightMode),
+				pageActive: false,
+				practiceProgressUpdatedHandler: null
 			}
 		},
 		computed: {
@@ -98,9 +105,15 @@
 				return this.items.filter(item => `${item.name} ${item.chapter || ''}`.toLowerCase().indexOf(keyword) > -1)
 			}
 		},
-			onLoad(options) {
+		onLoad(options) {
+			this.pageActive = true
 			this.subjectId = options.subjectId
 			this.view = options.view === 'knowledge' ? 'knowledge' : 'chapter'
+			this.showChapterInterstitialAd()
+			if (typeof uni.$on === 'function') {
+				this.practiceProgressUpdatedHandler = event => this.handlePracticeProgressUpdated(event)
+				uni.$on(PRACTICE_PROGRESS_UPDATED_EVENT, this.practiceProgressUpdatedHandler)
+			}
 			uni.setNavigationBarTitle({ title: this.view === 'knowledge' ? '知识点练习' : '章节练习' })
 			this.applyNavigationTheme()
 			this.loadItems()
@@ -115,11 +128,62 @@
 				this.loadItems()
 				return
 			}
-			if (this.answerMode !== 'exam' && this.view === 'chapter' && this.items.length) {
-				this.refreshChapterProgress()
+			if (this.answerMode !== 'exam' && this.items.length) {
+				if (this.view === 'knowledge') this.refreshKnowledgeProgress()
+				else this.refreshChapterProgress()
 			}
 		},
+		onUnload() {
+			this.pageActive = false
+			if (this.practiceProgressUpdatedHandler && typeof uni.$off === 'function') {
+				uni.$off(PRACTICE_PROGRESS_UPDATED_EVENT, this.practiceProgressUpdatedHandler)
+			}
+			this.practiceProgressUpdatedHandler = null
+			this.destroyChapterInterstitialAd()
+		},
 		methods: {
+			async showChapterInterstitialAd() {
+				if (this.view !== 'chapter') return
+				let membership
+				try {
+					membership = await getMembership()
+				} catch (error) {
+					membership = getCachedMembership()
+				}
+				if (!this.pageActive || membership.isMember) return
+
+				// #ifdef MP-WEIXIN
+				if (typeof wx === 'undefined' || !wx.createInterstitialAd) return
+				interstitialAd = wx.createInterstitialAd({
+					adUnitId: 'adunit-4ea7a830fe0d7db2'
+				})
+				interstitialAd.onLoad(() => {})
+				interstitialAd.onError(error => {
+					console.error('插屏广告加载失败', error)
+				})
+				interstitialAd.onClose(() => {})
+				try {
+					await interstitialAd.show()
+				} catch (error) {
+					console.error('插屏广告显示失败', error)
+				}
+				// #endif
+			},
+			destroyChapterInterstitialAd() {
+				if (interstitialAd && typeof interstitialAd.destroy === 'function') {
+					interstitialAd.destroy()
+				}
+				interstitialAd = null
+			},
+			handlePracticeProgressUpdated(event) {
+				if (!event
+					|| event.subjectId !== this.subjectId
+					|| event.mode !== this.view
+					|| this.answerMode === 'exam'
+					|| !this.items.length) return
+				if (this.view === 'knowledge') this.refreshKnowledgeProgress()
+				else this.refreshChapterProgress()
+			},
 			applyNavigationTheme() {
 				uni.setNavigationBarColor({
 					frontColor: this.nightMode ? '#ffffff' : '#000000',
@@ -135,6 +199,42 @@
 						progress: Object.assign({}, item.progress, {
 							attempted,
 							percent: item.count ? Math.min(100, Math.round(attempted / item.count * 100)) : 0
+						})
+					})
+				})
+			},
+			getLocalKnowledgeAttempts() {
+				const attemptedByKnowledge = {}
+				const state = getPracticeState()
+				Object.keys(state.answers).forEach(questionId => {
+					const answer = state.answers[questionId]
+					const isLegacyDefault = !answer.subjectId
+						&& this.subjectId === 'junior-personal-finance'
+						&& questionId.indexOf('ipf-') === 0
+					if (answer.subjectId !== this.subjectId && !isLegacyDefault) return
+					if (!Array.isArray(answer.practiceModes) || answer.practiceModes.indexOf('knowledge') === -1) return
+					if (!answer.knowledge) return
+					const scopeKey = getKnowledgeScopeKey(answer.chapterId, answer.knowledge)
+					const key = scopeKey || answer.knowledge
+					attemptedByKnowledge[key] = (attemptedByKnowledge[key] || 0) + 1
+				})
+				return attemptedByKnowledge
+			},
+			refreshKnowledgeProgress() {
+				if (this.answerMode === 'exam') return
+				const attemptedByKnowledge = this.getLocalKnowledgeAttempts()
+				this.items = this.items.map(item => {
+					const scopeKey = getKnowledgeScopeKey(item.chapterId, item.name)
+					const localAttempted = attemptedByKnowledge[scopeKey]
+						|| attemptedByKnowledge[item.name]
+						|| 0
+					const attempted = Math.max(item.progress.attempted, localAttempted)
+					return Object.assign({}, item, {
+						progress: Object.assign({}, item.progress, {
+							attempted,
+							percent: item.progress.total
+								? Math.min(100, Math.round(attempted / item.progress.total * 100))
+								: 0
 						})
 					})
 				})
@@ -193,30 +293,22 @@
 						return
 					}
 
-					const attemptedByKnowledge = {}
-					if (shouldLoadProgress) {
-						const state = getPracticeState()
-						Object.keys(state.answers).forEach(questionId => {
-							const answer = state.answers[questionId]
-							const isLegacyDefault = !answer.subjectId
-								&& this.subjectId === 'junior-personal-finance'
-								&& questionId.indexOf('ipf-') === 0
-							if (answer.subjectId !== this.subjectId && !isLegacyDefault) return
-							if (!Array.isArray(answer.practiceModes) || answer.practiceModes.indexOf('knowledge') === -1) return
-							if (!answer.knowledge) return
-							attemptedByKnowledge[answer.knowledge] = (attemptedByKnowledge[answer.knowledge] || 0) + 1
-						})
-					}
+					const attemptedByKnowledge = shouldLoadProgress ? this.getLocalKnowledgeAttempts() : {}
 					const knowledgeGroups = Array.isArray(catalog.knowledgeGroups) ? catalog.knowledgeGroups : []
 					const knowledgePositions = cloudState && cloudState.progressPositions
 						? cloudState.progressPositions.knowledge || {}
 						: {}
 					this.items = knowledgeGroups.map(item => {
+						const scopeKey = getKnowledgeScopeKey(item.chapterId, item.name)
 						const attempted = !shouldLoadProgress
 							? 0
 							: cloudState
-							? (cloudState.knowledgeAttempts[item.name] || 0)
-							: (attemptedByKnowledge[item.name] || 0)
+							? (cloudState.knowledgeAttempts[scopeKey]
+								|| cloudState.knowledgeAttempts[item.name]
+								|| 0)
+							: (attemptedByKnowledge[scopeKey]
+								|| attemptedByKnowledge[item.name]
+								|| 0)
 						const total = Number.isInteger(item.count) && item.count >= 0 ? item.count : 0
 						return {
 							...item,
@@ -226,7 +318,7 @@
 								total,
 								percent: total ? Math.min(100, Math.round(attempted / total * 100)) : 0,
 								positionQuestionId: shouldLoadProgress
-									? knowledgePositions[item.name] || ''
+									? knowledgePositions[scopeKey] || knowledgePositions[item.name] || ''
 									: ''
 							}
 						}
@@ -246,9 +338,9 @@
 			startItem(item) {
 				let url = `/practice-pages/practice/practice?subjectId=${this.subjectId}`
 				if (this.view === 'knowledge') {
-					url += `&mode=knowledge&knowledge=${encodeURIComponent(item.name)}`
+					url += `&mode=knowledge&chapterId=${encodeURIComponent(item.chapterId)}&knowledge=${encodeURIComponent(item.name)}`
 					if (this.answerMode !== 'exam') {
-						const savedPosition = getKnowledgePracticePosition(this.subjectId, item.name)
+						const savedPosition = getKnowledgePracticePosition(this.subjectId, item.chapterId, item.name)
 						const startId = savedPosition && savedPosition.questionId
 							|| item.progress.positionQuestionId
 						if (startId) {

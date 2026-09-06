@@ -17,6 +17,8 @@ function loadService(environment) {
 		ensurePracticeUser,
 		flushPracticeEvents,
 		getChapterPracticePosition,
+		getCachedPracticeSummary,
+		getKnowledgeScopeKey,
 		getKnowledgePracticePosition,
 		getLocalPracticePreferences,
 		getPracticeProgress,
@@ -26,7 +28,11 @@ function loadService(environment) {
 		getPracticeStateSnapshot,
 		getPracticeSummary,
 		getPracticeUserProfile,
+		markPracticePreferencesRefreshRequired,
+		markPracticeRecordsRefreshRequired,
+		markPracticeSummaryRefreshRequired,
 		pendingPracticeEventCount,
+		practiceCloudSyncEnabled,
 		queuePracticeAnswer,
 		queuePracticeFavorite,
 		savePracticeProgress,
@@ -35,6 +41,15 @@ function loadService(environment) {
 	vm.createContext(environment)
 	vm.runInContext(source, environment, { filename: servicePath })
 	return environment.__service
+}
+
+function activeMembership() {
+	return {
+		isMember: true,
+		status: 'active',
+		expiresAt: Date.now() + 30 * 24 * 60 * 60 * 1000,
+		cachedAt: Date.now()
+	}
 }
 
 async function testWeixinLogin() {
@@ -163,6 +178,7 @@ async function testServerTokenRecovery() {
 async function testPreferenceOfflineRetry() {
 	const storage = new Map()
 	const user = { uid: 'preference-user', tokenExpired: Date.now() + 60 * 60 * 1000 }
+	storage.set(`uni-learn-membership-v1:${user.uid}`, activeMembership())
 	let cloudCalls = 0
 	const environment = {
 		uni: {
@@ -230,6 +246,7 @@ async function testBatchScheduling() {
 	const calls = []
 	let nextTimerId = 0
 	const user = { uid: 'batch-user', tokenExpired: Date.now() + 60 * 60 * 1000 }
+	storage.set(`uni-learn-membership-v1:${user.uid}`, activeMembership())
 	const environment = {
 		uni: {
 			getStorageSync: key => storage.get(key),
@@ -351,11 +368,15 @@ async function testEmptyFlushDoesNotLogin() {
 	}
 	const service = loadService(environment)
 	const result = await service.flushPracticeEvents({ includeProgress: false })
-	assert.deepEqual(JSON.parse(JSON.stringify(result)), { synced: true, pending: 0 })
+	assert.deepEqual(JSON.parse(JSON.stringify(result)), {
+		synced: false,
+		localOnly: true,
+		pending: 0
+	})
 	assert.equal(loginCalls, 0)
 }
 
-async function testMembershipPreferenceDowngrade() {
+async function testNonMemberLocalOnly() {
 	const storage = new Map([[
 		'uni-learn-practice-preferences-v1:member-expired-user',
 		{
@@ -366,6 +387,7 @@ async function testMembershipPreferenceDowngrade() {
 		}
 	]])
 	const user = { uid: 'member-expired-user', tokenExpired: Date.now() + 60 * 60 * 1000 }
+	let cloudCalls = 0
 	const environment = {
 		uni: {
 			getStorageSync: key => storage.get(key),
@@ -375,10 +397,171 @@ async function testMembershipPreferenceDowngrade() {
 		uniCloud: {
 			getCurrentUserInfo: () => user,
 			async callFunction() {
+				cloudCalls += 1
+				throw new Error('non-member must not call questionBankUser')
+			}
+		},
+		console,
+		setTimeout,
+		clearTimeout,
+		Date,
+		Map,
+		Set,
+		Promise,
+		Math,
+		JSON,
+		Error,
+		Array,
+		Object,
+		Number,
+		String,
+		Boolean
+	}
+	const service = loadService(environment)
+	const loaded = await service.getPracticePreferences()
+	assert.equal(loaded.answerMode, 'exam')
+	assert.equal(loaded.nightMode, true)
+	assert.equal(loaded._syncPending, false)
+	assert.equal(loaded._localOnly, true)
+	const saved = await service.updatePracticePreferences({ answerMode: 'practice', nightMode: false })
+	assert.equal(saved._localOnly, true)
+	assert.equal(service.getLocalPracticePreferences().answerMode, 'practice')
+
+	const subjectId = 'junior-personal-finance'
+	const question = {
+		id: 'local-question',
+		subjectId,
+		chapterId: '1',
+		knowledge: '本地存储',
+		answer: ['A']
+	}
+	storage.set(`uni-learn-practice-state-v1:${user.uid}`, {
+		answers: {
+			[question.id]: {
+				subjectId,
+				chapterId: question.chapterId,
+				knowledge: question.knowledge,
+				selected: ['B'],
+				correct: false,
+				attempts: 3,
+				practiceModes: ['chapter', 'knowledge'],
+				timestamp: Date.now()
+			}
+		},
+		favorites: [],
+		favoriteSubjects: {},
+		favoriteUpdatedAt: {},
+		dailyAttempts: {
+			[subjectId]: { dayKey: new Date().toISOString().slice(0, 10), attempts: 3 }
+		}
+	})
+	service.queuePracticeAnswer(question, ['B'], {
+		eventId: 'local-answer-one',
+		correct: false,
+		practiceMode: 'chapter',
+		occurredAt: Date.now()
+	})
+	service.savePracticeProgress(question, {
+		progressId: 'local-progress-one',
+		occurredAt: Date.now()
+	})
+	assert.equal(service.practiceCloudSyncEnabled(), false)
+	assert.equal(service.pendingPracticeEventCount(), 0)
+	assert.equal(storage.get(`uni-learn-practice-cloud-outbox-v1:${user.uid}`).events.length, 1)
+	const summary = await service.getPracticeSummary(subjectId)
+	assert.equal(summary.attempted, 1)
+	assert.equal(summary.wrong, 1)
+	assert.equal(summary.totalAttempts, 3)
+	assert.equal(summary._localOnly, true)
+	const snapshot = await service.getPracticeStateSnapshot(subjectId, {
+		questionIds: [question.id]
+	})
+	assert.deepEqual(Array.from(snapshot.wrongQuestionIds), [question.id])
+	assert.equal(snapshot.chapterAttempts['1'], 1)
+	assert.equal(snapshot.progressPositions.chapter['1'], question.id)
+	const progress = await service.getPracticeProgress({
+		subjectId,
+		mode: 'chapter',
+		chapterId: '1'
+	})
+	assert.equal(progress.questionId, question.id)
+	assert.equal(progress._localOnly, true)
+	await assert.rejects(
+		service.getPracticeRecords({ subjectId, type: 'wrong', page: 1, pageSize: 20 }),
+		error => error && error.errCode === 'QUESTION_BANK_MEMBERSHIP_REQUIRED'
+	)
+	await assert.rejects(
+		service.getSmartPracticeQuestions({ subjectId, pageSize: 20 }),
+		error => error && error.errCode === 'QUESTION_BANK_LOCAL_SMART_REQUIRED'
+	)
+	const flush = await service.flushPracticeEvents()
+	assert.equal(flush.localOnly, true)
+	service.savePracticeProgress(question, {
+		mode: 'knowledge',
+		knowledge: question.knowledge,
+		progressId: 'local-knowledge-progress',
+		occurredAt: Date.now()
+	})
+	await service.flushPracticeEvents()
+	const restartedService = loadService(Object.assign({}, environment))
+	const restoredSnapshot = await restartedService.getPracticeStateSnapshot(subjectId)
+	const knowledgeScope = restartedService.getKnowledgeScopeKey(question.chapterId, question.knowledge)
+	assert.equal(restoredSnapshot.knowledgeAttempts[knowledgeScope], 1)
+	assert.equal(restoredSnapshot.progressPositions.knowledge[knowledgeScope], question.id)
+	assert.equal(
+		restartedService.getKnowledgePracticePosition(subjectId, question.chapterId, question.knowledge).questionId,
+		question.id
+	)
+	const knowledgePositionStorageKey = `uni-learn-practice-knowledge-position-v1:${user.uid}`
+	const savedKnowledgePositions = storage.get(knowledgePositionStorageKey)
+	savedKnowledgePositions.positions[`${subjectId}|旧版同名知识点`] = {
+		subjectId,
+		chapterId: '2',
+		knowledge: '旧版同名知识点',
+		questionId: 'legacy-position-question',
+		updatedAt: Date.now() - 1000
+	}
+	storage.set(knowledgePositionStorageKey, savedKnowledgePositions)
+	assert.equal(
+		restartedService.getKnowledgePracticePosition(subjectId, '2', '旧版同名知识点').questionId,
+		'legacy-position-question'
+	)
+	assert.equal(
+		restartedService.getKnowledgePracticePosition(subjectId, '3', '旧版同名知识点'),
+		null
+	)
+	user.uid = 'other-non-member'
+	assert.equal(restartedService.getKnowledgePracticePosition(subjectId, question.chapterId, question.knowledge), null)
+	user.uid = 'member-expired-user'
+	const cleared = await service.clearCurrentSubjectPracticeData(subjectId)
+	assert.equal(cleared.localOnly, true)
+	assert.equal(cloudCalls, 0)
+}
+
+async function testMembershipActivationFlushesLocalQueue() {
+	const storage = new Map()
+	const user = { uid: 'new-member-user', tokenExpired: Date.now() + 60 * 60 * 1000 }
+	let cloudCalls = 0
+	const environment = {
+		uni: {
+			getStorageSync: key => storage.get(key),
+			setStorageSync: (key, value) => storage.set(key, value),
+			removeStorageSync: key => storage.delete(key)
+		},
+		uniCloud: {
+			getCurrentUserInfo: () => user,
+			async callFunction(request) {
+				cloudCalls += 1
 				return {
 					result: {
-						errCode: 'QUESTION_BANK_MEMBERSHIP_REQUIRED',
-						errMsg: '考试模式和背题模式为会员权益'
+						errCode: 0,
+						data: {
+							acceptedEventIds: request.data.events.map(item => item.eventId),
+							duplicateEventIds: [],
+							rejectedEventIds: [],
+							summaries: {},
+							progress: null
+						}
 					}
 				}
 			}
@@ -400,16 +583,206 @@ async function testMembershipPreferenceDowngrade() {
 		Boolean
 	}
 	const service = loadService(environment)
-	const loaded = await service.getPracticePreferences()
-	assert.equal(loaded.answerMode, 'practice')
-	assert.equal(loaded.nightMode, true)
-	assert.equal(loaded._syncPending, false)
-	await assert.rejects(
-		service.updatePracticePreferences({ answerMode: 'review', nightMode: true }),
-		error => error && error.errCode === 'QUESTION_BANK_MEMBERSHIP_REQUIRED'
-	)
-	assert.equal(service.getLocalPracticePreferences().answerMode, 'practice')
-	assert.equal(service.getLocalPracticePreferences()._syncPending, false)
+	service.queuePracticeAnswer({
+		id: 'upgrade-question',
+		subjectId: 'junior-personal-finance',
+		chapterId: '1',
+		knowledge: '会员升级',
+		answer: ['A']
+	}, ['A'], {
+		eventId: 'upgrade-answer-one',
+		correct: true,
+		occurredAt: Date.now()
+	})
+	assert.equal(cloudCalls, 0)
+	storage.set(`uni-learn-membership-v1:${user.uid}`, activeMembership())
+	await service.flushPracticeEvents({ includeProgress: false })
+	assert.equal(cloudCalls, 1)
+	assert.equal(service.pendingPracticeEventCount(), 0)
+}
+
+async function testServerRevocationClearsLocalMembership() {
+	const storage = new Map()
+	const user = { uid: 'revoked-member-user', tokenExpired: Date.now() + 60 * 60 * 1000 }
+	storage.set(`uni-learn-membership-v1:${user.uid}`, activeMembership())
+	const environment = {
+		uni: {
+			getStorageSync: key => storage.get(key),
+			setStorageSync: (key, value) => storage.set(key, value),
+			removeStorageSync: key => storage.delete(key)
+		},
+		uniCloud: {
+			getCurrentUserInfo: () => user,
+			async callFunction() {
+				return {
+					result: {
+						errCode: 'QUESTION_BANK_MEMBERSHIP_REQUIRED',
+						errMsg: '会员权益已撤销'
+					}
+				}
+			}
+		},
+		console,
+		setTimeout,
+		clearTimeout,
+		Date,
+		Map,
+		Set,
+		Promise,
+		Math,
+		JSON,
+		Error,
+		Array,
+		Object,
+		Number,
+		String,
+		Boolean
+	}
+	const service = loadService(environment)
+	assert.equal(service.practiceCloudSyncEnabled(), true)
+	const preferences = await service.getPracticePreferences()
+	assert.equal(preferences.answerMode, 'practice')
+	assert.equal(service.practiceCloudSyncEnabled(), false)
+	const membership = storage.get(`uni-learn-membership-v1:${user.uid}`)
+	assert.equal(membership.isMember, false)
+	assert.equal(membership.status, 'inactive')
+	assert.equal(membership.expiresAt, 0)
+}
+
+async function testForegroundRefreshesCachedPreferencesOnce() {
+	const storage = new Map()
+	const user = { uid: 'foreground-member', tokenExpired: Date.now() + 60 * 60 * 1000 }
+	storage.set(`uni-learn-membership-v1:${user.uid}`, activeMembership())
+	storage.set(`uni-learn-practice-preferences-v1:${user.uid}`, {
+		version: 1,
+		preferences: { answerMode: 'practice', nightMode: false, updatedAt: 1 },
+		dirty: false,
+		syncedAt: Date.now()
+	})
+	let cloudCalls = 0
+	const environment = {
+		uni: {
+			getStorageSync: key => storage.get(key),
+			setStorageSync: (key, value) => storage.set(key, value),
+			removeStorageSync: key => storage.delete(key)
+		},
+		uniCloud: {
+			getCurrentUserInfo: () => user,
+			async callFunction(request) {
+				assert.equal(request.data.action, 'getPreferences')
+				cloudCalls += 1
+				return {
+					result: {
+						errCode: 0,
+						data: { answerMode: 'review', nightMode: true, updatedAt: 2 }
+					}
+				}
+			}
+		},
+		console,
+		setTimeout,
+		clearTimeout,
+		Date,
+		Map,
+		Set,
+		Promise,
+		Math,
+		JSON,
+		Error,
+		Array,
+		Object,
+		Number,
+		String,
+		Boolean
+	}
+	const service = loadService(environment)
+	const cached = await service.getPracticePreferences()
+	assert.equal(cached.nightMode, false)
+	assert.equal(cloudCalls, 0)
+
+	service.markPracticePreferencesRefreshRequired()
+	const refreshed = await service.getPracticePreferences()
+	assert.equal(refreshed.answerMode, 'review')
+	assert.equal(refreshed.nightMode, true)
+	assert.equal(cloudCalls, 1)
+
+	const reused = await service.getPracticePreferences()
+	assert.equal(reused.nightMode, true)
+	assert.equal(cloudCalls, 1)
+}
+
+async function testPersistentSummaryAndForegroundRefresh() {
+	const storage = new Map()
+	const subjectId = 'junior-personal-finance'
+	const user = { uid: 'summary-member', tokenExpired: Date.now() + 60 * 60 * 1000 }
+	const summaryStorageKey = `uni-learn-practice-summary-v1:${user.uid}`
+	storage.set(`uni-learn-membership-v1:${user.uid}`, activeMembership())
+	storage.set(summaryStorageKey, {
+		version: 1,
+		summaries: {
+			[subjectId]: {
+				data: { subjectId, attempted: 3, correct: 2, wrong: 1, favorite: 1, todayAttempts: 2 },
+				syncedAt: Date.now()
+			}
+		}
+	})
+	let summaryCalls = 0
+	const environment = {
+		uni: {
+			getStorageSync: key => storage.get(key),
+			setStorageSync: (key, value) => storage.set(key, value),
+			removeStorageSync: key => storage.delete(key)
+		},
+		uniCloud: {
+			getCurrentUserInfo: () => user,
+			async callFunction(request) {
+				if (request.data.action === 'getSummary') {
+					summaryCalls += 1
+					return {
+						result: {
+							errCode: 0,
+							data: { subjectId, attempted: 5, correct: 4, wrong: 1, favorite: 2, todayAttempts: 4 }
+						}
+					}
+				}
+				if (request.data.action === 'clearCurrentSubjectData') {
+					return { result: { errCode: 0, data: { cleared: true, subjectId } } }
+				}
+				throw new Error(`unexpected action ${request.data.action}`)
+			}
+		},
+		console,
+		setTimeout,
+		clearTimeout,
+		Date,
+		Map,
+		Set,
+		Promise,
+		Math,
+		JSON,
+		Error,
+		Array,
+		Object,
+		Number,
+		String,
+		Boolean
+	}
+	const service = loadService(environment)
+	assert.equal(service.getCachedPracticeSummary(subjectId).attempted, 3)
+	assert.equal((await service.getPracticeSummary(subjectId)).attempted, 3)
+	assert.equal(summaryCalls, 0)
+
+	service.markPracticeSummaryRefreshRequired()
+	assert.equal(service.getCachedPracticeSummary(subjectId).attempted, 3)
+	const refreshed = await service.getPracticeSummary(subjectId)
+	assert.equal(refreshed.attempted, 5)
+	assert.equal(summaryCalls, 1)
+	assert.equal(storage.get(summaryStorageKey).summaries[subjectId].data.favorite, 2)
+	assert.equal((await service.getPracticeSummary(subjectId)).attempted, 5)
+	assert.equal(summaryCalls, 1)
+
+	await service.clearCurrentSubjectPracticeData(subjectId)
+	assert.equal(storage.has(summaryStorageKey), false)
 }
 
 async function run() {
@@ -417,6 +790,7 @@ async function run() {
 	const calls = []
 	let cloudPreferences = { answerMode: 'practice', nightMode: false, updatedAt: 0 }
 	const user = { uid: 'user-one', tokenExpired: Date.now() + 60 * 60 * 1000 }
+	storage.set(`uni-learn-membership-v1:${user.uid}`, activeMembership())
 	const environment = {
 		uni: {
 			getStorageSync: key => storage.get(key),
@@ -594,7 +968,7 @@ async function run() {
 	assert.equal(cloudSavedPreferences.answerMode, 'review')
 	assert.equal(cloudSavedPreferences.nightMode, true)
 	assert.equal(calls.filter(item => item.data.action === 'updatePreferences').length, 1)
-	assert.equal(calls.filter(item => item.data.action === 'getPreferences').length, 0)
+	assert.equal(calls.filter(item => item.data.action === 'getPreferences').length, 1)
 	const question = {
 		id: 'ipf-1',
 		subjectId: 'junior-personal-finance',
@@ -644,7 +1018,7 @@ async function run() {
 		occurredAt: Date.now()
 	})
 	assert.equal(
-		service.getKnowledgePracticePosition(question.subjectId, question.knowledge).questionId,
+		service.getKnowledgePracticePosition(question.subjectId, question.chapterId, question.knowledge).questionId,
 		question.id
 	)
 	await service.flushPracticeEvents()
@@ -736,6 +1110,14 @@ async function run() {
 	assert.equal(firstRecords.items[0].recordId, 'wrong-ipf-1')
 	assert.equal(cachedRecords.total, 1)
 	assert.equal(calls.filter(item => item.data.action === 'getRecords').length, 1)
+	service.markPracticeRecordsRefreshRequired()
+	await service.getPracticeRecords({
+		subjectId: question.subjectId,
+		type: 'wrong',
+		page: 1,
+		pageSize: 20
+	})
+	assert.equal(calls.filter(item => item.data.action === 'getRecords').length, 2)
 	await service.getSmartPracticeQuestions({ subjectId: question.subjectId, pageSize: 20 })
 	await service.getSmartPracticeQuestions({ subjectId: question.subjectId, pageSize: 20 })
 	assert.equal(calls.filter(item => item.data.action === 'getSmartPractice').length, 1)
@@ -802,7 +1184,11 @@ async function run() {
 	await testPreferenceOfflineRetry()
 	await testBatchScheduling()
 	await testEmptyFlushDoesNotLogin()
-	await testMembershipPreferenceDowngrade()
+	await testNonMemberLocalOnly()
+	await testMembershipActivationFlushesLocalQueue()
+	await testServerRevocationClearsLocalMembership()
+	await testForegroundRefreshesCachedPreferencesOnce()
+	await testPersistentSummaryAndForegroundRefresh()
 
 	console.log('user-practice service tests passed')
 }

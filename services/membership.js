@@ -1,10 +1,11 @@
-import { ensurePracticeUser, getCurrentPracticeUser } from '@/services/user-practice.js'
+import { ensurePracticeUser, getCurrentPracticeUser, schedulePracticeSync } from '@/services/user-practice.js'
 
 const CLOUD_FUNCTION_NAME = 'virtualPayment'
 const STORAGE_KEY = 'uni-learn-membership-v1'
 const LAST_ORDER_KEY = 'uni-learn-membership-last-order-v1'
-const MEMBER_CACHE_TTL = 5 * 60 * 1000
-const NON_MEMBER_CACHE_TTL = 60 * 1000
+const MEMBER_CACHE_TTL = 6 * 60 * 60 * 1000
+const NON_MEMBER_CACHE_TTL = 6 * 60 * 60 * 1000
+const MEMBER_EXPIRY_GRACE_MS = 6 * 60 * 60 * 1000
 
 let membershipRequest = null
 
@@ -45,7 +46,11 @@ function userScopedStorageKey(baseKey) {
 function normalizeMembership(value) {
 	const source = value && typeof value === 'object' ? value : {}
 	const expiresAt = Number(source.expiresAt) || 0
-	const isMember = Boolean(source.isMember && expiresAt > Date.now())
+	const isMember = Boolean(
+		source.isMember
+		&& source.status !== 'revoked'
+		&& expiresAt + MEMBER_EXPIRY_GRACE_MS > Date.now()
+	)
 	return {
 		isMember,
 		status: isMember ? 'active' : 'inactive',
@@ -63,6 +68,7 @@ function normalizeMembership(value) {
 function saveMembership(value) {
 	const normalized = normalizeMembership(Object.assign({}, value, { cachedAt: Date.now() }))
 	storageSet(userScopedStorageKey(STORAGE_KEY), normalized)
+	if (normalized.isMember) schedulePracticeSync({ immediate: true })
 	return normalized
 }
 

@@ -4,13 +4,14 @@
 				<view class="account-avatar">{{ profileInitial }}</view>
 				<view class="account-copy">
 					<text class="account-name">{{ accountName }}</text>
-					<text class="account-status" v-if="accountLoading">正在连接微信账号…</text>
-					<text class="account-status error" v-else-if="accountError">{{ accountError }}</text>
-					<text class="account-status" v-else>{{ accountStatus }}</text>
-					<text class="account-pending" v-if="!accountLoading && pendingCount">{{ pendingCount }} 条记录等待同步</text>
+					<text class="account-status">{{ accountStatus }}</text>
+					<text class="account-pending" v-if="pendingCount">{{ pendingCount }} 条记录等待同步</text>
 				</view>
-				<button class="account-retry" v-if="accountError" @tap="loadAccount(true)">重试</button>
-				<uni-icons v-else type="cloud-upload" size="24" color="#ffffff"></uni-icons>
+				<uni-icons
+					:type="membership.isMember ? 'cloud-upload' : 'person-filled'"
+					size="24"
+					color="#ffffff"
+				></uni-icons>
 			</view>
 			<uni-list>
 			<uni-list-item
@@ -44,10 +45,7 @@
 </template>
 
 	<script>
-		import {
-			getPracticeUserProfile,
-			pendingPracticeEventCount
-		} from '@/services/user-practice.js'
+		import { pendingPracticeEventCount } from '@/services/user-practice.js'
 		import {
 			getCachedMembership,
 			getMembership
@@ -56,24 +54,20 @@
 		export default {
 			data() {
 				return {
-					accountLoading: true,
-					accountError: '',
-					profile: null,
-					pendingCount: 0,
-					accountRequestId: 0,
+					pendingCount: pendingPracticeEventCount(),
 					membership: getCachedMembership()
 				}
 			},
 			computed: {
 				accountName() {
-					return this.profile && this.profile.nickname || '微信用户'
+					return this.membership.isMember ? '会员用户' : '普通用户'
 				},
 				profileInitial() {
 					return this.accountName.slice(0, 1)
 				},
 				accountStatus() {
-					if (!this.profile) return '等待连接云端账号'
-					return this.profile.weixinBound ? '微信账号已连接，做题数据已开启云同步' : '云端账号已登录'
+					if (!this.membership.isMember) return '做题数据仅保存在本机'
+					return '做题数据已开启云同步'
 				},
 				membershipText() {
 					if (!this.membership.isMember) return '未开通'
@@ -82,40 +76,24 @@
 				}
 			},
 			onShow() {
-				this.loadAccount()
+				this.pendingCount = pendingPracticeEventCount()
 				this.loadMembership()
 			},
 			methods: {
 				async loadMembership() {
 					try {
-						this.membership = await getMembership({ forceRefresh: true })
+						this.membership = await getMembership()
 					} catch (error) {
 						this.membership = getCachedMembership()
-					}
-				},
-				async loadAccount(forceRefresh) {
-					const requestId = ++this.accountRequestId
-					this.accountLoading = true
-					this.accountError = ''
-					this.pendingCount = pendingPracticeEventCount()
-					try {
-						const profile = await getPracticeUserProfile({ forceRefresh: Boolean(forceRefresh) })
-						if (requestId !== this.accountRequestId) return
-						this.profile = profile
-						this.pendingCount = pendingPracticeEventCount()
-					} catch (error) {
-						if (requestId !== this.accountRequestId) return
-						this.profile = null
-						this.accountError = (error && (error.errMsg || error.message)) || '微信登录暂时不可用'
 					} finally {
-						if (requestId === this.accountRequestId) this.accountLoading = false
+						this.pendingCount = pendingPracticeEventCount()
 					}
 				},
 				onClick(e) {
-				console.log('执行click事件', e.data)
+					console.log('执行click事件', e.data)
+				}
 			}
 		}
-	}
 </script>
 
 	<style lang="scss">
@@ -176,28 +154,8 @@
 			line-height: 1.4;
 		}
 
-		.account-status.error {
-			color: #fff2c7;
-		}
-
 		.account-pending {
 			color: #fff2c7;
-		}
-
-		.account-retry {
-			height: 56rpx;
-			margin: 0;
-			padding: 0 22rpx;
-			border: 1rpx solid rgba(255, 255, 255, 0.7);
-			border-radius: 30rpx;
-			background: rgba(255, 255, 255, 0.16);
-			color: #ffffff;
-			font-size: 23rpx;
-			line-height: 56rpx;
-		}
-
-		.account-retry::after {
-			border: 0;
 		}
 
 		/* 问题反馈列表项容器 */

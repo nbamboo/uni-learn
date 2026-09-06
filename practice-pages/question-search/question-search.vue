@@ -56,6 +56,17 @@
 				<text class="empty-caption">换个关键词试试</text>
 			</view>
 		</view>
+
+		<!-- #ifdef MP-WEIXIN -->
+		<view class="search-ad-container" v-if="showAds">
+			<ad-custom
+				unit-id="adunit-482241fd0b438f17"
+				@load="adLoad"
+				@error="adError"
+				@close="adClose"
+			></ad-custom>
+		</view>
+		<!-- #endif -->
 	</view>
 </template>
 
@@ -63,10 +74,13 @@
 	import { getKnowledgeGroups } from '@/data/practice-questions.js'
 	import { getSubjectById } from '@/data/practice.js'
 	import { searchQuestionBank } from '@/services/question-bank.js'
+	import { getCachedMembership, getMembership } from '@/services/membership.js'
 
 	export default {
 		data() {
 			return {
+				membership: getCachedMembership(),
+				membershipLoaded: false,
 				subjectId: '',
 				keyword: '',
 				results: [],
@@ -83,6 +97,9 @@
 		computed: {
 			subject() {
 				return getSubjectById(this.subjectId)
+			},
+			showAds() {
+				return this.membershipLoaded && !this.membership.isMember
 			}
 		},
 		watch: {
@@ -93,6 +110,7 @@
 		},
 		async onLoad(options) {
 			this.subjectId = options.subjectId
+			const membershipTask = this.refreshMembership()
 			try {
 				const knowledgeGroups = await getKnowledgeGroups(this.subjectId)
 				this.popularKnowledge = knowledgeGroups.slice(0, 10)
@@ -101,11 +119,21 @@
 			} finally {
 				this.loading = false
 			}
+			await membershipTask
 		},
 		onUnload() {
 			if (this.searchTimer) clearTimeout(this.searchTimer)
 		},
 		methods: {
+			async refreshMembership() {
+				try {
+					this.membership = await getMembership()
+				} catch (error) {
+					this.membership = getCachedMembership()
+				} finally {
+					this.membershipLoaded = true
+				}
+			},
 			async search(reset) {
 				const keyword = this.keyword.trim()
 				const requestId = ++this.searchRequestId
@@ -159,6 +187,15 @@
 				uni.navigateTo({
 					url: `/practice-pages/practice/practice?subjectId=${this.subjectId}&mode=search&keyword=${keyword}&startId=${questionId}`
 				})
+			},
+			adLoad() {
+				console.log('原生模板广告加载成功')
+			},
+			adError(error) {
+				console.error('原生模板广告加载失败', error)
+			},
+			adClose() {
+				console.log('原生模板广告关闭')
 			}
 		}
 	}
@@ -187,4 +224,5 @@
 	.loading-state { display: flex; align-items: center; justify-content: center; min-height: 45vh; }
 	.empty-title { margin-top: 22rpx; font-size: 30rpx; font-weight: 600; }
 	.empty-caption { margin-top: 10rpx; color: #8d939b; font-size: 25rpx; }
+	.search-ad-container { margin-top: 28rpx; overflow: hidden; border-radius: 8rpx; }
 </style>

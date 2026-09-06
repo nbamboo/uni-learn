@@ -1,6 +1,12 @@
 <script>
 	import { getPracticeState } from '@/data/practice.js'
-	import { flushPracticeEvents, schedulePracticeSync } from '@/services/user-practice.js'
+	import {
+		flushPracticeEvents,
+		markPracticePreferencesRefreshRequired,
+		markPracticeRecordsRefreshRequired,
+		markPracticeSummaryRefreshRequired,
+		schedulePracticeSync
+	} from '@/services/user-practice.js'
 
 	export default {
 		globalData: {
@@ -19,6 +25,9 @@
 		},
 		onShow: function() {
 			console.log('App Show')
+			markPracticePreferencesRefreshRequired()
+			markPracticeRecordsRefreshRequired()
+			markPracticeSummaryRefreshRequired()
 			schedulePracticeSync({ localState: getPracticeState() })
 		},
 		onHide: function() {

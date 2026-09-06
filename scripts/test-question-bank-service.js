@@ -37,7 +37,12 @@ function createEnvironment() {
 			id: 'ipf-1',
 			questionId: 'ipf-1',
 			subjectId: 'junior-personal-finance',
+			chapterId: '1',
+			chapter: '第一章',
+			section: '第一节',
+			knowledge: '共同知识点',
 			title: '题目一',
+			options: [{ alias: 'A', text: '选项一' }],
 			answer: ['A'],
 			sortOrder: 1
 		},
@@ -45,7 +50,12 @@ function createEnvironment() {
 			id: 'ipf-2',
 			questionId: 'ipf-2',
 			subjectId: 'junior-personal-finance',
+			chapterId: '1',
+			chapter: '第一章',
+			section: '第一节',
+			knowledge: '共同知识点',
 			title: '题目二',
+			options: [{ alias: 'B', text: '选项二' }],
 			answer: ['B'],
 			sortOrder: 2
 		},
@@ -53,7 +63,12 @@ function createEnvironment() {
 			id: 'ipf-3',
 			questionId: 'ipf-3',
 			subjectId: 'junior-personal-finance',
+			chapterId: '1',
+			chapter: '第一章',
+			section: '第二节',
+			knowledge: '另一个知识点',
 			title: '题目三',
+			options: [{ alias: 'C', text: '选项三' }],
 			answer: ['C'],
 			sortOrder: 3
 		}
@@ -100,7 +115,11 @@ function createEnvironment() {
 							activeVersion: catalogVersion,
 							questionCount: 3,
 							chapters: [{ id: '1', count: 3 }],
-							knowledgeGroups: []
+							knowledgeGroups: [{
+								chapterId: '1', name: '共同知识点', count: 2
+							}, {
+								chapterId: '1', name: '另一个知识点', count: 1
+							}]
 						}
 					}
 				}
@@ -250,6 +269,61 @@ async function testPersistentChapterCache() {
 	assert.deepEqual(Array.from(restored.items, item => item.id), ['ipf-1', 'ipf-2', 'ipf-3'])
 	assert.equal(environment.calls.filter(call => call.data.action === 'getPracticePage').length, cloudPagesAfterDownload)
 
+	const reuseService = reloadService(environment)
+	const callsBeforeCrossModeReuse = environment.calls.length
+	const localKnowledge = await reuseService.getAllPracticeQuestions({
+		subjectId,
+		mode: 'knowledge',
+		chapterId: '1',
+		knowledge: '共同知识点'
+	})
+	assert.deepEqual(Array.from(localKnowledge.items, item => item.id), ['ipf-1', 'ipf-2'])
+	assert.equal(localKnowledge._localOnly, true)
+	const localSequence = await reuseService.getAllPracticeQuestions({ subjectId, mode: 'sequence' })
+	assert.equal(localSequence.items.length, 3)
+	assert.equal(localSequence._localOnly, true)
+	const localSmart = await reuseService.getPracticePage({
+		subjectId,
+		mode: 'smart',
+		pageSize: 2,
+		answeredQuestionIds: ['ipf-1', 'ipf-2'],
+		wrongQuestionIds: ['ipf-2']
+	}, { versionFromResponse: true })
+	assert.equal(localSmart.items.length, 2)
+	assert.equal(localSmart._localOnly, true)
+	const localSearch = await reuseService.searchQuestionBank({
+		subjectId,
+		keyword: '题目一',
+		pageSize: 20
+	})
+	assert.deepEqual(Array.from(localSearch.items, item => item.id), ['ipf-1'])
+	assert.equal(localSearch._localOnly, true)
+	const localByIds = await reloadService(environment).getQuestionsByIds({
+		subjectId,
+		questionIds: ['ipf-3', 'ipf-1']
+	})
+	assert.deepEqual(Array.from(localByIds.items, item => item.id), ['ipf-3', 'ipf-1'])
+	assert.equal(environment.calls.length, callsBeforeCrossModeReuse)
+	const persistedCatalogCache = environment.storage.get('uni-learn-question-bank-catalog-cache-v1')
+	persistedCatalogCache.entries[subjectId].expiresAt = Date.now() - 1
+	environment.storage.set('uni-learn-question-bank-catalog-cache-v1', persistedCatalogCache)
+	const catalogCallsBeforeExpiredReuse = environment.calls.filter(call => (
+		call.data.action === 'getCatalog'
+	)).length
+	const practiceCallsBeforeExpiredReuse = environment.calls.filter(call => (
+		call.data.action === 'getPracticePage'
+	)).length
+	const expiredCatalogSmart = await reloadService(environment).getPracticePage({
+		subjectId,
+		mode: 'smart',
+		pageSize: 2,
+		answeredQuestionIds: [],
+		wrongQuestionIds: []
+	}, { versionFromResponse: true })
+	assert.equal(expiredCatalogSmart._localOnly, true)
+	assert.equal(environment.calls.filter(call => call.data.action === 'getCatalog').length, catalogCallsBeforeExpiredReuse + 1)
+	assert.equal(environment.calls.filter(call => call.data.action === 'getPracticePage').length, practiceCallsBeforeExpiredReuse)
+
 	environment.setCatalogVersion('2026-09-01')
 	await coldStartService.getQuestionCatalog(subjectId, { forceRefresh: true })
 	const cloudPagesBeforeVersionReload = environment.calls.filter(call => (
@@ -284,6 +358,48 @@ async function testPersistentChapterCache() {
 	secondColdStartService.clearQuestionBankCache(subjectId)
 	const clearedIndex = environment.storage.get('uni-learn-question-bank-chapter-cache-index-v1')
 	assert.equal(Object.keys(clearedIndex.entries).length, 0)
+}
+
+async function testPracticePageVersionFromResponse() {
+	const environment = createEnvironment()
+	const subjectId = 'junior-personal-finance'
+	const service = loadService(environment.sandbox)
+	const params = {
+		subjectId,
+		mode: 'smart',
+		pageSize: 20,
+		answeredQuestionIds: ['ipf-1'],
+		wrongQuestionIds: []
+	}
+
+	const firstPage = await service.getPracticePage(params, { versionFromResponse: true })
+	const cachedPage = await service.getPracticePage(params, { versionFromResponse: true })
+	assert.equal(firstPage.version, '2026-08-21')
+	assert.equal(cachedPage.version, '2026-08-21')
+	assert.equal(environment.calls.filter(call => call.data.action === 'getCatalog').length, 0)
+	assert.equal(environment.calls.filter(call => call.data.action === 'getPracticePage').length, 1)
+
+	await service.getQuestionCatalog(subjectId)
+	environment.setCatalogVersion('2026-09-01')
+	const catalogCallsBeforeRefresh = environment.calls.filter(call => (
+		call.data.action === 'getCatalog'
+	)).length
+	const refreshedPage = await service.getPracticePage(params, {
+		versionFromResponse: true,
+		forceRefresh: true
+	})
+	assert.equal(refreshedPage.version, '2026-09-01')
+	assert.equal(
+		environment.calls.filter(call => call.data.action === 'getCatalog').length,
+		catalogCallsBeforeRefresh
+	)
+
+	const refreshedCatalog = await service.getQuestionCatalog(subjectId)
+	assert.equal(refreshedCatalog.activeVersion, '2026-09-01')
+	assert.equal(
+		environment.calls.filter(call => call.data.action === 'getCatalog').length,
+		catalogCallsBeforeRefresh + 1
+	)
 }
 
 async function run() {
@@ -334,7 +450,9 @@ async function run() {
 	assert.deepEqual(Array.from(idRequest.data.questionIds), ['ipf-missing'])
 
 	const search = await service.searchQuestionBank({ subjectId, keyword: '题目', pageSize: 10 })
-	assert.equal(search.total, 1)
+	assert.equal(search.total, 3)
+	assert.equal(search._localOnly, true)
+	assert.equal(environment.calls.filter(call => call.data.action === 'searchQuestions').length, 0)
 	const answer = await service.checkQuestionAnswer({
 		subjectId,
 		questionId: 'ipf-1',
@@ -364,6 +482,7 @@ async function run() {
 async function main() {
 	await run()
 	await testPersistentChapterCache()
+	await testPracticePageVersionFromResponse()
 	console.log('question-bank service tests passed')
 }
 

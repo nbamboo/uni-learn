@@ -9,6 +9,7 @@ export const DEFAULT_SUBJECT_ID = 'junior-personal-finance'
 export const PRACTICE_STATE_KEY = 'uni-learn-practice-state-v1'
 export const DAILY_GOAL = 20
 const PRACTICE_ENTRY_MODES = ['smart', 'chapter', 'knowledge', 'wrong', 'favorite', 'search', 'sequence']
+export const PRACTICE_PROGRESS_UPDATED_EVENT = 'uni-learn-practice-progress-updated'
 
 export const subjectGroups = [
 	{
@@ -263,6 +264,17 @@ export function recordAnswer(question, selected, options) {
 		attempts: daily && daily.dayKey === todayKey ? (Number(daily.attempts) || 0) + 1 : 1
 	}
 	savePracticeState(state)
+	if ((practiceMode === 'chapter' || practiceMode === 'knowledge')
+		&& typeof uni !== 'undefined'
+		&& typeof uni.$emit === 'function') {
+		uni.$emit(PRACTICE_PROGRESS_UPDATED_EVENT, {
+			subjectId: question.subjectId,
+			mode: practiceMode,
+			chapterId: question.chapterId,
+			knowledge: question.knowledge || '',
+			questionId: question.id
+		})
+	}
 	queuePracticeAnswer(question, selected, {
 		eventId,
 		correct,

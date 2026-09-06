@@ -386,8 +386,16 @@
 			this.applyNavigationTheme()
 			this.initializePractice()
 		},
-		onShow() {
+		async onShow() {
 			this.progressSavedOnLeave = false
+			if (!this.membershipLoaded) return
+			try {
+				const preferences = await getPracticePreferences()
+				this.nightMode = Boolean(preferences.nightMode)
+				this.applyNavigationTheme()
+			} catch (error) {
+				// 前台刷新失败时继续沿用当前主题，不影响本次答题。
+			}
 		},
 		onHide() {
 			this.syncCurrentProgress()
@@ -407,7 +415,9 @@
 		},
 		methods: {
 			async initializePractice() {
-				await this.loadMembershipState()
+				await this.loadMembershipState({
+					forceRefresh: this.membership.isMember
+				})
 				if ((this.mode === 'wrong' || this.mode === 'favorite') && !this.membership.isMember) {
 					this.loading = false
 					this.loadError = `${this.mode === 'wrong' ? '错题集' : '收藏夹'}为会员权益`
@@ -416,9 +426,9 @@
 				}
 				this.loadQuestions()
 			},
-			async loadMembershipState() {
+			async loadMembershipState(options) {
 				try {
-					this.membership = await getMembership()
+					this.membership = await getMembership(options)
 				} catch (error) {
 					this.membership = getCachedMembership()
 				} finally {
@@ -536,7 +546,11 @@
 			},
 			async loadAnswerPreferences() {
 				const preferences = await getPracticePreferences()
-				await this.loadMembershipState()
+				if (!this.membershipLoaded) {
+					await this.loadMembershipState({
+						forceRefresh: this.membership.isMember
+					})
+				}
 				this.answerMode = !this.membership.isMember
 					&& (preferences.answerMode === 'exam' || preferences.answerMode === 'review')
 					? 'practice'
@@ -903,7 +917,9 @@
 				})
 			},
 			async favoriteCurrent() {
-				await this.loadMembershipState()
+				await this.loadMembershipState({
+					forceRefresh: this.membership.isMember
+				})
 				if (!this.membership.isMember) {
 					showMembershipRequired('收藏夹')
 					return
