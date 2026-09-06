@@ -135,7 +135,12 @@ const adLocations = firstPartyVueFiles.flatMap(relativePath => {
 	const source = readText(relativePath)
 	return (source.match(/<ad(?:-custom)?\b/g) || []).map(() => relativePath)
 })
-if (adLocations.length !== 1 || adLocations[0] !== 'practice-pages/practice/practice.vue') {
+const expectedAdLocations = [
+	'practice-pages/answer-settings/answer-settings.vue',
+	'practice-pages/practice/practice.vue',
+	'practice-pages/question-search/question-search.vue'
+]
+if (adLocations.slice().sort().join('|') !== expectedAdLocations.slice().sort().join('|')) {
 	failures.push(`业务源码广告组件清单异常：${adLocations.length ? adLocations.join('、') : '未找到广告组件'}`)
 }
 

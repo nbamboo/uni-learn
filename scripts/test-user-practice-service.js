@@ -448,9 +448,9 @@ async function testNonMemberLocalOnly() {
 				timestamp: Date.now()
 			}
 		},
-		favorites: [],
-		favoriteSubjects: {},
-		favoriteUpdatedAt: {},
+		favorites: [question.id],
+		favoriteSubjects: { [question.id]: subjectId },
+		favoriteUpdatedAt: { [question.id]: Date.now() },
 		dailyAttempts: {
 			[subjectId]: { dayKey: new Date().toISOString().slice(0, 10), attempts: 3 }
 		}
@@ -486,10 +486,24 @@ async function testNonMemberLocalOnly() {
 	})
 	assert.equal(progress.questionId, question.id)
 	assert.equal(progress._localOnly, true)
-	await assert.rejects(
-		service.getPracticeRecords({ subjectId, type: 'wrong', page: 1, pageSize: 20 }),
-		error => error && error.errCode === 'QUESTION_BANK_MEMBERSHIP_REQUIRED'
-	)
+	const localWrongRecords = await service.getPracticeRecords({
+		subjectId,
+		type: 'wrong',
+		page: 1,
+		pageSize: 20
+	})
+	assert.equal(localWrongRecords._localOnly, true)
+	assert.equal(localWrongRecords.total, 1)
+	assert.equal(localWrongRecords.items[0].question.id, question.id)
+	const localFavoriteRecords = await service.getPracticeRecords({
+		subjectId,
+		type: 'favorite',
+		page: 1,
+		pageSize: 20
+	})
+	assert.equal(localFavoriteRecords._localOnly, true)
+	assert.equal(localFavoriteRecords.total, 1)
+	assert.equal(localFavoriteRecords.items[0].question.id, question.id)
 	await assert.rejects(
 		service.getSmartPracticeQuestions({ subjectId, pageSize: 20 }),
 		error => error && error.errCode === 'QUESTION_BANK_LOCAL_SMART_REQUIRED'
@@ -605,6 +619,12 @@ async function testServerRevocationClearsLocalMembership() {
 	const storage = new Map()
 	const user = { uid: 'revoked-member-user', tokenExpired: Date.now() + 60 * 60 * 1000 }
 	storage.set(`uni-learn-membership-v1:${user.uid}`, activeMembership())
+	storage.set(`uni-learn-practice-preferences-v1:${user.uid}`, {
+		version: 1,
+		preferences: { answerMode: 'exam', nightMode: true, updatedAt: Date.now() },
+		dirty: false,
+		syncedAt: 0
+	})
 	const environment = {
 		uni: {
 			getStorageSync: key => storage.get(key),
@@ -641,7 +661,9 @@ async function testServerRevocationClearsLocalMembership() {
 	const service = loadService(environment)
 	assert.equal(service.practiceCloudSyncEnabled(), true)
 	const preferences = await service.getPracticePreferences()
-	assert.equal(preferences.answerMode, 'practice')
+	assert.equal(preferences.answerMode, 'exam')
+	assert.equal(preferences.nightMode, true)
+	assert.equal(preferences._localOnly, true)
 	assert.equal(service.practiceCloudSyncEnabled(), false)
 	const membership = storage.get(`uni-learn-membership-v1:${user.uid}`)
 	assert.equal(membership.isMember, false)

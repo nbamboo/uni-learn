@@ -164,6 +164,6 @@ node scripts/check-virtual-payment-readiness.js
 - [x] 已在本文说明退款规则、结算周期和费率（Android 等 1%、iOS 12%）。
 - [ ] 上线后已用小额真单核对“支付 → 推送 → 发货 → 会员生效 → 后台账单金额”。
 
-真单验证时购买最低价的 `membership_1m`，确认 `question_bank_payment_orders.status` 为 `delivered`、`question_bank_memberships.expiresAt` 延长一个月，并验证广告、错题集/收藏夹、考试/背题模式三类权益。自然到期允许最多 6 小时宽限，普通页面的会员状态缓存同样为 6 小时；会员中心始终强制刷新，本地仍显示会员时进入会员权益也会强制刷新。
+真单验证时购买最低价的 `membership_1m`，确认 `question_bank_payment_orders.status` 为 `delivered`、`question_bank_memberships.expiresAt` 延长一个月，并验证免广告与云端学习数据同步权益。错题集、收藏夹、考试模式和背题模式对所有用户开放。自然到期允许最多 6 小时宽限，普通页面的会员状态缓存同样为 6 小时；会员中心始终强制刷新。
 
 随后从 MP 后台执行一笔退款，确认订单变为 `refunded` 且相应时长被立即撤销。后台人工撤销必须将 `question_bank_memberships.status` 设为 `revoked`，不能仅修改为 `expired`；`revoked` 与退款撤销均不享有到期宽限。验证撤销后再次进入任一会员功能时，本地会员缓存立即变为非会员，并确认 `questionBankUser` 的会员 action 返回 `QUESTION_BANK_MEMBERSHIP_REQUIRED`。

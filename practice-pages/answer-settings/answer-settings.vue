@@ -9,7 +9,7 @@
 			<view class="mode-list">
 				<view
 					class="mode-option"
-					:class="{ selected: answerMode === item.key, 'is-saving': saving, locked: item.memberOnly && !membership.isMember }"
+					:class="{ selected: answerMode === item.key, 'is-saving': saving }"
 					v-for="item in answerModes"
 					:key="item.key"
 					@tap="selectAnswerMode(item.key)"
@@ -21,7 +21,6 @@
 						<view class="mode-title-row">
 							<text class="mode-name">{{ item.name }}</text>
 							<text class="current-tag" v-if="answerMode === item.key">当前模式</text>
-							<text class="member-mode-tag" v-else-if="item.memberOnly && !membership.isMember">会员</text>
 						</view>
 						<text class="mode-desc">{{ item.desc }}</text>
 					</view>
@@ -110,8 +109,7 @@
 	} from '@/services/user-practice.js'
 	import {
 		getCachedMembership,
-		getMembership,
-		showMembershipRequired
+		getMembership
 	} from '@/services/membership.js'
 
 	function showConfirm(title, content, confirmText) {
@@ -145,10 +143,9 @@
 						key: 'exam',
 						name: '考试模式',
 						desc: '提交整套试卷后统一查看答案与解析',
-						icon: 'locked-filled',
+						icon: 'paperplane-filled',
 						color: '#008cff',
-						tone: 'blue',
-						memberOnly: true
+						tone: 'blue'
 					},
 					{
 						key: 'practice',
@@ -164,8 +161,7 @@
 						desc: '进入题目后直接显示答案与解析',
 						icon: 'eye-filled',
 						color: '#008cff',
-						tone: 'blue',
-						memberOnly: true
+						tone: 'blue'
 					}
 				]
 			}
@@ -191,9 +187,6 @@
 					this.membership = getCachedMembership()
 				} finally {
 					this.membershipLoaded = true
-				}
-				if (!this.membership.isMember && (this.answerMode === 'exam' || this.answerMode === 'review')) {
-					this.answerMode = 'practice'
 				}
 			},
 			async confirmClearSubjectData() {
@@ -246,11 +239,7 @@
 				this.syncError = ''
 				try {
 					const preferences = await getPracticePreferences(options)
-					const answerMode = !this.membership.isMember
-						&& (preferences.answerMode === 'exam' || preferences.answerMode === 'review')
-						? 'practice'
-						: preferences.answerMode
-					this.applyPreferences(Object.assign({}, preferences, { answerMode }))
+					this.applyPreferences(preferences)
 					this.syncError = preferences._syncError || ''
 				} finally {
 					this.saving = false
@@ -258,15 +247,6 @@
 			},
 			async selectAnswerMode(answerMode) {
 				if (this.saving || answerMode === this.answerMode) return
-				if (answerMode === 'exam' || answerMode === 'review') {
-					await this.refreshMembership({
-						forceRefresh: this.membership.isMember
-					})
-					if (!this.membership.isMember) {
-						showMembershipRequired(answerMode === 'exam' ? '考试模式' : '背题模式')
-						return
-					}
-				}
 				this.persistPreferences({ answerMode })
 			},
 			toggleNightMode() {
@@ -323,14 +303,12 @@
 	.mode-option { display: flex; align-items: center; min-height: 128rpx; padding: 22rpx 24rpx; border: 2rpx solid transparent; border-radius: 14rpx; box-sizing: border-box; background: #ffffff; box-shadow: 0 5rpx 18rpx rgba(31, 45, 61, 0.045); }
 	.mode-option.is-saving, .night-option.is-saving { opacity: 0.72; }
 	.mode-option.selected { border-color: #79c2ff; background: #f4faff; box-shadow: 0 7rpx 22rpx rgba(0, 140, 255, 0.09); }
-	.mode-option.locked { opacity: 0.82; }
 	.mode-icon { display: flex; align-items: center; justify-content: center; width: 70rpx; height: 70rpx; flex: 0 0 70rpx; margin-right: 22rpx; border-radius: 16rpx; }
 	.mode-icon.blue { background: #e4f3ff; }
 	.mode-copy { display: flex; flex: 1; flex-direction: column; min-width: 0; }
 	.mode-title-row { display: flex; align-items: center; }
 	.mode-name { font-size: 29rpx; font-weight: 600; }
 	.current-tag { margin-left: 14rpx; padding: 4rpx 10rpx; border-radius: 6rpx; background: #008cff; color: #ffffff; font-size: 18rpx; line-height: 1.3; }
-	.member-mode-tag { margin-left: 14rpx; padding: 4rpx 10rpx; border-radius: 6rpx; background: #273a50; color: #ffffff; font-size: 18rpx; line-height: 1.3; }
 	.mode-desc { margin-top: 8rpx; color: #858c95; font-size: 22rpx; line-height: 1.45; }
 	.radio-mark { display: flex; align-items: center; justify-content: center; width: 38rpx; height: 38rpx; flex: 0 0 38rpx; margin-left: 18rpx; border: 3rpx solid #d3d8de; border-radius: 50%; box-sizing: border-box; }
 	.radio-dot { width: 20rpx; height: 20rpx; border-radius: 50%; background: #008cff; }

@@ -264,8 +264,7 @@
 	} from '@/services/user-practice.js'
 	import {
 		getCachedMembership,
-		getMembership,
-		showMembershipRequired
+		getMembership
 	} from '@/services/membership.js'
 	import FinanceCalculator from '@/components/finance-calculator/finance-calculator.vue'
 
@@ -418,13 +417,7 @@
 				await this.loadMembershipState({
 					forceRefresh: this.membership.isMember
 				})
-				if ((this.mode === 'wrong' || this.mode === 'favorite') && !this.membership.isMember) {
-					this.loading = false
-					this.loadError = `${this.mode === 'wrong' ? '错题集' : '收藏夹'}为会员权益`
-					showMembershipRequired(this.mode === 'wrong' ? '错题集' : '收藏夹')
-					return
-				}
-				this.loadQuestions()
+				return this.loadQuestions()
 			},
 			async loadMembershipState(options) {
 				try {
@@ -551,10 +544,7 @@
 						forceRefresh: this.membership.isMember
 					})
 				}
-				this.answerMode = !this.membership.isMember
-					&& (preferences.answerMode === 'exam' || preferences.answerMode === 'review')
-					? 'practice'
-					: preferences.answerMode
+				this.answerMode = preferences.answerMode
 				this.nightMode = Boolean(preferences.nightMode)
 				this.applyNavigationTheme()
 			},
@@ -917,13 +907,6 @@
 				})
 			},
 			async favoriteCurrent() {
-				await this.loadMembershipState({
-					forceRefresh: this.membership.isMember
-				})
-				if (!this.membership.isMember) {
-					showMembershipRequired('收藏夹')
-					return
-				}
 				this.favorite = toggleFavorite(this.currentQuestion)
 				const questionId = this.currentQuestion.id
 				const index = this.favoriteQuestionIds.indexOf(questionId)

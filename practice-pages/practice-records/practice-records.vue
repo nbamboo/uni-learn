@@ -25,7 +25,7 @@
 			<view class="empty-icon">
 				<uni-icons type="cloud-download" size="42" color="#d34d4d"></uni-icons>
 			</view>
-			<text class="empty-title">云端记录加载失败</text>
+			<text class="empty-title">记录加载失败</text>
 			<text class="empty-caption">{{ loadError }}</text>
 			<button @tap="retryLoad">重新加载</button>
 		</view>
@@ -67,6 +67,7 @@
 
 <script>
 	import { getSubjectById } from '@/data/practice.js'
+	import { getQuestionsByIds } from '@/services/question-bank.js'
 	import {
 		getLocalPracticePreferences,
 		getPracticeRecords
@@ -149,7 +150,20 @@
 						forceRefresh: Boolean(forceRefresh)
 					})
 					if (requestId !== this.requestId) return
-					const items = (result.items || []).map(item => Object.assign({}, item, {
+					let sourceItems = result.items || []
+					if (result._localOnly && sourceItems.length) {
+						const questionIds = sourceItems.map(item => item.question.id)
+						const questions = await getQuestionsByIds({
+							subjectId: this.subjectId,
+							questionIds
+						})
+						const questionMap = new Map((questions.items || []).map(question => [question.id, question]))
+						sourceItems = sourceItems.map(item => Object.assign({}, item, {
+							question: questionMap.get(item.question.id)
+						})).filter(item => item.question)
+					}
+					if (requestId !== this.requestId) return
+					const items = sourceItems.map(item => Object.assign({}, item, {
 						time: item.timestamp ? formatRecordTime(item.timestamp) : ''
 					}))
 					this.records = shouldReset ? items : this.records.concat(items)
@@ -159,7 +173,7 @@
 					this.hasMore = Boolean(result.hasMore)
 				} catch (error) {
 					if (requestId !== this.requestId) return
-					this.loadError = (error && (error.errMsg || error.message)) || '云端记录加载失败'
+					this.loadError = (error && (error.errMsg || error.message)) || '记录加载失败'
 				} finally {
 					if (requestId === this.requestId) {
 						this.loading = false

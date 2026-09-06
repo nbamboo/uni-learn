@@ -172,6 +172,9 @@ async function run() {
 	cloudMembership = { isMember: false, status: 'inactive', expiresAt: 0 }
 	const revoked = await service.getMembership({ forceRefresh: true })
 	assert.equal(revoked.isMember, false)
+	assert.equal(revoked.entitlements.adFree, false)
+	assert.equal(revoked.entitlements.practiceRecords, true)
+	assert.equal(revoked.entitlements.advancedAnswerModes, true)
 	assert.equal(service.getCachedMembership().isMember, false)
 
 	console.log('membership service tests passed')

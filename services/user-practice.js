@@ -217,8 +217,8 @@ function deactivateCachedMembership() {
 		expiresAt: 0,
 		entitlements: {
 			adFree: false,
-			practiceRecords: false,
-			advancedAnswerModes: false
+			practiceRecords: true,
+			advancedAnswerModes: true
 		},
 		cachedAt: Date.now()
 	}))
@@ -1012,6 +1012,67 @@ function getLocalPracticeSnapshot(subjectId, options) {
 	}
 }
 
+function localRecordBelongsToSubject(state, questionId, subjectId) {
+	const answer = state.answers[questionId]
+	const savedSubjectId = state.favoriteSubjects[questionId]
+	return savedSubjectId === subjectId
+		|| answer && answer.subjectId === subjectId
+		|| (!savedSubjectId
+			&& (!answer || !answer.subjectId)
+			&& subjectId === 'junior-personal-finance'
+			&& questionId.indexOf('ipf-') === 0)
+}
+
+function getLocalPracticeRecords(params) {
+	const input = params || {}
+	const subjectId = input.subjectId
+	const type = input.type === 'favorite' ? 'favorite' : 'wrong'
+	const page = Math.max(1, Number(input.page) || 1)
+	const pageSize = Math.max(1, Math.min(50, Number(input.pageSize) || 20))
+	const state = readLocalPracticeState(input.localState)
+	let rows
+	if (type === 'favorite') {
+		rows = state.favorites
+			.filter(questionId => localRecordBelongsToSubject(state, questionId, subjectId))
+			.map(questionId => ({
+				questionId,
+				correct: Boolean(state.answers[questionId] && state.answers[questionId].correct),
+				timestamp: Number(state.favoriteUpdatedAt[questionId]) || 0
+			}))
+	} else {
+		rows = Object.keys(state.answers)
+			.filter(questionId => {
+				const answer = state.answers[questionId]
+				return answer
+					&& answer.correct === false
+					&& localRecordBelongsToSubject(state, questionId, subjectId)
+			})
+			.map(questionId => ({
+				questionId,
+				correct: false,
+				timestamp: Number(state.answers[questionId].timestamp) || 0
+			}))
+	}
+	rows.sort((left, right) => right.timestamp - left.timestamp)
+	const offset = (page - 1) * pageSize
+	const items = rows.slice(offset, offset + pageSize).map(row => ({
+		recordId: `${type}-${row.questionId}`,
+		question: { id: row.questionId },
+		correct: row.correct,
+		timestamp: row.timestamp
+	}))
+	return {
+		subjectId,
+		type,
+		page,
+		pageSize,
+		total: rows.length,
+		hasMore: offset + items.length < rows.length,
+		items,
+		_localOnly: true
+	}
+}
+
 export function invalidateUserPracticeCache(subjectId) {
 	if (subjectId) {
 		Array.from(snapshotCache.keys()).forEach(key => {
@@ -1108,10 +1169,7 @@ export async function getPracticeStateSnapshot(subjectId, options) {
 export async function getPracticeRecords(params) {
 	const input = params || {}
 	if (!practiceCloudSyncEnabled()) {
-		throw new UserPracticeServiceError(
-			'QUESTION_BANK_MEMBERSHIP_REQUIRED',
-			`${input.type === 'favorite' ? '收藏夹' : '错题集'}为会员权益，请先开通会员`
-		)
+		return getLocalPracticeRecords(input)
 	}
 	const subjectId = input.subjectId
 	const type = input.type || 'wrong'
@@ -1301,12 +1359,11 @@ export async function getPracticePreferences(options) {
 			return Object.assign({}, saved, { _syncPending: false })
 		} catch (error) {
 			if (error && error.errCode === 'QUESTION_BANK_MEMBERSHIP_REQUIRED') {
-				const downgraded = normalizePracticePreferences(Object.assign({}, localEntry.preferences, {
-					answerMode: 'practice',
-					updatedAt: Date.now()
-				}))
-				const saved = savePreferencesEntry(downgraded, false, Date.now())
-				return Object.assign({}, saved, { _syncPending: false })
+				deactivateCachedMembership()
+				return Object.assign({}, localEntry.preferences, {
+					_syncPending: false,
+					_localOnly: true
+				})
 			}
 			if (config.localFallback === false) throw error
 			return Object.assign({}, localEntry.preferences, {
@@ -1344,10 +1401,11 @@ export async function updatePracticePreferences(preferences) {
 		result = await executeCloudCall('updatePreferences', next)
 	} catch (error) {
 		if (error && error.errCode === 'QUESTION_BANK_MEMBERSHIP_REQUIRED') {
-			savePreferencesEntry(Object.assign({}, next, {
-				answerMode: 'practice',
-				updatedAt: Date.now()
-			}), false, Date.now())
+			deactivateCachedMembership()
+			return Object.assign({}, next, {
+				_syncPending: false,
+				_localOnly: true
+			})
 		}
 		throw error
 	}

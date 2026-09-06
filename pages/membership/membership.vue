@@ -94,8 +94,6 @@
 				countdownTimer: null,
 				benefits: [
 					{ title: '屏蔽全部广告', desc: '学习和查看成绩时不再展示广告', icon: 'eye-slash' },
-					{ title: '错题集与收藏夹', desc: '集中回顾薄弱题目和重点内容', icon: 'star' },
-					{ title: '考试模式与背题模式', desc: '按需要切换统一交卷或直接查看解析', icon: 'checkbox' },
 					{ title: '云端学习数据同步', desc: '同一微信账号跨设备登录，答题记录与学习进度自动同步', icon: 'cloud-upload' }
 				]
 			}
@@ -105,7 +103,7 @@
 				return this.plans.find(item => item.productId === this.selectedProductId) || this.plans[0]
 			},
 			membershipCaption() {
-				if (!this.membership.isMember) return '开通会员即可解锁完整答题体验'
+				if (!this.membership.isMember) return '开通会员，享受免广告与云端同步'
 				return `有效期至 ${this.formatDate(this.membership.expiresAt)}`
 			},
 			purchaseButtonText() {

@@ -57,8 +57,8 @@ function normalizeMembership(value) {
 		expiresAt: isMember ? expiresAt : 0,
 		entitlements: {
 			adFree: isMember,
-			practiceRecords: isMember,
-			advancedAnswerModes: isMember
+			practiceRecords: true,
+			advancedAnswerModes: true
 		},
 		plans: Array.isArray(source.plans) ? source.plans.map(item => Object.assign({}, item)) : [],
 		cachedAt: Number(source.cachedAt) || 0
@@ -246,32 +246,11 @@ export async function restoreLastMembershipOrder() {
 	return queryMembershipOrder(saved.outTradeNo, { attempts: 1 })
 }
 
-export function openMembershipPage() {
-	uni.navigateTo({ url: '/pages/membership/membership' })
-}
-
-export function showMembershipRequired(featureName) {
-	return new Promise(resolve => {
-		uni.showModal({
-			title: '会员专属功能',
-			content: `${featureName || '该功能'}为会员权益，开通后还可屏蔽全部广告。`,
-			confirmText: '查看会员',
-			success: result => {
-				if (result.confirm) openMembershipPage()
-				resolve(Boolean(result.confirm))
-			},
-			fail: () => resolve(false)
-		})
-	})
-}
-
 export default {
 	getCachedMembership,
 	getMembership,
 	membershipIsActive,
-	openMembershipPage,
 	purchaseMembership,
 	queryMembershipOrder,
-	restoreLastMembershipOrder,
-	showMembershipRequired
+	restoreLastMembershipOrder
 }

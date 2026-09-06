@@ -56,8 +56,6 @@ async function run() {
 	let interstitialCreateCalls = 0
 	let interstitialShowCalls = 0
 	let interstitialDestroyCalls = 0
-	const membershipRequestOptions = []
-	const membershipPrompts = []
 	let preferenceResponse = { answerMode: 'practice', nightMode: false }
 	let practiceAnswers = {}
 	const practiceProgressEvent = 'uni-learn-practice-progress-updated'
@@ -156,14 +154,7 @@ async function run() {
 			getPracticePreferences: async () => preferenceResponse,
 			getCachedPracticeSummary: () => null,
 		getCachedMembership: () => membershipResponse,
-		getMembership: async options => {
-			membershipRequestOptions.push(options || {})
-			return membershipResponse
-		},
-		showMembershipRequired: async feature => {
-			membershipPrompts.push(feature)
-			return true
-		},
+		getMembership: async () => membershipResponse,
 		updatePracticePreferences: async preferences => {
 			preferenceResponse = Object.assign({}, preferences, { updatedAt: Date.now() })
 			return preferenceResponse
@@ -191,6 +182,28 @@ async function run() {
 			}
 		},
 		getPracticeSummary: async () => ({ attempted: 0, todayAttempts: 0 }),
+		getPracticeRecords: async input => ({
+			subjectId: input.subjectId,
+			type: input.type,
+			page: input.page,
+			pageSize: input.pageSize,
+			total: 1,
+			hasMore: false,
+			_localOnly: true,
+			items: [{
+				recordId: `${input.type}-local-record`,
+				question: { id: 'local-record' },
+				correct: false,
+				timestamp: Date.now()
+			}]
+		}),
+		getQuestionsByIds: async () => ({
+			items: [{
+				id: 'local-record',
+				title: '本地错题',
+				knowledge: '本地记录'
+			}]
+		}),
 		getCatalog: async () => {
 			catalogCalls += 1
 			return {
@@ -714,6 +727,14 @@ async function run() {
 	recordsComponent.onShow.call(recordsTheme)
 	assert.equal(recordsTheme.nightMode, true)
 	assert.equal(recordsLoadCalls, 1)
+	const freeRecords = Object.assign(recordsComponent.data(), recordsComponent.methods, {
+		subjectId: 'junior-personal-finance',
+		activeView: 'wrong'
+	})
+	await freeRecords.loadRecords()
+	assert.equal(freeRecords.total, 1)
+	assert.equal(freeRecords.records[0].question.title, '本地错题')
+	assert.equal(freeRecords.loadError, '')
 	assert.deepEqual(JSON.parse(JSON.stringify(navigationColors.slice(-1)[0])), {
 		frontColor: '#ffffff',
 		backgroundColor: '#171c22'
@@ -783,51 +804,39 @@ async function run() {
 		isMember: false,
 		status: 'inactive',
 		expiresAt: 0,
-		entitlements: { adFree: false, practiceRecords: false, advancedAnswerModes: false },
+		entitlements: { adFree: false, practiceRecords: true, advancedAnswerModes: true },
 		plans: []
 	}
-	home.membership = membershipResponse
 	home.stats = Object.assign({}, home.stats, { wrong: 7, favorite: 3 })
-	assert.equal(home.featureCount('wrong'), 0)
-	assert.equal(home.featureCount('favorite'), 0)
-	home.membership = activeMembership
 	assert.equal(home.featureCount('wrong'), 7)
 	assert.equal(home.featureCount('favorite'), 3)
-	home.membership = membershipResponse
-
-	const lockedPractice = createContext('practice', [single])
-	lockedPractice.membershipLoaded = true
-	assert.equal(lockedPractice.showAds, true)
-	lockedPractice.currentIndex = 0
-	lockedPractice.loadQuestion(0)
+	await home.handleFeature(home.features.find(item => item.key === 'wrong'))
+	assert.equal(navigationUrls.slice(-1)[0], '/practice-pages/practice-records/practice-records?subjectId=junior-personal-finance&view=wrong')
+	await home.handleFeature(home.features.find(item => item.key === 'favorite'))
+	assert.equal(navigationUrls.slice(-1)[0], '/practice-pages/practice-records/practice-records?subjectId=junior-personal-finance&view=favorite')
+	const freePractice = createContext('practice', [single])
+	freePractice.membershipLoaded = true
+	assert.equal(freePractice.showAds, true)
+	freePractice.currentIndex = 0
+	freePractice.loadQuestion(0)
 	const recordsBeforeLockedWrongAnswer = recordCalls.length
-	lockedPractice.chooseOption('B')
+	freePractice.chooseOption('B')
 	assert.equal(recordCalls.length, recordsBeforeLockedWrongAnswer + 1)
-	assert.equal(lockedPractice.sessionAnswers[single.id].correct, false)
+	assert.equal(freePractice.sessionAnswers[single.id].correct, false)
 	const togglesBeforeLockedFavorite = favoriteToggleCalls
-	await lockedPractice.favoriteCurrent()
-	assert.equal(membershipRequestOptions.slice(-1)[0].forceRefresh, false)
-	assert.equal(favoriteToggleCalls, togglesBeforeLockedFavorite)
-	assert.equal(membershipPrompts.slice(-1)[0], '收藏夹')
-	lockedPractice.mode = 'wrong'
-	await lockedPractice.initializePractice()
-	assert.equal(membershipRequestOptions.slice(-1)[0].forceRefresh, false)
-	assert.equal(lockedPractice.loadError, '错题集为会员权益')
-	assert.equal(membershipPrompts.slice(-1)[0], '错题集')
+	await freePractice.favoriteCurrent()
+	assert.equal(favoriteToggleCalls, togglesBeforeLockedFavorite + 1)
+	freePractice.mode = 'wrong'
+	await freePractice.initializePractice()
+	assert.equal(freePractice.loadError, '')
 
-	const lockedSettings = Object.assign(settingsComponent.data(), settingsComponent.methods)
-	lockedSettings.answerMode = 'practice'
-	lockedSettings.saving = false
-	await lockedSettings.selectAnswerMode('exam')
-	assert.equal(membershipRequestOptions.slice(-1)[0].forceRefresh, false)
-	assert.equal(lockedSettings.answerMode, 'practice')
-	assert.equal(membershipPrompts.slice(-1)[0], '考试模式')
-
-	const staleMemberPractice = createContext('practice', [single])
-	staleMemberPractice.membership = activeMembership
-	await staleMemberPractice.favoriteCurrent()
-	assert.equal(membershipRequestOptions.slice(-1)[0].forceRefresh, true)
-	assert.equal(staleMemberPractice.membership.isMember, false)
+	const freeSettings = Object.assign(settingsComponent.data(), settingsComponent.methods)
+	freeSettings.answerMode = 'practice'
+	freeSettings.saving = false
+	await freeSettings.selectAnswerMode('exam')
+	assert.equal(freeSettings.answerMode, 'exam')
+	await freeSettings.selectAnswerMode('review')
+	assert.equal(freeSettings.answerMode, 'review')
 
 	const pagesConfig = JSON.parse(fs.readFileSync(path.resolve(__dirname, '../pages.json'), 'utf8'))
 	assert.equal(pagesConfig.pages.some(page => page.path === 'pages/privacy/privacy'), false)
@@ -840,6 +849,7 @@ async function run() {
 	assert.match(aboutPageSource, /做题数据已开启云同步/)
 	const membershipPageSource = fs.readFileSync(path.resolve(__dirname, '../pages/membership/membership.vue'), 'utf8')
 	assert.doesNotMatch(membershipPageSource, /支付后权益未到账|class="notice-card"/)
+	assert.doesNotMatch(membershipPageSource, /错题集与收藏夹|考试模式与背题模式/)
 	assert.match(membershipPageSource, /云端学习数据同步/)
 	assert.match(membershipPageSource, /同一微信账号跨设备登录，答题记录与学习进度自动同步/)
 	const settingsPageSource = fs.readFileSync(path.resolve(__dirname, '../practice-pages/answer-settings/answer-settings.vue'), 'utf8')
