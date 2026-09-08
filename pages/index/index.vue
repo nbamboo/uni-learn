@@ -24,12 +24,26 @@
 
 			<view v-if="activeMode === 1" class="parameter-pane">
 				<view class="parameter-list">
-					<my-unit
-						v-for="item in parameterTools"
-						:key="item.url"
-						:tool-data="item"
-						@change="openTool"
-					></my-unit>
+					<block v-for="item in parameterTools" :key="item.url">
+						<my-unit
+							:tool-data="item"
+							@change="openTool"
+						></my-unit>
+
+						<!-- #ifdef MP-WEIXIN -->
+						<view
+							class="parameter-ad-container"
+							v-if="showAds && item.url === '/pages/flzzb/flzzb'"
+						>
+							<ad-custom
+								unit-id="adunit-9ff96a0edd39a741"
+								@load="adLoad"
+								@error="adError"
+								@close="adClose"
+							></ad-custom>
+						</view>
+						<!-- #endif -->
+					</block>
 				</view>
 			</view>
 		</scroll-view>
@@ -39,6 +53,7 @@
 <script>
 	import FinanceCalculator from '@/components/finance-calculator/finance-calculator.vue'
 	import MyUnit from '@/components/myUnit/myUnit.vue'
+	import { getCachedMembership, getMembership } from '@/services/membership.js'
 
 	export default {
 		components: {
@@ -47,6 +62,9 @@
 		},
 		data() {
 			return {
+				membership: getCachedMembership(),
+				membershipLoaded: false,
+				membershipLoading: false,
 				activeMode: 0,
 				modes: [
 					{ key: 'calculator', label: '理财计算器' },
@@ -112,6 +130,11 @@
 				]
 			}
 		},
+		computed: {
+			showAds() {
+				return this.membershipLoaded && !this.membership.isMember
+			}
+		},
 		onShareAppMessage() {
 			return {
 				title: '银行从业理财计算器',
@@ -123,6 +146,9 @@
 				this.$refs.calculator.dismissKeyboard()
 			}
 		},
+		onShow() {
+			if (this.activeMode === 1) this.refreshMembership()
+		},
 		methods: {
 			switchMode(index) {
 				if (index === this.activeMode) return
@@ -131,11 +157,33 @@
 					this.$refs.calculator.dismissKeyboard()
 				}
 				this.activeMode = index
+				if (index === 1) this.refreshMembership()
+			},
+			async refreshMembership() {
+				if (this.membershipLoading) return
+				this.membershipLoading = true
+				try {
+					this.membership = await getMembership()
+				} catch (error) {
+					this.membership = getCachedMembership()
+				} finally {
+					this.membershipLoaded = true
+					this.membershipLoading = false
+				}
 			},
 			openTool(toolData) {
 				uni.navigateTo({
 					url: toolData.url
 				})
+			},
+			adLoad() {
+				console.log('原生模板广告加载成功')
+			},
+			adError(error) {
+				console.error('原生模板广告加载失败', error)
+			},
+			adClose() {
+				console.log('原生模板广告关闭')
 			}
 		}
 	}
@@ -224,6 +272,14 @@
 
 	.parameter-list {
 		padding: 8rpx 12rpx 20rpx;
+	}
+
+	.parameter-ad-container {
+		margin: 10px;
+		overflow: hidden;
+		border-radius: 4px;
+		background: #ffffff;
+		box-shadow: 0 0 6px 1px rgba(165, 165, 165, 0.2);
 	}
 
 	@media screen and (min-width: 900px) {

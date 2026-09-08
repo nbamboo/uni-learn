@@ -42,6 +42,12 @@ SUBJECT_CONFIGS = {
         "level": "初级",
         "questionPrefix": "jlaw",
     },
+    "银行从业初级银行管理": {
+        "subjectId": "junior-bank-management",
+        "name": "初级银行管理",
+        "level": "初级",
+        "questionPrefix": "jbm",
+    },
 }
 
 FIELD_LIMITS = {

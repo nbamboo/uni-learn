@@ -16,10 +16,10 @@ const MISSING_ORDER_CLOSE_AGE_MS = 30 * 60 * 1000
 const MEMBER_EXPIRY_GRACE_MS = 6 * 60 * 60 * 1000
 
 const PRODUCTS = Object.freeze({
-	'membership_1m': Object.freeze({ productId: 'membership_1m', name: '1个月会员', months: 1, priceFen: 300 }),
-	'membership_3m': Object.freeze({ productId: 'membership_3m', name: '3个月会员', months: 3, priceFen: 600 }),
-	'membership_6m': Object.freeze({ productId: 'membership_6m', name: '半年会员', months: 6, priceFen: 1000 }),
-	'membership_12m': Object.freeze({ productId: 'membership_12m', name: '1年会员', months: 12, priceFen: 1500 })
+	'membership_1m': Object.freeze({ productId: 'membership_1m', name: '全科31天', months: 1, days: 31, priceFen: 800, regularPriceFen: 1200, showRegularPrice: true }),
+	'membership_3m': Object.freeze({ productId: 'membership_3m', name: '全科93天', months: 3, days: 93, priceFen: 1900, regularPriceFen: 2900 }),
+	'membership_6m': Object.freeze({ productId: 'membership_6m', name: '全科186天', months: 6, days: 186, priceFen: 3500, regularPriceFen: 5200 }),
+	'membership_12m': Object.freeze({ productId: 'membership_12m', name: '全科366天', months: 12, days: 366, priceFen: 5900, regularPriceFen: 8900 })
 })
 
 class VirtualPaymentError extends Error {
@@ -118,6 +118,10 @@ function addCalendarMonths(timestamp, months) {
 	return targetMonthStart.getTime() - SHANGHAI_OFFSET_MS
 }
 
+function addFixedDays(timestamp, days) {
+	return Number(timestamp) + Number(days) * 24 * 60 * 60 * 1000
+}
+
 function recomputeMembership(membership, timestamp) {
 	const grants = Array.isArray(membership && membership.grants)
 		? membership.grants.slice(-MAX_GRANTS)
@@ -128,7 +132,11 @@ function recomputeMembership(membership, timestamp) {
 	activeGrants.forEach(grant => {
 		const grantedAt = dateValue(grant.grantedAt) || timestamp
 		const base = Math.max(expiresAt, grantedAt)
-		expiresAt = addCalendarMonths(base, Number(grant.months) * Number(grant.quantity || 1))
+		const quantity = Number(grant.quantity || 1)
+		const days = Number(grant.days)
+		expiresAt = Number.isInteger(days) && days > 0
+			? addFixedDays(base, days * quantity)
+			: addCalendarMonths(base, Number(grant.months) * quantity)
 	})
 	return {
 		grants,
@@ -463,6 +471,7 @@ function createVirtualPaymentService(db, options) {
 			productId,
 			productName: product.name,
 			months: product.months,
+			days: product.days,
 			quantity: 1,
 			amountFen: product.priceFen,
 			env: ENV,
@@ -501,7 +510,12 @@ function createVirtualPaymentService(db, options) {
 			if (order.status === 'refunded') return { order, alreadyDelivered: true }
 			if (order.status === 'delivered') return { order, alreadyDelivered: true }
 			const product = PRODUCTS[order.productId]
-			if (!product || product.priceFen !== Number(order.amountFen) || product.months !== Number(order.months)) {
+			const orderDays = optionalNumber(order.days)
+			if (!product
+				|| product.months !== Number(order.months)
+				|| (Number.isFinite(orderDays) && product.days !== orderDays)
+				|| !Number.isInteger(Number(order.amountFen))
+				|| Number(order.amountFen) <= 0) {
 				fail('VIRTUAL_PAYMENT_ORDER_MISMATCH', '本地订单商品配置不一致')
 			}
 			const timestamp = now().getTime()
@@ -514,14 +528,16 @@ function createVirtualPaymentService(db, options) {
 			}
 			const grants = Array.isArray(membership.grants) ? membership.grants.slice() : []
 			if (!grants.some(item => item.grantId === wxOrderId)) {
-				grants.push({
+				const grant = {
 					grantId: wxOrderId,
 					outTradeNo: order.outTradeNo,
 					productId: order.productId,
 					months: order.months,
 					quantity: order.quantity,
 					grantedAt: new Date(platformOrder.paidAt || timestamp)
-				})
+				}
+				if (Number.isFinite(orderDays)) grant.days = orderDays
+				grants.push(grant)
 			}
 			membership.grants = grants.slice(-MAX_GRANTS)
 			const computed = recomputeMembership(membership, timestamp)
@@ -838,6 +854,7 @@ module.exports = {
 	PRODUCTS,
 	VirtualPaymentError,
 	addCalendarMonths,
+	addFixedDays,
 	calculateMessageSignature,
 	calculatePaySignature,
 	calculateUserSignature,

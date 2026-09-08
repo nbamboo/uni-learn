@@ -64,15 +64,20 @@ if (paymentConfig) {
 }
 
 const expectedProducts = {
-	'membership_1m': { months: 1, priceFen: 300 },
-	'membership_3m': { months: 3, priceFen: 600 },
-	'membership_6m': { months: 6, priceFen: 1000 },
-	'membership_12m': { months: 12, priceFen: 1500 }
+	'membership_1m': { name: '全科31天', months: 1, days: 31, priceFen: 800, regularPriceFen: 1200 },
+	'membership_3m': { name: '全科93天', months: 3, days: 93, priceFen: 1900, regularPriceFen: 2900 },
+	'membership_6m': { name: '全科186天', months: 6, days: 186, priceFen: 3500, regularPriceFen: 5200 },
+	'membership_12m': { name: '全科366天', months: 12, days: 366, priceFen: 5900, regularPriceFen: 8900 }
 }
 Object.keys(expectedProducts).forEach(productId => {
 	const actual = PRODUCTS[productId]
 	const expected = expectedProducts[productId]
-	if (!actual || actual.months !== expected.months || actual.priceFen !== expected.priceFen) {
+	if (!actual
+		|| actual.name !== expected.name
+		|| actual.months !== expected.months
+		|| actual.days !== expected.days
+		|| actual.priceFen !== expected.priceFen
+		|| actual.regularPriceFen !== expected.regularPriceFen) {
 		failures.push(`会员商品配置错误：${productId}`)
 	}
 })
@@ -136,6 +141,7 @@ const adLocations = firstPartyVueFiles.flatMap(relativePath => {
 	return (source.match(/<ad(?:-custom)?\b/g) || []).map(() => relativePath)
 })
 const expectedAdLocations = [
+	'pages/index/index.vue',
 	'practice-pages/answer-settings/answer-settings.vue',
 	'practice-pages/chapter/chapter.vue',
 	'practice-pages/practice/practice.vue',

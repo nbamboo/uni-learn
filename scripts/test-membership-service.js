@@ -71,7 +71,7 @@ async function run() {
 								order: {
 									outTradeNo: 'Mpaymentorder1',
 									productId: 'membership_1m',
-									amountFen: 300,
+									amountFen: 800,
 									status: 'pending'
 								},
 								payData: { signData: '{}', mode: 'short_series_goods', paySig: 'sig', signature: 'user-sig' }

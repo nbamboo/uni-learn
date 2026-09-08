@@ -4,6 +4,7 @@ const assert = require('node:assert/strict')
 const crypto = require('node:crypto')
 const {
 	addCalendarMonths,
+	addFixedDays,
 	calculateMessageSignature,
 	calculatePaySignature,
 	calculateUserSignature,
@@ -86,6 +87,7 @@ function encryptWeixinMessage(message, encodingAESKey, appId) {
 
 async function testReconcileFairness() {
 	const currentTime = new Date('2026-09-02T00:00:00.000Z')
+	// 保留调价前的 3 元订单，验证调价不会让历史待处理订单失效。
 	const orders = Array.from({ length: 51 }, (_, index) => {
 		const orderNumber = String(index + 1).padStart(2, '0')
 		const outTradeNo = `Mreconcile${orderNumber}`
@@ -139,6 +141,7 @@ async function testReconcileFairness() {
 async function testMissingOrderCleanup() {
 	const currentTime = new Date('2026-09-02T01:00:00.000Z')
 	const outTradeNo = 'Mmissingorder123456'
+	// 历史订单即使金额与当前商品价不同，仍应按创建时保存的金额完成发货。
 	const environment = createDatabase({
 		question_bank_payment_orders: [{
 			_id: outTradeNo,
@@ -219,6 +222,10 @@ async function run() {
 
 	const januaryEnd = new Date('2026-01-31T04:30:00.000Z').getTime()
 	assert.equal(new Date(addCalendarMonths(januaryEnd, 1)).toISOString(), '2026-02-28T04:30:00.000Z')
+	assert.equal(
+		new Date(addFixedDays(januaryEnd, 31)).toISOString(),
+		'2026-03-03T04:30:00.000Z'
+	)
 	const computed = recomputeMembership({
 		grants: [
 			{ grantId: 'a', months: 1, quantity: 1, grantedAt: new Date('2026-01-01T00:00:00.000Z') },
@@ -295,8 +302,8 @@ async function run() {
 						order: {
 							order_id: createdOrderId,
 							status: 2,
-							order_fee: 300,
-							paid_fee: 300,
+							order_fee: 800,
+							paid_fee: 800,
 							paid_time: 1788235200,
 							wx_order_id: 'wx-order-one',
 							wxpay_order_id: 'transaction-one',
@@ -309,13 +316,26 @@ async function run() {
 		}
 	})
 
+	const availablePlans = (await service.execute({ action: 'getMembership' }, 'user-one')).plans
+	assert.deepEqual(
+		availablePlans.map(plan => plan.priceFen),
+		[800, 1900, 3500, 5900]
+	)
+	assert.equal(availablePlans[0].regularPriceFen, 1200)
+	assert.equal(availablePlans[0].name, '全科31天')
+	assert.equal(availablePlans[1].name, '全科93天')
+	assert.equal(availablePlans[0].days, 31)
+	assert.equal(availablePlans[3].name, '全科366天')
+	assert.equal(availablePlans[3].days, 366)
+	assert.equal(availablePlans[0].showRegularPrice, true)
+
 	const created = await service.execute({
 		action: 'createOrder',
 		productId: 'membership_1m',
 		code: 'login-code'
 	}, 'user-one')
 	createdOrderId = created.order.outTradeNo
-	assert.equal(created.order.amountFen, 300)
+	assert.equal(created.order.amountFen, 800)
 	assert.equal(created.payData.mode, 'short_series_goods')
 	assert.equal(
 		created.payData.paySig,
@@ -345,6 +365,8 @@ async function run() {
 	assert.match(notifyResult.body, /<ErrCode>0<\/ErrCode>/)
 	const membership = environment.collections.question_bank_memberships.get('user-one')
 	assert.equal(membership.grants.length, 1)
+	assert.equal(membership.grants[0].days, 31)
+	assert.equal(new Date(membership.expiresAt).getTime(), addFixedDays(1788235200000, 31))
 	const wrongAmountResult = await service.handleHttp({
 		httpMethod: 'POST',
 		headers: { 'content-type': 'text/xml' },
@@ -379,7 +401,7 @@ async function run() {
 		httpMethod: 'POST',
 		headers: { 'content-type': 'text/xml' },
 		queryStringParameters: { timestamp, nonce, signature },
-		body: `<xml><Event><![CDATA[xpay_refund_notify]]></Event><MchOrderId><![CDATA[${created.order.outTradeNo}]]></MchOrderId><WxOrderId><![CDATA[wx-order-one]]></WxOrderId><WxRefundId><![CDATA[refund-one]]></WxRefundId><RefundFee>300</RefundFee><RetCode>0</RetCode><RefundSuccTimestamp>1788235400</RefundSuccTimestamp></xml>`
+		body: `<xml><Event><![CDATA[xpay_refund_notify]]></Event><MchOrderId><![CDATA[${created.order.outTradeNo}]]></MchOrderId><WxOrderId><![CDATA[wx-order-one]]></WxOrderId><WxRefundId><![CDATA[refund-one]]></WxRefundId><RefundFee>800</RefundFee><RetCode>0</RetCode><RefundSuccTimestamp>1788235400</RefundSuccTimestamp></xml>`
 	})
 	assert.match(refundResult.body, /<ErrCode>0<\/ErrCode>/)
 	assert.equal(environment.collections.question_bank_payment_orders.get(created.order.outTradeNo).status, 'refunded')

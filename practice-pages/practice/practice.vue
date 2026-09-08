@@ -922,7 +922,7 @@
 							return
 						}
 						if (result.cancel && canContinue) {
-							this.animateToQuestion(firstUnansweredIndex)
+							this.loadQuestion(firstUnansweredIndex)
 						}
 					}
 				})

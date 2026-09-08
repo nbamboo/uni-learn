@@ -74,6 +74,7 @@ async function run() {
 	let membershipResponse = activeMembership
 	const environment = {
 		FinanceCalculator: {},
+		MyUnit: {},
 		wx: {
 			createInterstitialAd(options) {
 				interstitialCreateCalls += 1
@@ -323,8 +324,6 @@ async function run() {
 		[following.id]: { selected: ['B'], correct: true }
 	}
 	incompletePractice.correctCount = 1
-	let continuedAt = -1
-	incompletePractice.animateToQuestion = index => { continuedAt = index }
 	incompletePractice.nextQuestion()
 	const incompleteModal = modalOptions.slice(-1)[0]
 	assert.equal(incompleteModal.showCancel, true)
@@ -332,7 +331,8 @@ async function run() {
 	assert.equal(incompleteModal.confirmText, '返回首页')
 	assert.match(incompleteModal.content, /未答 2 题/)
 	incompleteModal.success({ confirm: false, cancel: true })
-	assert.equal(continuedAt, 0)
+	assert.equal(incompletePractice.currentIndex, 0)
+	assert.equal(incompletePractice.currentQuestion.id, single.id)
 
 	const completedPractice = createContext('practice', [single, following])
 	completedPractice.currentIndex = 1
@@ -545,6 +545,13 @@ async function run() {
 	assert.equal(interstitialShowCalls, 1)
 	freeChapterList.destroyChapterInterstitialAd()
 	assert.equal(interstitialDestroyCalls, 1)
+	const repeatedFreeChapterList = Object.assign(chapterComponent.data(), chapterComponent.methods, {
+		view: 'chapter',
+		pageActive: true
+	})
+	await repeatedFreeChapterList.showChapterInterstitialAd()
+	assert.equal(interstitialCreateCalls, 1)
+	assert.equal(interstitialShowCalls, 1)
 	const freeKnowledgeList = Object.assign(chapterComponent.data(), chapterComponent.methods, {
 		view: 'knowledge',
 		pageActive: true
@@ -552,23 +559,24 @@ async function run() {
 	await freeKnowledgeList.showChapterInterstitialAd()
 	assert.equal(interstitialCreateCalls, 1)
 	assert.equal(interstitialShowCalls, 1)
-	assert.equal(freeKnowledgeList.shouldShowKnowledgeAd(9), false)
+	assert.equal(freeKnowledgeList.shouldShowKnowledgeAd(4), false)
 	await freeKnowledgeList.refreshMembership()
 	assert.equal(freeKnowledgeList.membershipLoaded, true)
-	assert.equal(freeKnowledgeList.shouldShowKnowledgeAd(8), false)
+	assert.equal(freeKnowledgeList.shouldShowKnowledgeAd(3), false)
+	assert.equal(freeKnowledgeList.shouldShowKnowledgeAd(4), true)
 	assert.equal(freeKnowledgeList.shouldShowKnowledgeAd(9), true)
-	assert.equal(freeKnowledgeList.shouldShowKnowledgeAd(29), true)
-	assert.equal(freeKnowledgeList.shouldShowKnowledgeAd(30), false)
-	freeKnowledgeList.hiddenKnowledgeAdPositions = { 10: true }
-	assert.equal(freeKnowledgeList.shouldShowKnowledgeAd(9), false)
+	assert.equal(freeKnowledgeList.shouldShowKnowledgeAd(10), false)
+	assert.equal(freeKnowledgeList.shouldShowKnowledgeAd(29), false)
+	freeKnowledgeList.hiddenKnowledgeAdPositions = { 5: true }
+	assert.equal(freeKnowledgeList.shouldShowKnowledgeAd(4), false)
 
 	const memberKnowledgeList = Object.assign(chapterComponent.data(), chapterComponent.methods, {
 		view: 'knowledge',
 		membershipLoaded: true,
 		membership: activeMembership
 	})
+	assert.equal(memberKnowledgeList.shouldShowKnowledgeAd(4), false)
 	assert.equal(memberKnowledgeList.shouldShowKnowledgeAd(9), false)
-	assert.equal(memberKnowledgeList.shouldShowKnowledgeAd(29), false)
 	membershipResponse = activeMembership
 	const catalogItem = {
 		id: '1',
@@ -919,7 +927,27 @@ async function run() {
 	assert.match(searchPageSource, /v-if="showAds"/)
 	const chapterPageSource = fs.readFileSync(path.resolve(__dirname, '../practice-pages/chapter/chapter.vue'), 'utf8')
 	assert.match(chapterPageSource, /unit-id="adunit-e55002bf7256a6bb"/)
-	assert.match(chapterPageSource, /position === 10 \|\| position === 30/)
+	assert.match(chapterPageSource, /position === 5 \|\| position === 10/)
+	assert.doesNotMatch(chapterPageSource, /position === 30/)
+	const toolHomeComponent = loadComponent(environment, '../pages/index/index.vue')
+	const toolHomePage = Object.assign(
+		toolHomeComponent.data(),
+		toolHomeComponent.methods,
+		{ $refs: {} }
+	)
+	assert.equal(toolHomeComponent.computed.showAds.call(toolHomePage), false)
+	toolHomePage.membershipLoaded = true
+	assert.equal(toolHomeComponent.computed.showAds.call(toolHomePage), true)
+	toolHomePage.membership = activeMembership
+	assert.equal(toolHomeComponent.computed.showAds.call(toolHomePage), false)
+	const toolHomeSource = fs.readFileSync(path.resolve(__dirname, '../pages/index/index.vue'), 'utf8')
+	assert.match(toolHomeSource, /unit-id="adunit-9ff96a0edd39a741"/)
+	assert.match(toolHomeSource, /showAds && item\.url === '\/pages\/flzzb\/flzzb'/)
+	assert.match(toolHomeSource, /\.parameter-ad-container\s*\{[\s\S]*?margin:\s*10px;/)
+	const parameterCardSource = fs.readFileSync(path.resolve(__dirname, '../components/myUnit/myUnit.vue'), 'utf8')
+	assert.match(parameterCardSource, /<uni-card\s+margin="10px"/)
+	const compoundFutureValueSource = fs.readFileSync(path.resolve(__dirname, '../pages/flzzb/flzzb.vue'), 'utf8')
+	assert.doesNotMatch(compoundFutureValueSource, /adunit-9ff96a0edd39a741|<ad-custom/)
 
 	console.log('practice answer mode tests passed')
 }

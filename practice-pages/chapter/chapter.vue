@@ -87,6 +87,8 @@
 	import { getCachedMembership, getMembership } from '@/services/membership.js'
 
 	let interstitialAd = null
+	let chapterInterstitialShownThisLaunch = false
+	let chapterInterstitialShowing = false
 
 	export default {
 		data() {
@@ -170,24 +172,33 @@
 				return this.membership
 			},
 			async showChapterInterstitialAd() {
-				if (this.view !== 'chapter') return
+				if (this.view !== 'chapter'
+					|| chapterInterstitialShownThisLaunch
+					|| chapterInterstitialShowing) return
 				const membership = await this.refreshMembership()
-				if (!this.pageActive || membership.isMember) return
+				if (!this.pageActive
+					|| membership.isMember
+					|| chapterInterstitialShownThisLaunch
+					|| chapterInterstitialShowing) return
 
 				// #ifdef MP-WEIXIN
 				if (typeof wx === 'undefined' || !wx.createInterstitialAd) return
-				interstitialAd = wx.createInterstitialAd({
-					adUnitId: 'adunit-4ea7a830fe0d7db2'
-				})
-				interstitialAd.onLoad(() => {})
-				interstitialAd.onError(error => {
-					console.error('插屏广告加载失败', error)
-				})
-				interstitialAd.onClose(() => {})
+				chapterInterstitialShowing = true
 				try {
+					interstitialAd = wx.createInterstitialAd({
+						adUnitId: 'adunit-4ea7a830fe0d7db2'
+					})
+					interstitialAd.onLoad(() => {})
+					interstitialAd.onError(error => {
+						console.error('插屏广告加载失败', error)
+					})
+					interstitialAd.onClose(() => {})
 					await interstitialAd.show()
+					chapterInterstitialShownThisLaunch = true
 				} catch (error) {
 					console.error('插屏广告显示失败', error)
+				} finally {
+					chapterInterstitialShowing = false
 				}
 				// #endif
 			},
@@ -202,7 +213,7 @@
 				return this.view === 'knowledge'
 					&& this.membershipLoaded
 					&& !this.membership.isMember
-					&& (position === 10 || position === 30)
+					&& (position === 5 || position === 10)
 					&& !this.hiddenKnowledgeAdPositions[position]
 			},
 			adLoad(position) {

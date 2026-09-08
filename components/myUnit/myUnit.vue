@@ -1,6 +1,6 @@
 <template>
 	<view>
-		<uni-card @tap="tap(toolData)">
+		<uni-card margin="10px" @tap="tap(toolData)">
 			<view class="uni-flex uni-row">
 				<view class="text" style="width: 20%;">
 					<uni-icons custom-prefix="iconfont" :type="toolData.iconType" size="25"></uni-icons>

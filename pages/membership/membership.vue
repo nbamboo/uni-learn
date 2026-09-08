@@ -49,7 +49,10 @@
 						<text class="price-symbol">¥</text>
 						<text class="price-value">{{ formatPrice(plan.priceFen) }}</text>
 					</view>
-					<text class="plan-average">{{ averageText(plan) }}</text>
+					<text v-if="plan.showRegularPrice && plan.regularPriceFen" class="plan-regular-price">
+						¥{{ formatPrice(plan.regularPriceFen) }}
+					</text>
+					<text v-else class="plan-average">{{ averageText(plan) }}</text>
 				</view>
 			</view>
 			<button class="purchase-button" :loading="purchasing" :disabled="purchasing || loading" @tap="purchase">
@@ -67,10 +70,10 @@
 	} from '@/services/membership.js'
 
 	const FALLBACK_PLANS = [
-		{ productId: 'membership_1m', name: '1个月会员', months: 1, priceFen: 300 },
-		{ productId: 'membership_3m', name: '3个月会员', months: 3, priceFen: 600 },
-		{ productId: 'membership_6m', name: '半年会员', months: 6, priceFen: 1000 },
-		{ productId: 'membership_12m', name: '1年会员', months: 12, priceFen: 1500 }
+		{ productId: 'membership_1m', name: '全科31天', months: 1, days: 31, priceFen: 800, regularPriceFen: 1200, showRegularPrice: true },
+		{ productId: 'membership_3m', name: '全科93天', months: 3, days: 93, priceFen: 1900, regularPriceFen: 2900 },
+		{ productId: 'membership_6m', name: '全科186天', months: 6, days: 186, priceFen: 3500, regularPriceFen: 5200 },
+		{ productId: 'membership_12m', name: '全科366天', months: 12, days: 366, priceFen: 5900, regularPriceFen: 8900 }
 	]
 
 	function getNextExamTargetAt() {
@@ -85,7 +88,7 @@
 			const cached = getCachedMembership()
 			return {
 				membership: cached,
-				plans: cached.plans.length ? cached.plans : FALLBACK_PLANS,
+				plans: FALLBACK_PLANS,
 				selectedProductId: 'membership_12m',
 				loading: false,
 				purchasing: false,
@@ -227,6 +230,7 @@
 	.plan-price { display: flex; align-items: baseline; margin-top: 10rpx; color: #007bd1; }
 	.price-symbol { font-size: 22rpx; }
 	.price-value { margin-left: 3rpx; font-size: 39rpx; font-weight: 700; }
+	.plan-regular-price { margin-top: 4rpx; color: #9aa2aa; font-size: 19rpx; text-decoration: line-through; }
 	.plan-average { margin-top: 4rpx; color: #89929b; font-size: 19rpx; }
 	.purchase-button { height: 88rpx; margin-top: 26rpx; border-radius: 46rpx; background: #008cff; color: #ffffff; font-size: 29rpx; font-weight: 600; line-height: 88rpx; }
 	.purchase-button::after { border: 0; }
