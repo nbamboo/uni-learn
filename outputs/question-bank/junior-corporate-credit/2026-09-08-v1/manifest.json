@@ -1,0 +1,29 @@
+{
+  "schemaVersion": 1,
+  "subjectId": "junior-corporate-credit",
+  "version": "2026-09-08-v1",
+  "questionCount": 340,
+  "files": [
+    {
+      "name": "questions.json",
+      "bytes": 342187,
+      "sha256": "136c9499ac432182dd2fa35bb700bf16e01adbd7f045589a835eff1a2ee132a3"
+    },
+    {
+      "name": "catalog.json",
+      "bytes": 13642,
+      "sha256": "4803a30bb9fd31b5a075a857f2216a071dc0f4407aa6b2b8a6f4f38639f2e3a0"
+    },
+    {
+      "name": "rejected.json",
+      "bytes": 1153,
+      "sha256": "d8ab1d985b2b8ea6284db4b6ee0bd96d068f1b48635cc0f59bc8978e5372c0b7"
+    },
+    {
+      "name": "validation-report.json",
+      "bytes": 2989,
+      "sha256": "c85058a73087d5cc7e0916ebc047f65061668cedc28b86bd7e3248ab61db14c1"
+    }
+  ],
+  "generatedAt": "2026-09-08T14:56:58.493909+00:00"
+}

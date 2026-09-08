@@ -1,0 +1,29 @@
+{
+  "schemaVersion": 1,
+  "subjectId": "junior-bank-management",
+  "version": "2026-09-07-v2",
+  "questionCount": 647,
+  "files": [
+    {
+      "name": "questions.json",
+      "bytes": 626649,
+      "sha256": "a63d1d2378da44361812c679dadede6bf9729a327a8001bd2f824a6f2b76ac91"
+    },
+    {
+      "name": "catalog.json",
+      "bytes": 23053,
+      "sha256": "b2a1a56d1b77ffd6bb7c673061dc51acfa6dd759b4dc07c478602f573c1f9cce"
+    },
+    {
+      "name": "rejected.json",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "validation-report.json",
+      "bytes": 3849,
+      "sha256": "870ef85c1ed287efa7a318be004686edb8b5775aac45ec23348a69f3b4990afb"
+    }
+  ],
+  "generatedAt": "2026-09-08T14:56:58.569802+00:00"
+}

@@ -15,7 +15,7 @@
 输入只需要 Excel 路径：
 
 ```bash
-python3 scripts/generate-question-bank-import.py "resources/topic/题目整理.xlsx"
+python3 scripts/generate-question-bank-import.py "resources/topic/银行从业初级银行管理_章节练习_题目整理.xlsx"
 ```
 
 脚本从 Excel 的“说明”工作表识别科目，并将文件生成到：

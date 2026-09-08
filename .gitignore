@@ -1,7 +1,16 @@
 unpackage/
 .hbuilderx/
 .DS_Store
-scripts/__pycache__
+
+# Codex 临时工作文件
+.codex-tmp/
+
+# Python 缓存
+__pycache__/
+*.py[cod]
+
+# 表格检查生成的中间文件
+*.inspect.ndjson
 
 # uni-id 服务端密钥，仅保留本地配置；提交 config.example.json 作为模板
 uni_modules/uni-config-center/uniCloud/cloudfunctions/common/uni-config-center/uni-id/config.json

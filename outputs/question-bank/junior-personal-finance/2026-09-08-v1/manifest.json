@@ -1,0 +1,29 @@
+{
+  "schemaVersion": 1,
+  "subjectId": "junior-personal-finance",
+  "version": "2026-09-08-v1",
+  "questionCount": 778,
+  "files": [
+    {
+      "name": "questions.json",
+      "bytes": 900503,
+      "sha256": "7e46238995daeb05e50271305bddeac98d7280a606f24fad90f40d04487f8ca0"
+    },
+    {
+      "name": "catalog.json",
+      "bytes": 15075,
+      "sha256": "a2927cb96b586634a430f85792313e64b7018797d9973b04da1972ee5c24f551"
+    },
+    {
+      "name": "rejected.json",
+      "bytes": 32750,
+      "sha256": "10782f72f0aebff2147a61772c546f73d165e259011239eee994666102eb74a1"
+    },
+    {
+      "name": "validation-report.json",
+      "bytes": 2473,
+      "sha256": "7e6bcdc24afdffab622a8e3a5b954213e74534a1c240b3e3bef37d49c18b1271"
+    }
+  ],
+  "generatedAt": "2026-09-08T14:56:58.540525+00:00"
+}

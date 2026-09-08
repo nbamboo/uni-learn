@@ -48,6 +48,24 @@ SUBJECT_CONFIGS = {
         "level": "初级",
         "questionPrefix": "jbm",
     },
+    "银行从业初级风险管理": {
+        "subjectId": "junior-risk",
+        "name": "初级风险管理",
+        "level": "初级",
+        "questionPrefix": "jrisk",
+    },
+    "银行从业初级个人贷款": {
+        "subjectId": "junior-personal-loan",
+        "name": "初级个人贷款",
+        "level": "初级",
+        "questionPrefix": "jpl",
+    },
+    "银行从业初级公司信贷": {
+        "subjectId": "junior-corporate-credit",
+        "name": "初级公司信贷",
+        "level": "初级",
+        "questionPrefix": "jcc",
+    },
 }
 
 FIELD_LIMITS = {
