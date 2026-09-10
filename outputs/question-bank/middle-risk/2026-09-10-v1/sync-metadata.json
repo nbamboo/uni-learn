@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "runId": "20260910T150637-a29a3f55",
+  "source": "233网校",
+  "sourceSubjectId": 1285,
+  "subjectId": "middle-risk",
+  "version": "2026-09-10-v1",
+  "sourceUrl": "https://wx.233.com/center/study/tiku/chapter?domain=ccbp&subjectId=1285&chapterType=1",
+  "sourceQuestionCount": 1075,
+  "statusCounts": {
+    "可查看": 594,
+    "权限不足/收费题": 481
+  },
+  "warnings": [],
+  "workbookSha256": "4721e68fa83e6d9b3f6e18629a7a053e4d1124260edc6834a525dc8f314f2c07",
+  "acceptedQuestionCount": 565,
+  "reusedExplanationCount": 3,
+  "ocrAttemptedQuestionCount": 8,
+  "ocrSucceededQuestionCount": 0,
+  "ocrFailedQuestionCount": 8,
+  "ocrImageCount": 8
+}

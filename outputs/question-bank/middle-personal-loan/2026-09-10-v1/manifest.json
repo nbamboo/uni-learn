@@ -1,0 +1,39 @@
+{
+  "schemaVersion": 1,
+  "subjectId": "middle-personal-loan",
+  "version": "2026-09-10-v1",
+  "questionCount": 479,
+  "files": [
+    {
+      "name": "catalog.json",
+      "bytes": 8463,
+      "sha256": "f6ef28cab3cd4893f28da37a8851f0d2e549b305a98dd7d2981ffdac13d172bb"
+    },
+    {
+      "name": "questions.json",
+      "bytes": 494246,
+      "sha256": "3bd4ad0f07442abed33a712fee2b8e47514d7e9a237fdcf5329ce2a6e8347103"
+    },
+    {
+      "name": "rejected.json",
+      "bytes": 2980,
+      "sha256": "5df4c0a2f7d4d232228d2ae563ca691ba230cf8d22a20edccecf3725f18ec31e"
+    },
+    {
+      "name": "source-index.json",
+      "bytes": 252057,
+      "sha256": "e50c4caa9cf9639d91f772bf4c35d75cff7a675f75e83d64ced6d60955903fb8"
+    },
+    {
+      "name": "sync-metadata.json",
+      "bytes": 690,
+      "sha256": "2340efa06e15228758096cba6824a495026d2403790f4c8f75a2ae9406cbdf37"
+    },
+    {
+      "name": "validation-report.json",
+      "bytes": 2509,
+      "sha256": "e67339c6c8bf0e897c68c6530b48b6aa918ce85263116af0b67aff140a805e62"
+    }
+  ],
+  "generatedAt": "2026-09-10T07:10:14.565268+00:00"
+}

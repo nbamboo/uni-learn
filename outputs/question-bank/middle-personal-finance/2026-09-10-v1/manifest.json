@@ -1,0 +1,39 @@
+{
+  "schemaVersion": 1,
+  "subjectId": "middle-personal-finance",
+  "version": "2026-09-10-v1",
+  "questionCount": 894,
+  "files": [
+    {
+      "name": "catalog.json",
+      "bytes": 18431,
+      "sha256": "9d95b58a57ee6dedda643da96b7ac356e72c2af0117d8c5693defeda7d92afd8"
+    },
+    {
+      "name": "questions.json",
+      "bytes": 1084335,
+      "sha256": "41c5b8905fa4415edb8d101eab4bb7d6232099bdf7c1f73292a258897aa5cf09"
+    },
+    {
+      "name": "rejected.json",
+      "bytes": 23370,
+      "sha256": "e5b6abb9b39853c7c2efda67acfb1380894b662ce76150f995696e1780355624"
+    },
+    {
+      "name": "source-index.json",
+      "bytes": 435739,
+      "sha256": "941f05cb4b03eb17eac81491399c29b07aebd68cd0d3f4a813fe0fcae4aacbbb"
+    },
+    {
+      "name": "sync-metadata.json",
+      "bytes": 694,
+      "sha256": "787e99006e9c7fa1ff6677c228d69fcd554e47a0f420eff96f7fe933a31b6779"
+    },
+    {
+      "name": "validation-report.json",
+      "bytes": 2903,
+      "sha256": "734a6051c151f3c992b85813813bd61a585b7910903bf59f58714d0915a00a1f"
+    }
+  ],
+  "generatedAt": "2026-09-10T07:09:57.387663+00:00"
+}

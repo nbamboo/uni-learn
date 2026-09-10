@@ -1,0 +1,39 @@
+{
+  "schemaVersion": 1,
+  "subjectId": "middle-bank-management",
+  "version": "2026-09-10-v1",
+  "questionCount": 616,
+  "files": [
+    {
+      "name": "catalog.json",
+      "bytes": 28503,
+      "sha256": "4dcec770db381f17aa3fa2ddf6ca32d579316d7239f755b9aac1a5bd664ba4fa"
+    },
+    {
+      "name": "questions.json",
+      "bytes": 607363,
+      "sha256": "1cc48d11b3c66c8bbf18ca7fc49bcce6a03ef20dba7b8c98b96fa504e8f8b220"
+    },
+    {
+      "name": "rejected.json",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "source-index.json",
+      "bytes": 303449,
+      "sha256": "27521f2973a144869f02ddc80c1b2e0d8935ba602ecdaf7deba7c727469fb3df"
+    },
+    {
+      "name": "sync-metadata.json",
+      "bytes": 693,
+      "sha256": "c57e99c3fefff9ec003c210778a3e952c632e5af8b6068af2b43cb11185ddd68"
+    },
+    {
+      "name": "validation-report.json",
+      "bytes": 4695,
+      "sha256": "39365806bf786286912a9bc5bdf3aacd2f5f1cfcb613501d2596a4f58370839d"
+    }
+  ],
+  "generatedAt": "2026-09-10T07:11:33.333235+00:00"
+}

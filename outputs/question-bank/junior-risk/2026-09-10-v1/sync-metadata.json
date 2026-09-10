@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "runId": "20260910T150637-a29a3f55",
+  "source": "233网校",
+  "sourceSubjectId": 386,
+  "subjectId": "junior-risk",
+  "version": "2026-09-10-v1",
+  "sourceUrl": "https://wx.233.com/center/study/tiku/chapter?domain=ccbp&subjectId=386&chapterType=1",
+  "sourceQuestionCount": 1249,
+  "statusCounts": {
+    "可查看": 651,
+    "权限不足/收费题": 598
+  },
+  "warnings": [],
+  "workbookSha256": "8c565285a5a460971d52ff5f7f10ff91a0083f28b948aaf3c917fc69c0ece9d3",
+  "acceptedQuestionCount": 647,
+  "reusedExplanationCount": 9,
+  "ocrAttemptedQuestionCount": 0,
+  "ocrSucceededQuestionCount": 0,
+  "ocrFailedQuestionCount": 0,
+  "ocrImageCount": 0
+}

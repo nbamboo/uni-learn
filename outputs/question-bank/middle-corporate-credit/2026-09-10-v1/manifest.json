@@ -1,0 +1,39 @@
+{
+  "schemaVersion": 1,
+  "subjectId": "middle-corporate-credit",
+  "version": "2026-09-10-v1",
+  "questionCount": 663,
+  "files": [
+    {
+      "name": "catalog.json",
+      "bytes": 16415,
+      "sha256": "2f4680041502cb22d7f415d2c0fe84b7581d5a9dcac8bd448c34a4b3c71bcf4e"
+    },
+    {
+      "name": "questions.json",
+      "bytes": 644382,
+      "sha256": "4cc42b95c0d2c711a2768d0fb69c367c0c588278a65e142a1b8b5a29f2fca2d3"
+    },
+    {
+      "name": "rejected.json",
+      "bytes": 1696,
+      "sha256": "b03779659ef30700f34a01d0f6f2c9125cfbc13a0a8aa1cb357814a6f42a4a4f"
+    },
+    {
+      "name": "source-index.json",
+      "bytes": 355420,
+      "sha256": "024e7bd6ff4910923dfb97624dc2687493a25c5f5438dd0185afa6c92594b8bd"
+    },
+    {
+      "name": "sync-metadata.json",
+      "bytes": 694,
+      "sha256": "459c2f52fa0edd4ce546765737a134ba66b62abbf15225ea7e073851481a6f8f"
+    },
+    {
+      "name": "validation-report.json",
+      "bytes": 3142,
+      "sha256": "62a7bad4970af0686026d085362454c0cb1a9ed2cce21d15c1d1657976550ef4"
+    }
+  ],
+  "generatedAt": "2026-09-10T07:10:37.308423+00:00"
+}

@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "runId": "20260910T150637-a29a3f55",
+  "source": "233网校",
+  "sourceSubjectId": 1248,
+  "subjectId": "middle-personal-loan",
+  "version": "2026-09-10-v1",
+  "sourceUrl": "https://wx.233.com/center/study/tiku/chapter?domain=ccbp&subjectId=1248&chapterType=1",
+  "sourceQuestionCount": 919,
+  "statusCounts": {
+    "可查看": 486,
+    "权限不足/收费题": 433
+  },
+  "warnings": [],
+  "workbookSha256": "990f15753ac070043077740aaa1cb36f811e34c2ffd9695218f90c89daf8a464",
+  "acceptedQuestionCount": 479,
+  "reusedExplanationCount": 0,
+  "ocrAttemptedQuestionCount": 1,
+  "ocrSucceededQuestionCount": 0,
+  "ocrFailedQuestionCount": 1,
+  "ocrImageCount": 1
+}
