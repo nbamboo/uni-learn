@@ -1,0 +1,18 @@
+{
+  "schemaVersion": 1,
+  "runId": "20260909T162436-50d94094",
+  "source": "233网校",
+  "sourceSubjectId": 751,
+  "subjectId": "junior-personal-loan",
+  "version": "2026-09-09-v1",
+  "sourceUrl": "https://wx.233.com/center/study/tiku/chapter?domain=ccbp&subjectId=751&chapterType=1",
+  "sourceQuestionCount": 907,
+  "statusCounts": {
+    "可查看": 459,
+    "权限不足/收费题": 448
+  },
+  "warnings": [],
+  "workbookSha256": "4f8396e3331d712bc0f4fbba62e744f4478b06cbcd367c36f1b39536484aa42b",
+  "acceptedQuestionCount": 454,
+  "reusedExplanationCount": 1
+}

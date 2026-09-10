@@ -1,0 +1,7265 @@
+{
+  "schemaVersion": 1,
+  "source": "233网校",
+  "sourceSubjectId": 751,
+  "subjectId": "junior-personal-loan",
+  "generatedAt": "2026-09-10T00:15:37+08:00",
+  "records": [
+    {
+      "questionId": "jpl-3702594",
+      "sourceQuestionId": "3702594",
+      "permissionStatus": "可查看",
+      "chapter": "第二章 个人贷款管理",
+      "section": "第一节 个人贷款管理原则",
+      "knowledge": "全流程管理原则、诚信申贷原则和协议承诺原则"
+    },
+    {
+      "questionId": "jpl-3702596",
+      "sourceQuestionId": "3702596",
+      "permissionStatus": "可查看",
+      "chapter": "第二章 个人贷款管理",
+      "section": "第一节 个人贷款管理原则",
+      "knowledge": "审贷分离原则和重视贷后管理原则"
+    },
+    {
+      "questionId": "jpl-3702685",
+      "sourceQuestionId": "3702685",
+      "permissionStatus": "可查看",
+      "chapter": "第二章 个人贷款管理",
+      "section": "第一节 个人贷款管理原则",
+      "knowledge": "全流程管理原则、诚信申贷原则和协议承诺原则"
+    },
+    {
+      "questionId": "jpl-3702686",
+      "sourceQuestionId": "3702686",
+      "permissionStatus": "可查看",
+      "chapter": "第二章 个人贷款管理",
+      "section": "第一节 个人贷款管理原则",
+      "knowledge": "全流程管理原则、诚信申贷原则和协议承诺原则"
+    },
+    {
+      "questionId": "jpl-3702900",
+      "sourceQuestionId": "3702900",
+      "permissionStatus": "可查看",
+      "chapter": "第二章 个人贷款管理",
+      "section": "第一节 个人贷款管理原则",
+      "knowledge": "审贷分离原则和重视贷后管理原则"
+    },
+    {
+      "questionId": "jpl-3703076",
+      "sourceQuestionId": "3703076",
+      "permissionStatus": "可查看",
+      "chapter": "第二章 个人贷款管理",
+      "section": "第一节 个人贷款管理原则",
+      "knowledge": "审贷分离原则和重视贷后管理原则"
+    },
+    {
+      "questionId": "jpl-3703278",
+      "sourceQuestionId": "3703278",
+      "permissionStatus": "可查看",
+      "chapter": "第二章 个人贷款管理",
+      "section": "第一节 个人贷款管理原则",
+      "knowledge": "全流程管理原则、诚信申贷原则和协议承诺原则"
+    },
+    {
+      "questionId": "jpl-3703279",
+      "sourceQuestionId": "3703279",
+      "permissionStatus": "可查看",
+      "chapter": "第二章 个人贷款管理",
+      "section": "第一节 个人贷款管理原则",
+      "knowledge": "审贷分离原则和重视贷后管理原则"
+    },
+    {
+      "questionId": "jpl-3703315",
+      "sourceQuestionId": "3703315",
+      "permissionStatus": "可查看",
+      "chapter": "第二章 个人贷款管理",
+      "section": "第一节 个人贷款管理原则",
+      "knowledge": ""
+    },
+    {
+      "questionId": "jpl-4204111",
+      "sourceQuestionId": "4204111",
+      "permissionStatus": "可查看",
+      "chapter": "第二章 个人贷款管理",
+      "section": "第一节 个人贷款管理原则",
+      "knowledge": ""
+    },
+    {
+      "questionId": "jpl-5004233",
+      "sourceQuestionId": "5004233",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第六章 信用卡业务",
+      "section": "第一节 信用卡概述",
+      "knowledge": "定义"
+    },
+    {
+      "questionId": "jpl-5004235",
+      "sourceQuestionId": "5004235",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第六章 信用卡业务",
+      "section": "第一节 信用卡概述",
+      "knowledge": "信用卡的产生和发展"
+    },
+    {
+      "questionId": "jpl-5004236",
+      "sourceQuestionId": "5004236",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第六章 信用卡业务",
+      "section": "第一节 信用卡概述",
+      "knowledge": "信用卡的产生和发展"
+    },
+    {
+      "questionId": "jpl-5004237",
+      "sourceQuestionId": "5004237",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第六章 信用卡业务",
+      "section": "第一节 信用卡概述",
+      "knowledge": "信用卡的产生和发展"
+    },
+    {
+      "questionId": "jpl-5004238",
+      "sourceQuestionId": "5004238",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第六章 信用卡业务",
+      "section": "第一节 信用卡概述",
+      "knowledge": "信用卡的产生和发展"
+    },
+    {
+      "questionId": "jpl-5004240",
+      "sourceQuestionId": "5004240",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第六章 信用卡业务",
+      "section": "第一节 信用卡概述",
+      "knowledge": "信用卡的分类"
+    },
+    {
+      "questionId": "jpl-5004242",
+      "sourceQuestionId": "5004242",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第六章 信用卡业务",
+      "section": "第一节 信用卡概述",
+      "knowledge": "信用卡的分类"
+    },
+    {
+      "questionId": "jpl-5004251",
+      "sourceQuestionId": "5004251",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第六章 信用卡业务",
+      "section": "第一节 信用卡概述",
+      "knowledge": "定义"
+    },
+    {
+      "questionId": "jpl-5004252",
+      "sourceQuestionId": "5004252",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第六章 信用卡业务",
+      "section": "第一节 信用卡概述",
+      "knowledge": "定义"
+    },
+    {
+      "questionId": "jpl-5004253",
+      "sourceQuestionId": "5004253",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第六章 信用卡业务",
+      "section": "第一节 信用卡概述",
+      "knowledge": "信用卡的产生和发展"
+    },
+    {
+      "questionId": "jpl-5004254",
+      "sourceQuestionId": "5004254",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第六章 信用卡业务",
+      "section": "第一节 信用卡概述",
+      "knowledge": "信用卡的产生和发展"
+    },
+    {
+      "questionId": "jpl-5004255",
+      "sourceQuestionId": "5004255",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第六章 信用卡业务",
+      "section": "第一节 信用卡概述",
+      "knowledge": "信用卡的分类"
+    },
+    {
+      "questionId": "jpl-5004256",
+      "sourceQuestionId": "5004256",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第六章 信用卡业务",
+      "section": "第一节 信用卡概述",
+      "knowledge": "信用卡业务与一般个人贷款业务的异同"
+    },
+    {
+      "questionId": "jpl-5086114",
+      "sourceQuestionId": "5086114",
+      "permissionStatus": "可查看",
+      "chapter": "第六章 信用卡业务",
+      "section": "第一节 信用卡概述",
+      "knowledge": "信用卡的产生和发展"
+    },
+    {
+      "questionId": "jpl-5086139",
+      "sourceQuestionId": "5086139",
+      "permissionStatus": "可查看",
+      "chapter": "第六章 信用卡业务",
+      "section": "第一节 信用卡概述",
+      "knowledge": "信用卡的产生和发展"
+    },
+    {
+      "questionId": "jpl-5086143",
+      "sourceQuestionId": "5086143",
+      "permissionStatus": "可查看",
+      "chapter": "第八章 个人征信系统",
+      "section": "第三节 互联网金融背景下征信业务的新发展",
+      "knowledge": "互联网金融背景下征信业务的新发展"
+    },
+    {
+      "questionId": "jpl-5086180",
+      "sourceQuestionId": "5086180",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第八章 个人征信系统",
+      "section": "第三节 互联网金融背景下征信业务的新发展",
+      "knowledge": "互联网金融背景下征信业务的新发展"
+    },
+    {
+      "questionId": "jpl-5094431",
+      "sourceQuestionId": "5094431",
+      "permissionStatus": "可查看",
+      "chapter": "第六章 信用卡业务",
+      "section": "第一节 信用卡概述",
+      "knowledge": "信用卡的产生和发展"
+    },
+    {
+      "questionId": "jpl-5126947",
+      "sourceQuestionId": "5126947",
+      "permissionStatus": "可查看",
+      "chapter": "第二章 个人贷款管理",
+      "section": "第四节 个人贷款定价管理",
+      "knowledge": "个人贷款定价原则"
+    },
+    {
+      "questionId": "jpl-5126948",
+      "sourceQuestionId": "5126948",
+      "permissionStatus": "可查看",
+      "chapter": "第二章 个人贷款管理",
+      "section": "第四节 个人贷款定价管理",
+      "knowledge": "个人贷款定价原则"
+    },
+    {
+      "questionId": "jpl-5126949",
+      "sourceQuestionId": "5126949",
+      "permissionStatus": "可查看",
+      "chapter": "第二章 个人贷款管理",
+      "section": "第四节 个人贷款定价管理",
+      "knowledge": "个人贷款定价影响因素"
+    },
+    {
+      "questionId": "jpl-5126950",
+      "sourceQuestionId": "5126950",
+      "permissionStatus": "可查看",
+      "chapter": "第二章 个人贷款管理",
+      "section": "第四节 个人贷款定价管理",
+      "knowledge": "个人贷款定价影响因素"
+    },
+    {
+      "questionId": "jpl-5151128",
+      "sourceQuestionId": "5151128",
+      "permissionStatus": "可查看",
+      "chapter": "第五章 个人经营类贷款",
+      "section": "第一节 个人经营贷款",
+      "knowledge": "基础知识"
+    },
+    {
+      "questionId": "jpl-5151129",
+      "sourceQuestionId": "5151129",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第二章 个人贷款管理",
+      "section": "第二节 个人贷款流程",
+      "knowledge": "贷款的受理与调查"
+    },
+    {
+      "questionId": "jpl-5151130",
+      "sourceQuestionId": "5151130",
+      "permissionStatus": "可查看",
+      "chapter": "第三章 个人住房贷款",
+      "section": "第一节 个人住房贷款基础知识",
+      "knowledge": "基础知识"
+    },
+    {
+      "questionId": "jpl-5151132",
+      "sourceQuestionId": "5151132",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第一章 个人贷款概述",
+      "section": "第二节 个人贷款产品的种类",
+      "knowledge": "按有无担保分类"
+    },
+    {
+      "questionId": "jpl-5151135",
+      "sourceQuestionId": "5151135",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第二章 个人贷款管理",
+      "section": "第二节 个人贷款流程",
+      "knowledge": "贷款的受理与调查"
+    },
+    {
+      "questionId": "jpl-5151142",
+      "sourceQuestionId": "5151142",
+      "permissionStatus": "可查看",
+      "chapter": "第二章 个人贷款管理",
+      "section": "第三节 个人贷款营销管理",
+      "knowledge": "个人贷款营销渠道"
+    },
+    {
+      "questionId": "jpl-5151146",
+      "sourceQuestionId": "5151146",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第三章 个人住房贷款",
+      "section": "第一节 个人住房贷款基础知识",
+      "knowledge": "基础知识"
+    },
+    {
+      "questionId": "jpl-5151179",
+      "sourceQuestionId": "5151179",
+      "permissionStatus": "可查看",
+      "chapter": "第三章 个人住房贷款",
+      "section": "第三节 个人住房贷款风险管理",
+      "knowledge": "操作风险管理"
+    },
+    {
+      "questionId": "jpl-5151186",
+      "sourceQuestionId": "5151186",
+      "permissionStatus": "可查看",
+      "chapter": "第五章 个人经营类贷款",
+      "section": "第二节 个人商用房贷款",
+      "knowledge": "贷款流程"
+    },
+    {
+      "questionId": "jpl-5151204",
+      "sourceQuestionId": "5151204",
+      "permissionStatus": "可查看",
+      "chapter": "第六章 信用卡业务",
+      "section": "第一节 信用卡概述",
+      "knowledge": "信用卡业务与一般个人贷款业务的异同"
+    },
+    {
+      "questionId": "jpl-5151205",
+      "sourceQuestionId": "5151205",
+      "permissionStatus": "可查看",
+      "chapter": "第二章 个人贷款管理",
+      "section": "第四节 个人贷款定价管理",
+      "knowledge": "个人贷款定价原则"
+    },
+    {
+      "questionId": "jpl-5151211",
+      "sourceQuestionId": "5151211",
+      "permissionStatus": "可查看",
+      "chapter": "第三章 个人住房贷款",
+      "section": "第二节 个人住房贷款流程",
+      "knowledge": "单笔贷款流程"
+    },
+    {
+      "questionId": "jpl-5151222",
+      "sourceQuestionId": "5151222",
+      "permissionStatus": "可查看",
+      "chapter": "附录",
+      "section": "个人贷款的监管政策和法规",
+      "knowledge": "与个人住房贷款相关的政策和法规"
+    },
+    {
+      "questionId": "jpl-5151400",
+      "sourceQuestionId": "5151400",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第二章 个人贷款管理",
+      "section": "第二节 个人贷款流程",
+      "knowledge": "贷款的签约与发放"
+    },
+    {
+      "questionId": "jpl-5151405",
+      "sourceQuestionId": "5151405",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第四章 个人消费类贷款",
+      "section": "第二节 个人教育贷款",
+      "knowledge": "基础知识"
+    },
+    {
+      "questionId": "jpl-5151412",
+      "sourceQuestionId": "5151412",
+      "permissionStatus": "可查看",
+      "chapter": "第四章 个人消费类贷款",
+      "section": "第一节 个人汽车贷款",
+      "knowledge": "风险管理"
+    },
+    {
+      "questionId": "jpl-5151418",
+      "sourceQuestionId": "5151418",
+      "permissionStatus": "可查看",
+      "chapter": "第三章 个人住房贷款",
+      "section": "第一节 个人住房贷款基础知识",
+      "knowledge": "基础知识"
+    },
+    {
+      "questionId": "jpl-5151424",
+      "sourceQuestionId": "5151424",
+      "permissionStatus": "可查看",
+      "chapter": "第三章 个人住房贷款",
+      "section": "第一节 个人住房贷款基础知识",
+      "knowledge": "基础知识"
+    },
+    {
+      "questionId": "jpl-5151434",
+      "sourceQuestionId": "5151434",
+      "permissionStatus": "可查看",
+      "chapter": "第二章 个人贷款管理",
+      "section": "第二节 个人贷款流程",
+      "knowledge": "贷后管理"
+    },
+    {
+      "questionId": "jpl-5151438",
+      "sourceQuestionId": "5151438",
+      "permissionStatus": "可查看",
+      "chapter": "第四章 个人消费类贷款",
+      "section": "第一节 个人汽车贷款",
+      "knowledge": "基础知识"
+    },
+    {
+      "questionId": "jpl-5151444",
+      "sourceQuestionId": "5151444",
+      "permissionStatus": "可查看",
+      "chapter": "第二章 个人贷款管理",
+      "section": "第二节 个人贷款流程",
+      "knowledge": "贷款的签约与发放"
+    },
+    {
+      "questionId": "jpl-5151445",
+      "sourceQuestionId": "5151445",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第三章 个人住房贷款",
+      "section": "第一节 个人住房贷款基础知识",
+      "knowledge": "基础知识"
+    },
+    {
+      "questionId": "jpl-5151450",
+      "sourceQuestionId": "5151450",
+      "permissionStatus": "可查看",
+      "chapter": "第三章 个人住房贷款",
+      "section": "第四节 公积金个人住房贷款",
+      "knowledge": "贷款流程"
+    },
+    {
+      "questionId": "jpl-5151453",
+      "sourceQuestionId": "5151453",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第八章 个人征信系统",
+      "section": "第二节 个人征信系统的管理及应用",
+      "knowledge": "个人征信系统的信息查询"
+    },
+    {
+      "questionId": "jpl-5151464",
+      "sourceQuestionId": "5151464",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第二章 个人贷款管理",
+      "section": "第六节 个人贷款押品管理",
+      "knowledge": "押品管理基本流程"
+    },
+    {
+      "questionId": "jpl-5151470",
+      "sourceQuestionId": "5151470",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第三章 个人住房贷款",
+      "section": "第二节 个人住房贷款流程",
+      "knowledge": "单笔贷款流程"
+    },
+    {
+      "questionId": "jpl-5151471",
+      "sourceQuestionId": "5151471",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第三章 个人住房贷款",
+      "section": "第三节 个人住房贷款风险管理",
+      "knowledge": "合作机构风险管理"
+    },
+    {
+      "questionId": "jpl-5151474",
+      "sourceQuestionId": "5151474",
+      "permissionStatus": "可查看",
+      "chapter": "附录",
+      "section": "个人贷款的相关法律",
+      "knowledge": "中华人民共和国民法典"
+    },
+    {
+      "questionId": "jpl-5151476",
+      "sourceQuestionId": "5151476",
+      "permissionStatus": "可查看",
+      "chapter": "第八章 个人征信系统",
+      "section": "第一节 概述",
+      "knowledge": "个人征信系统的含义和内容"
+    },
+    {
+      "questionId": "jpl-5151491",
+      "sourceQuestionId": "5151491",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第五章 个人经营类贷款",
+      "section": "第一节 个人经营贷款",
+      "knowledge": "风险管理"
+    },
+    {
+      "questionId": "jpl-5151495",
+      "sourceQuestionId": "5151495",
+      "permissionStatus": "可查看",
+      "chapter": "第三章 个人住房贷款",
+      "section": "第三节 个人住房贷款风险管理",
+      "knowledge": "操作风险管理"
+    },
+    {
+      "questionId": "jpl-5151498",
+      "sourceQuestionId": "5151498",
+      "permissionStatus": "可查看",
+      "chapter": "第五章 个人经营类贷款",
+      "section": "第一节 个人经营贷款",
+      "knowledge": "风险管理"
+    },
+    {
+      "questionId": "jpl-5151521",
+      "sourceQuestionId": "5151521",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第四章 个人消费类贷款",
+      "section": "第一节 个人汽车贷款",
+      "knowledge": "基础知识"
+    },
+    {
+      "questionId": "jpl-5151526",
+      "sourceQuestionId": "5151526",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第三章 个人住房贷款",
+      "section": "第四节 公积金个人住房贷款",
+      "knowledge": "基础知识"
+    },
+    {
+      "questionId": "jpl-5151532",
+      "sourceQuestionId": "5151532",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第二章 个人贷款管理",
+      "section": "第六节 个人贷款押品管理",
+      "knowledge": "押品管理基本概念"
+    },
+    {
+      "questionId": "jpl-5151539",
+      "sourceQuestionId": "5151539",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第二章 个人贷款管理",
+      "section": "第五节 个人贷款风险管理",
+      "knowledge": "信用风险管理"
+    },
+    {
+      "questionId": "jpl-5151545",
+      "sourceQuestionId": "5151545",
+      "permissionStatus": "可查看",
+      "chapter": "第二章 个人贷款管理",
+      "section": "第二节 个人贷款流程",
+      "knowledge": "贷款的受理与调查"
+    },
+    {
+      "questionId": "jpl-5151548",
+      "sourceQuestionId": "5151548",
+      "permissionStatus": "可查看",
+      "chapter": "第三章 个人住房贷款",
+      "section": "第四节 公积金个人住房贷款",
+      "knowledge": "基础知识"
+    },
+    {
+      "questionId": "jpl-5151559",
+      "sourceQuestionId": "5151559",
+      "permissionStatus": "可查看",
+      "chapter": "第三章 个人住房贷款",
+      "section": "第二节 个人住房贷款流程",
+      "knowledge": "合作项目准入流程"
+    },
+    {
+      "questionId": "jpl-5151562",
+      "sourceQuestionId": "5151562",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第四章 个人消费类贷款",
+      "section": "第二节 个人教育贷款",
+      "knowledge": "贷款流程"
+    },
+    {
+      "questionId": "jpl-5151569",
+      "sourceQuestionId": "5151569",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "附录",
+      "section": "个人贷款的监管政策和法规",
+      "knowledge": "与个人贷款相关的政策法规"
+    },
+    {
+      "questionId": "jpl-5151579",
+      "sourceQuestionId": "5151579",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第五章 个人经营类贷款",
+      "section": "第二节 个人商用房贷款",
+      "knowledge": "风险管理"
+    },
+    {
+      "questionId": "jpl-5151586",
+      "sourceQuestionId": "5151586",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第三章 个人住房贷款",
+      "section": "第二节 个人住房贷款流程",
+      "knowledge": "单笔贷款流程"
+    },
+    {
+      "questionId": "jpl-5151590",
+      "sourceQuestionId": "5151590",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第三章 个人住房贷款",
+      "section": "第三节 个人住房贷款风险管理",
+      "knowledge": "操作风险管理"
+    },
+    {
+      "questionId": "jpl-5151591",
+      "sourceQuestionId": "5151591",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第一章 个人贷款概述",
+      "section": "第三节 个人贷款产品的要素",
+      "knowledge": "担保方式和贷款额度"
+    },
+    {
+      "questionId": "jpl-5151594",
+      "sourceQuestionId": "5151594",
+      "permissionStatus": "可查看",
+      "chapter": "第二章 个人贷款管理",
+      "section": "第二节 个人贷款流程",
+      "knowledge": "贷后管理"
+    },
+    {
+      "questionId": "jpl-5151602",
+      "sourceQuestionId": "5151602",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第二章 个人贷款管理",
+      "section": "第二节 个人贷款流程",
+      "knowledge": "贷款的签约与发放"
+    },
+    {
+      "questionId": "jpl-5151610",
+      "sourceQuestionId": "5151610",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "附录",
+      "section": "个人贷款的监管政策和法规",
+      "knowledge": "与个人汽车贷款相关的政策和法规"
+    },
+    {
+      "questionId": "jpl-5151611",
+      "sourceQuestionId": "5151611",
+      "permissionStatus": "可查看",
+      "chapter": "第三章 个人住房贷款",
+      "section": "第二节 个人住房贷款流程",
+      "knowledge": "单笔贷款流程"
+    },
+    {
+      "questionId": "jpl-5151613",
+      "sourceQuestionId": "5151613",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第四章 个人消费类贷款",
+      "section": "第一节 个人汽车贷款",
+      "knowledge": "基础知识"
+    },
+    {
+      "questionId": "jpl-5151616",
+      "sourceQuestionId": "5151616",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第一章 个人贷款概述",
+      "section": "第一节 个人贷款的性质和发展",
+      "knowledge": "个人贷款的特征"
+    },
+    {
+      "questionId": "jpl-5151626",
+      "sourceQuestionId": "5151626",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第二章 个人贷款管理",
+      "section": "第六节 个人贷款押品管理",
+      "knowledge": "押品管理基本概念"
+    },
+    {
+      "questionId": "jpl-5151627",
+      "sourceQuestionId": "5151627",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第二章 个人贷款管理",
+      "section": "第四节 个人贷款定价管理",
+      "knowledge": "个人贷款定价模型"
+    },
+    {
+      "questionId": "jpl-5151636",
+      "sourceQuestionId": "5151636",
+      "permissionStatus": "可查看",
+      "chapter": "第三章 个人住房贷款",
+      "section": "第二节 个人住房贷款流程",
+      "knowledge": "合作项目准入流程"
+    },
+    {
+      "questionId": "jpl-5151641",
+      "sourceQuestionId": "5151641",
+      "permissionStatus": "可查看",
+      "chapter": "第二章 个人贷款管理",
+      "section": "第二节 个人贷款流程",
+      "knowledge": "贷款的受理与调查"
+    },
+    {
+      "questionId": "jpl-5151645",
+      "sourceQuestionId": "5151645",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第三章 个人住房贷款",
+      "section": "第四节 公积金个人住房贷款",
+      "knowledge": "贷款流程"
+    },
+    {
+      "questionId": "jpl-5151658",
+      "sourceQuestionId": "5151658",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第五章 个人经营类贷款",
+      "section": "第一节 个人经营贷款",
+      "knowledge": "风险管理"
+    },
+    {
+      "questionId": "jpl-5151661",
+      "sourceQuestionId": "5151661",
+      "permissionStatus": "可查看",
+      "chapter": "第五章 个人经营类贷款",
+      "section": "第二节 个人商用房贷款",
+      "knowledge": "贷款流程"
+    },
+    {
+      "questionId": "jpl-5151663",
+      "sourceQuestionId": "5151663",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第六章 信用卡业务",
+      "section": "第一节 信用卡概述",
+      "knowledge": "信用卡的分类"
+    },
+    {
+      "questionId": "jpl-5151681",
+      "sourceQuestionId": "5151681",
+      "permissionStatus": "可查看",
+      "chapter": "第二章 个人贷款管理",
+      "section": "第四节 个人贷款定价管理",
+      "knowledge": "个人贷款定价原则"
+    },
+    {
+      "questionId": "jpl-5151683",
+      "sourceQuestionId": "5151683",
+      "permissionStatus": "可查看",
+      "chapter": "第二章 个人贷款管理",
+      "section": "第五节 个人贷款风险管理",
+      "knowledge": "信用风险管理"
+    },
+    {
+      "questionId": "jpl-5151685",
+      "sourceQuestionId": "5151685",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第二章 个人贷款管理",
+      "section": "第六节 个人贷款押品管理",
+      "knowledge": "押品风险控制措施"
+    },
+    {
+      "questionId": "jpl-5151693",
+      "sourceQuestionId": "5151693",
+      "permissionStatus": "可查看",
+      "chapter": "第四章 个人消费类贷款",
+      "section": "第一节 个人汽车贷款",
+      "knowledge": "基础知识"
+    },
+    {
+      "questionId": "jpl-5151699",
+      "sourceQuestionId": "5151699",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第二章 个人贷款管理",
+      "section": "第五节 个人贷款风险管理",
+      "knowledge": "信用风险管理"
+    },
+    {
+      "questionId": "jpl-5151704",
+      "sourceQuestionId": "5151704",
+      "permissionStatus": "可查看",
+      "chapter": "第三章 个人住房贷款",
+      "section": "第三节 个人住房贷款风险管理",
+      "knowledge": "合作机构风险管理"
+    },
+    {
+      "questionId": "jpl-5151707",
+      "sourceQuestionId": "5151707",
+      "permissionStatus": "可查看",
+      "chapter": "第四章 个人消费类贷款",
+      "section": "第二节 个人教育贷款",
+      "knowledge": "贷款流程"
+    },
+    {
+      "questionId": "jpl-5151720",
+      "sourceQuestionId": "5151720",
+      "permissionStatus": "可查看",
+      "chapter": "第八章 个人征信系统",
+      "section": "第一节 概述",
+      "knowledge": "个人征信系统的含义和内容"
+    },
+    {
+      "questionId": "jpl-5151721",
+      "sourceQuestionId": "5151721",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第一章 个人贷款概述",
+      "section": "第一节 个人贷款的性质和发展",
+      "knowledge": "个人贷款的概念和意义"
+    },
+    {
+      "questionId": "jpl-5151727",
+      "sourceQuestionId": "5151727",
+      "permissionStatus": "可查看",
+      "chapter": "第四章 个人消费类贷款",
+      "section": "第一节 个人汽车贷款",
+      "knowledge": "贷款流程"
+    },
+    {
+      "questionId": "jpl-5151729",
+      "sourceQuestionId": "5151729",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "附录",
+      "section": "个人贷款的监管政策和法规",
+      "knowledge": "商业银行信用卡业务监督管理办法"
+    },
+    {
+      "questionId": "jpl-5151733",
+      "sourceQuestionId": "5151733",
+      "permissionStatus": "可查看",
+      "chapter": "第二章 个人贷款管理",
+      "section": "第一节 个人贷款管理原则",
+      "knowledge": "全流程管理原则、诚信申贷原则和协议承诺原则"
+    },
+    {
+      "questionId": "jpl-5151735",
+      "sourceQuestionId": "5151735",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "附录",
+      "section": "个人贷款的监管政策和法规",
+      "knowledge": "与个人汽车贷款相关的政策和法规"
+    },
+    {
+      "questionId": "jpl-5151736",
+      "sourceQuestionId": "5151736",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第四章 个人消费类贷款",
+      "section": "第一节 个人汽车贷款",
+      "knowledge": "风险管理"
+    },
+    {
+      "questionId": "jpl-5151743",
+      "sourceQuestionId": "5151743",
+      "permissionStatus": "可查看",
+      "chapter": "第二章 个人贷款管理",
+      "section": "第五节 个人贷款风险管理",
+      "knowledge": "信用风险管理"
+    },
+    {
+      "questionId": "jpl-5151746",
+      "sourceQuestionId": "5151746",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第二章 个人贷款管理",
+      "section": "第二节 个人贷款流程",
+      "knowledge": "贷款的受理与调查"
+    },
+    {
+      "questionId": "jpl-5151753",
+      "sourceQuestionId": "5151753",
+      "permissionStatus": "可查看",
+      "chapter": "第三章 个人住房贷款",
+      "section": "第三节 个人住房贷款风险管理",
+      "knowledge": "操作风险管理"
+    },
+    {
+      "questionId": "jpl-5151757",
+      "sourceQuestionId": "5151757",
+      "permissionStatus": "可查看",
+      "chapter": "第三章 个人住房贷款",
+      "section": "第四节 公积金个人住房贷款",
+      "knowledge": "基础知识"
+    },
+    {
+      "questionId": "jpl-5151761",
+      "sourceQuestionId": "5151761",
+      "permissionStatus": "可查看",
+      "chapter": "第三章 个人住房贷款",
+      "section": "第四节 公积金个人住房贷款",
+      "knowledge": "贷款流程"
+    },
+    {
+      "questionId": "jpl-5151764",
+      "sourceQuestionId": "5151764",
+      "permissionStatus": "可查看",
+      "chapter": "第四章 个人消费类贷款",
+      "section": "第一节 个人汽车贷款",
+      "knowledge": "贷款流程"
+    },
+    {
+      "questionId": "jpl-5151765",
+      "sourceQuestionId": "5151765",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第四章 个人消费类贷款",
+      "section": "第一节 个人汽车贷款",
+      "knowledge": "风险管理"
+    },
+    {
+      "questionId": "jpl-5151767",
+      "sourceQuestionId": "5151767",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第四章 个人消费类贷款",
+      "section": "第二节 个人教育贷款",
+      "knowledge": "贷款流程"
+    },
+    {
+      "questionId": "jpl-5151773",
+      "sourceQuestionId": "5151773",
+      "permissionStatus": "可查看",
+      "chapter": "第三章 个人住房贷款",
+      "section": "第三节 个人住房贷款风险管理",
+      "knowledge": "信用风险管理"
+    },
+    {
+      "questionId": "jpl-5151792",
+      "sourceQuestionId": "5151792",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第二章 个人贷款管理",
+      "section": "第二节 个人贷款流程",
+      "knowledge": "贷款的签约与发放"
+    },
+    {
+      "questionId": "jpl-5151796",
+      "sourceQuestionId": "5151796",
+      "permissionStatus": "可查看",
+      "chapter": "第二章 个人贷款管理",
+      "section": "第四节 个人贷款定价管理",
+      "knowledge": "个人贷款定价影响因素"
+    },
+    {
+      "questionId": "jpl-5151800",
+      "sourceQuestionId": "5151800",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第二章 个人贷款管理",
+      "section": "第六节 个人贷款押品管理",
+      "knowledge": "押品风险控制措施"
+    },
+    {
+      "questionId": "jpl-5151803",
+      "sourceQuestionId": "5151803",
+      "permissionStatus": "可查看",
+      "chapter": "附录",
+      "section": "个人贷款的监管政策和法规",
+      "knowledge": "农户贷款管理办法"
+    },
+    {
+      "questionId": "jpl-5151810",
+      "sourceQuestionId": "5151810",
+      "permissionStatus": "可查看",
+      "chapter": "第四章 个人消费类贷款",
+      "section": "第二节 个人教育贷款",
+      "knowledge": "基础知识"
+    },
+    {
+      "questionId": "jpl-5151812",
+      "sourceQuestionId": "5151812",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第一章 个人贷款概述",
+      "section": "第一节 个人贷款的性质和发展",
+      "knowledge": "个人贷款的概念和意义"
+    },
+    {
+      "questionId": "jpl-5151814",
+      "sourceQuestionId": "5151814",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第二章 个人贷款管理",
+      "section": "第四节 个人贷款定价管理",
+      "knowledge": "个人贷款定价模型"
+    },
+    {
+      "questionId": "jpl-5151815",
+      "sourceQuestionId": "5151815",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第二章 个人贷款管理",
+      "section": "第五节 个人贷款风险管理",
+      "knowledge": "风险管理概述"
+    },
+    {
+      "questionId": "jpl-5151821",
+      "sourceQuestionId": "5151821",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第四章 个人消费类贷款",
+      "section": "第二节 个人教育贷款",
+      "knowledge": "基础知识"
+    },
+    {
+      "questionId": "jpl-5151824",
+      "sourceQuestionId": "5151824",
+      "permissionStatus": "可查看",
+      "chapter": "第五章 个人经营类贷款",
+      "section": "第一节 个人经营贷款",
+      "knowledge": "风险管理"
+    },
+    {
+      "questionId": "jpl-5151828",
+      "sourceQuestionId": "5151828",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第六章 信用卡业务",
+      "section": "第二节 信用卡业务流程",
+      "knowledge": "信用卡申请"
+    },
+    {
+      "questionId": "jpl-5151836",
+      "sourceQuestionId": "5151836",
+      "permissionStatus": "可查看",
+      "chapter": "第八章 个人征信系统",
+      "section": "第二节 个人征信系统的管理及应用",
+      "knowledge": "个人征信报告异议处理"
+    },
+    {
+      "questionId": "jpl-5151839",
+      "sourceQuestionId": "5151839",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第二章 个人贷款管理",
+      "section": "第六节 个人贷款押品管理",
+      "knowledge": "押品管理基本概念"
+    },
+    {
+      "questionId": "jpl-5151841",
+      "sourceQuestionId": "5151841",
+      "permissionStatus": "可查看",
+      "chapter": "第二章 个人贷款管理",
+      "section": "第二节 个人贷款流程",
+      "knowledge": "贷后管理"
+    },
+    {
+      "questionId": "jpl-5151843",
+      "sourceQuestionId": "5151843",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第三章 个人住房贷款",
+      "section": "第一节 个人住房贷款基础知识",
+      "knowledge": "房地产估价"
+    },
+    {
+      "questionId": "jpl-5151863",
+      "sourceQuestionId": "5151863",
+      "permissionStatus": "可查看",
+      "chapter": "第二章 个人贷款管理",
+      "section": "第四节 个人贷款定价管理",
+      "knowledge": "个人贷款定价模型"
+    },
+    {
+      "questionId": "jpl-5151865",
+      "sourceQuestionId": "5151865",
+      "permissionStatus": "可查看",
+      "chapter": "第三章 个人住房贷款",
+      "section": "第三节 个人住房贷款风险管理",
+      "knowledge": "操作风险管理"
+    },
+    {
+      "questionId": "jpl-5151873",
+      "sourceQuestionId": "5151873",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第四章 个人消费类贷款",
+      "section": "第一节 个人汽车贷款",
+      "knowledge": "基础知识"
+    },
+    {
+      "questionId": "jpl-5151877",
+      "sourceQuestionId": "5151877",
+      "permissionStatus": "可查看",
+      "chapter": "第四章 个人消费类贷款",
+      "section": "第一节 个人汽车贷款",
+      "knowledge": "基础知识"
+    },
+    {
+      "questionId": "jpl-5151885",
+      "sourceQuestionId": "5151885",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第三章 个人住房贷款",
+      "section": "第四节 公积金个人住房贷款",
+      "knowledge": "贷款流程"
+    },
+    {
+      "questionId": "jpl-5151889",
+      "sourceQuestionId": "5151889",
+      "permissionStatus": "可查看",
+      "chapter": "第二章 个人贷款管理",
+      "section": "第三节 个人贷款营销管理",
+      "knowledge": "银行营销策略"
+    },
+    {
+      "questionId": "jpl-5151893",
+      "sourceQuestionId": "5151893",
+      "permissionStatus": "可查看",
+      "chapter": "第五章 个人经营类贷款",
+      "section": "第二节 个人商用房贷款",
+      "knowledge": "基础知识"
+    },
+    {
+      "questionId": "jpl-5151894",
+      "sourceQuestionId": "5151894",
+      "permissionStatus": "可查看",
+      "chapter": "第一章 个人贷款概述",
+      "section": "第二节 个人贷款产品的种类",
+      "knowledge": "按有无担保分类"
+    },
+    {
+      "questionId": "jpl-5151896",
+      "sourceQuestionId": "5151896",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第三章 个人住房贷款",
+      "section": "第一节 个人住房贷款基础知识",
+      "knowledge": "基础知识"
+    },
+    {
+      "questionId": "jpl-5151910",
+      "sourceQuestionId": "5151910",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第四章 个人消费类贷款",
+      "section": "第一节 个人汽车贷款",
+      "knowledge": "基础知识"
+    },
+    {
+      "questionId": "jpl-5151923",
+      "sourceQuestionId": "5151923",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第一章 个人贷款概述",
+      "section": "第三节 个人贷款产品的要素",
+      "knowledge": "还款方式"
+    },
+    {
+      "questionId": "jpl-5151927",
+      "sourceQuestionId": "5151927",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第一章 个人贷款概述",
+      "section": "第三节 个人贷款产品的要素",
+      "knowledge": "还款方式"
+    },
+    {
+      "questionId": "jpl-5151938",
+      "sourceQuestionId": "5151938",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第五章 个人经营类贷款",
+      "section": "第三节 涉农贷款",
+      "knowledge": ""
+    },
+    {
+      "questionId": "jpl-5151939",
+      "sourceQuestionId": "5151939",
+      "permissionStatus": "可查看",
+      "chapter": "第二章 个人贷款管理",
+      "section": "第三节 个人贷款营销管理",
+      "knowledge": "个人贷款营销渠道"
+    },
+    {
+      "questionId": "jpl-5151942",
+      "sourceQuestionId": "5151942",
+      "permissionStatus": "可查看",
+      "chapter": "第一章 个人贷款概述",
+      "section": "第三节 个人贷款产品的要素",
+      "knowledge": "还款方式"
+    },
+    {
+      "questionId": "jpl-5151951",
+      "sourceQuestionId": "5151951",
+      "permissionStatus": "可查看",
+      "chapter": "第三章 个人住房贷款",
+      "section": "第三节 个人住房贷款风险管理",
+      "knowledge": "操作风险管理"
+    },
+    {
+      "questionId": "jpl-5151954",
+      "sourceQuestionId": "5151954",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第四章 个人消费类贷款",
+      "section": "第二节 个人教育贷款",
+      "knowledge": "风险管理"
+    },
+    {
+      "questionId": "jpl-5151965",
+      "sourceQuestionId": "5151965",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第三章 个人住房贷款",
+      "section": "第一节 个人住房贷款基础知识",
+      "knowledge": "基础知识"
+    },
+    {
+      "questionId": "jpl-5151970",
+      "sourceQuestionId": "5151970",
+      "permissionStatus": "可查看",
+      "chapter": "第三章 个人住房贷款",
+      "section": "第二节 个人住房贷款流程",
+      "knowledge": "单笔贷款流程"
+    },
+    {
+      "questionId": "jpl-5151974",
+      "sourceQuestionId": "5151974",
+      "permissionStatus": "可查看",
+      "chapter": "第二章 个人贷款管理",
+      "section": "第二节 个人贷款流程",
+      "knowledge": "贷款的受理与调查"
+    },
+    {
+      "questionId": "jpl-5151984",
+      "sourceQuestionId": "5151984",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第三章 个人住房贷款",
+      "section": "第三节 个人住房贷款风险管理",
+      "knowledge": "操作风险管理"
+    },
+    {
+      "questionId": "jpl-5151987",
+      "sourceQuestionId": "5151987",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "附录",
+      "section": "个人贷款的监管政策和法规",
+      "knowledge": "与个人汽车贷款相关的政策和法规"
+    },
+    {
+      "questionId": "jpl-5151988",
+      "sourceQuestionId": "5151988",
+      "permissionStatus": "可查看",
+      "chapter": "第四章 个人消费类贷款",
+      "section": "第一节 个人汽车贷款",
+      "knowledge": "基础知识"
+    },
+    {
+      "questionId": "jpl-5151991",
+      "sourceQuestionId": "5151991",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第四章 个人消费类贷款",
+      "section": "第二节 个人教育贷款",
+      "knowledge": "基础知识"
+    },
+    {
+      "questionId": "jpl-5151999",
+      "sourceQuestionId": "5151999",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第五章 个人经营类贷款",
+      "section": "第一节 个人经营贷款",
+      "knowledge": "基础知识"
+    },
+    {
+      "questionId": "jpl-5152004",
+      "sourceQuestionId": "5152004",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "附录",
+      "section": "个人贷款的监管政策和法规",
+      "knowledge": "农户贷款管理办法"
+    },
+    {
+      "questionId": "jpl-5152012",
+      "sourceQuestionId": "5152012",
+      "permissionStatus": "可查看",
+      "chapter": "第二章 个人贷款管理",
+      "section": "第二节 个人贷款流程",
+      "knowledge": "贷款的签约与发放"
+    },
+    {
+      "questionId": "jpl-5152024",
+      "sourceQuestionId": "5152024",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第二章 个人贷款管理",
+      "section": "第二节 个人贷款流程",
+      "knowledge": "贷款的受理与调查"
+    },
+    {
+      "questionId": "jpl-5152025",
+      "sourceQuestionId": "5152025",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第三章 个人住房贷款",
+      "section": "第三节 个人住房贷款风险管理",
+      "knowledge": "操作风险管理"
+    },
+    {
+      "questionId": "jpl-5152026",
+      "sourceQuestionId": "5152026",
+      "permissionStatus": "可查看",
+      "chapter": "第二章 个人贷款管理",
+      "section": "第二节 个人贷款流程",
+      "knowledge": "贷后管理"
+    },
+    {
+      "questionId": "jpl-5152034",
+      "sourceQuestionId": "5152034",
+      "permissionStatus": "可查看",
+      "chapter": "第五章 个人经营类贷款",
+      "section": "第二节 个人商用房贷款",
+      "knowledge": "基础知识"
+    },
+    {
+      "questionId": "jpl-5152036",
+      "sourceQuestionId": "5152036",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第五章 个人经营类贷款",
+      "section": "第一节 个人经营贷款",
+      "knowledge": "基础知识"
+    },
+    {
+      "questionId": "jpl-5152043",
+      "sourceQuestionId": "5152043",
+      "permissionStatus": "可查看",
+      "chapter": "第三章 个人住房贷款",
+      "section": "第三节 个人住房贷款风险管理",
+      "knowledge": "合作机构风险管理"
+    },
+    {
+      "questionId": "jpl-5152044",
+      "sourceQuestionId": "5152044",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第八章 个人征信系统",
+      "section": "第一节 概述",
+      "knowledge": "个人征信的相关法律法规"
+    },
+    {
+      "questionId": "jpl-5152048",
+      "sourceQuestionId": "5152048",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第一章 个人贷款概述",
+      "section": "第二节 个人贷款产品的种类",
+      "knowledge": "按有无担保分类"
+    },
+    {
+      "questionId": "jpl-5152049",
+      "sourceQuestionId": "5152049",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第二章 个人贷款管理",
+      "section": "第二节 个人贷款流程",
+      "knowledge": "贷后管理"
+    },
+    {
+      "questionId": "jpl-5152052",
+      "sourceQuestionId": "5152052",
+      "permissionStatus": "可查看",
+      "chapter": "第二章 个人贷款管理",
+      "section": "第三节 个人贷款营销管理",
+      "knowledge": "个人贷款营销渠道"
+    },
+    {
+      "questionId": "jpl-5152055",
+      "sourceQuestionId": "5152055",
+      "permissionStatus": "可查看",
+      "chapter": "第八章 个人征信系统",
+      "section": "第一节 概述",
+      "knowledge": "个人征信系统的含义和内容"
+    },
+    {
+      "questionId": "jpl-5152068",
+      "sourceQuestionId": "5152068",
+      "permissionStatus": "可查看",
+      "chapter": "第三章 个人住房贷款",
+      "section": "第三节 个人住房贷款风险管理",
+      "knowledge": "信用风险管理"
+    },
+    {
+      "questionId": "jpl-5152071",
+      "sourceQuestionId": "5152071",
+      "permissionStatus": "可查看",
+      "chapter": "第二章 个人贷款管理",
+      "section": "第二节 个人贷款流程",
+      "knowledge": "贷后管理"
+    },
+    {
+      "questionId": "jpl-5155344",
+      "sourceQuestionId": "5155344",
+      "permissionStatus": "可查看",
+      "chapter": "附录",
+      "section": "个人贷款的相关法律",
+      "knowledge": "中华人民共和国民法典"
+    },
+    {
+      "questionId": "jpl-5155345",
+      "sourceQuestionId": "5155345",
+      "permissionStatus": "可查看",
+      "chapter": "附录",
+      "section": "个人贷款的相关法律",
+      "knowledge": "中华人民共和国民法典"
+    },
+    {
+      "questionId": "jpl-5155346",
+      "sourceQuestionId": "5155346",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "附录",
+      "section": "个人贷款的监管政策和法规",
+      "knowledge": "与个人住房贷款相关的政策和法规"
+    },
+    {
+      "questionId": "jpl-5155348",
+      "sourceQuestionId": "5155348",
+      "permissionStatus": "可查看",
+      "chapter": "附录",
+      "section": "个人贷款的监管政策和法规",
+      "knowledge": "与个人贷款相关的政策法规"
+    },
+    {
+      "questionId": "jpl-5155349",
+      "sourceQuestionId": "5155349",
+      "permissionStatus": "可查看",
+      "chapter": "附录",
+      "section": "个人贷款的相关法律",
+      "knowledge": "中华人民共和国民法典"
+    },
+    {
+      "questionId": "jpl-5155350",
+      "sourceQuestionId": "5155350",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "附录",
+      "section": "个人贷款的相关法律",
+      "knowledge": "中华人民共和国民法典"
+    },
+    {
+      "questionId": "jpl-5155351",
+      "sourceQuestionId": "5155351",
+      "permissionStatus": "可查看",
+      "chapter": "附录",
+      "section": "个人贷款的相关法律",
+      "knowledge": "贷款通则"
+    },
+    {
+      "questionId": "jpl-5155352",
+      "sourceQuestionId": "5155352",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "附录",
+      "section": "个人贷款的监管政策和法规",
+      "knowledge": "与个人住房贷款相关的政策和法规"
+    },
+    {
+      "questionId": "jpl-5155354",
+      "sourceQuestionId": "5155354",
+      "permissionStatus": "可查看",
+      "chapter": "附录",
+      "section": "个人贷款的监管政策和法规",
+      "knowledge": "与个人住房贷款相关的政策和法规"
+    },
+    {
+      "questionId": "jpl-5155356",
+      "sourceQuestionId": "5155356",
+      "permissionStatus": "可查看",
+      "chapter": "第三章 个人住房贷款",
+      "section": "第三节 个人住房贷款风险管理",
+      "knowledge": "操作风险管理"
+    },
+    {
+      "questionId": "jpl-5155358",
+      "sourceQuestionId": "5155358",
+      "permissionStatus": "可查看",
+      "chapter": "附录",
+      "section": "个人贷款的相关法律",
+      "knowledge": "中华人民共和国民法典"
+    },
+    {
+      "questionId": "jpl-5155359",
+      "sourceQuestionId": "5155359",
+      "permissionStatus": "可查看",
+      "chapter": "附录",
+      "section": "个人贷款的相关法律",
+      "knowledge": "中华人民共和国民法典"
+    },
+    {
+      "questionId": "jpl-5155361",
+      "sourceQuestionId": "5155361",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "附录",
+      "section": "个人贷款的相关法律",
+      "knowledge": "贷款通则"
+    },
+    {
+      "questionId": "jpl-5155363",
+      "sourceQuestionId": "5155363",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "附录",
+      "section": "个人贷款的监管政策和法规",
+      "knowledge": "与个人住房贷款相关的政策和法规"
+    },
+    {
+      "questionId": "jpl-5155364",
+      "sourceQuestionId": "5155364",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "附录",
+      "section": "个人贷款的相关法律",
+      "knowledge": "中华人民共和国民法典"
+    },
+    {
+      "questionId": "jpl-5155365",
+      "sourceQuestionId": "5155365",
+      "permissionStatus": "可查看",
+      "chapter": "附录",
+      "section": "个人贷款的相关法律",
+      "knowledge": "贷款通则"
+    },
+    {
+      "questionId": "jpl-5155366",
+      "sourceQuestionId": "5155366",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "附录",
+      "section": "个人贷款的监管政策和法规",
+      "knowledge": "与个人住房贷款相关的政策和法规"
+    },
+    {
+      "questionId": "jpl-5155368",
+      "sourceQuestionId": "5155368",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "附录",
+      "section": "个人贷款的监管政策和法规",
+      "knowledge": "与个人教育贷款相关的政策和法规"
+    },
+    {
+      "questionId": "jpl-5155370",
+      "sourceQuestionId": "5155370",
+      "permissionStatus": "可查看",
+      "chapter": "第五章 个人经营类贷款",
+      "section": "第三节 涉农贷款",
+      "knowledge": "农户贷款"
+    },
+    {
+      "questionId": "jpl-5155371",
+      "sourceQuestionId": "5155371",
+      "permissionStatus": "可查看",
+      "chapter": "附录",
+      "section": "个人贷款的监管政策和法规",
+      "knowledge": "与个人住房贷款相关的政策和法规"
+    },
+    {
+      "questionId": "jpl-5155372",
+      "sourceQuestionId": "5155372",
+      "permissionStatus": "可查看",
+      "chapter": "附录",
+      "section": "个人贷款的监管政策和法规",
+      "knowledge": "与个人贷款相关的政策法规"
+    },
+    {
+      "questionId": "jpl-5155373",
+      "sourceQuestionId": "5155373",
+      "permissionStatus": "可查看",
+      "chapter": "第二章 个人贷款管理",
+      "section": "第二节 个人贷款流程",
+      "knowledge": "贷款的审查与审批"
+    },
+    {
+      "questionId": "jpl-5155374",
+      "sourceQuestionId": "5155374",
+      "permissionStatus": "可查看",
+      "chapter": "附录",
+      "section": "个人贷款的监管政策和法规",
+      "knowledge": "与个人住房贷款相关的政策和法规"
+    },
+    {
+      "questionId": "jpl-5155376",
+      "sourceQuestionId": "5155376",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "附录",
+      "section": "个人贷款的监管政策和法规",
+      "knowledge": "与个人住房贷款相关的政策和法规"
+    },
+    {
+      "questionId": "jpl-5155377",
+      "sourceQuestionId": "5155377",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "附录",
+      "section": "个人贷款的监管政策和法规",
+      "knowledge": "与个人教育贷款相关的政策和法规"
+    },
+    {
+      "questionId": "jpl-5155378",
+      "sourceQuestionId": "5155378",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "附录",
+      "section": "个人贷款的监管政策和法规",
+      "knowledge": "与个人贷款相关的政策法规"
+    },
+    {
+      "questionId": "jpl-5155379",
+      "sourceQuestionId": "5155379",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "附录",
+      "section": "个人贷款的监管政策和法规",
+      "knowledge": "与个人贷款相关的政策法规"
+    },
+    {
+      "questionId": "jpl-5155380",
+      "sourceQuestionId": "5155380",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "附录",
+      "section": "个人贷款的监管政策和法规",
+      "knowledge": "与个人贷款相关的政策法规"
+    },
+    {
+      "questionId": "jpl-5155381",
+      "sourceQuestionId": "5155381",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "附录",
+      "section": "个人贷款的监管政策和法规",
+      "knowledge": "与个人教育贷款相关的政策和法规"
+    },
+    {
+      "questionId": "jpl-5155382",
+      "sourceQuestionId": "5155382",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "附录",
+      "section": "个人贷款的监管政策和法规",
+      "knowledge": "与个人住房贷款相关的政策和法规"
+    },
+    {
+      "questionId": "jpl-5155383",
+      "sourceQuestionId": "5155383",
+      "permissionStatus": "可查看",
+      "chapter": "附录",
+      "section": "个人贷款的相关法律",
+      "knowledge": "中华人民共和国民法典"
+    },
+    {
+      "questionId": "jpl-5155384",
+      "sourceQuestionId": "5155384",
+      "permissionStatus": "可查看",
+      "chapter": "附录",
+      "section": "个人贷款的相关法律",
+      "knowledge": "中华人民共和国民法典"
+    },
+    {
+      "questionId": "jpl-5155385",
+      "sourceQuestionId": "5155385",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "附录",
+      "section": "个人贷款的相关法律",
+      "knowledge": "中华人民共和国民法典"
+    },
+    {
+      "questionId": "jpl-5155388",
+      "sourceQuestionId": "5155388",
+      "permissionStatus": "可查看",
+      "chapter": "附录",
+      "section": "个人贷款的相关法律",
+      "knowledge": "中华人民共和国民法典"
+    },
+    {
+      "questionId": "jpl-5155389",
+      "sourceQuestionId": "5155389",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "附录",
+      "section": "个人贷款的相关法律",
+      "knowledge": "中华人民共和国民法典"
+    },
+    {
+      "questionId": "jpl-5155390",
+      "sourceQuestionId": "5155390",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "附录",
+      "section": "个人贷款的监管政策和法规",
+      "knowledge": "与个人贷款相关的政策法规"
+    },
+    {
+      "questionId": "jpl-5155391",
+      "sourceQuestionId": "5155391",
+      "permissionStatus": "可查看",
+      "chapter": "附录",
+      "section": "个人贷款的相关法律",
+      "knowledge": "中华人民共和国民法典"
+    },
+    {
+      "questionId": "jpl-5155392",
+      "sourceQuestionId": "5155392",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "附录",
+      "section": "个人贷款的监管政策和法规",
+      "knowledge": "与个人住房贷款相关的政策和法规"
+    },
+    {
+      "questionId": "jpl-5155394",
+      "sourceQuestionId": "5155394",
+      "permissionStatus": "可查看",
+      "chapter": "附录",
+      "section": "个人贷款的相关法律",
+      "knowledge": "中华人民共和国民法典"
+    },
+    {
+      "questionId": "jpl-5155395",
+      "sourceQuestionId": "5155395",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "附录",
+      "section": "个人贷款的监管政策和法规",
+      "knowledge": "与个人住房贷款相关的政策和法规"
+    },
+    {
+      "questionId": "jpl-5155396",
+      "sourceQuestionId": "5155396",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "附录",
+      "section": "个人贷款的监管政策和法规",
+      "knowledge": "与个人教育贷款相关的政策和法规"
+    },
+    {
+      "questionId": "jpl-5155397",
+      "sourceQuestionId": "5155397",
+      "permissionStatus": "可查看",
+      "chapter": "附录",
+      "section": "个人贷款的监管政策和法规",
+      "knowledge": "与个人住房贷款相关的政策和法规"
+    },
+    {
+      "questionId": "jpl-5155399",
+      "sourceQuestionId": "5155399",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第一章 个人贷款概述",
+      "section": "第二节 个人贷款产品的种类",
+      "knowledge": "按贷款是否可循环分类"
+    },
+    {
+      "questionId": "jpl-5155401",
+      "sourceQuestionId": "5155401",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第一章 个人贷款概述",
+      "section": "第二节 个人贷款产品的种类",
+      "knowledge": "按业务载体分类"
+    },
+    {
+      "questionId": "jpl-5155402",
+      "sourceQuestionId": "5155402",
+      "permissionStatus": "可查看",
+      "chapter": "第一章 个人贷款概述",
+      "section": "第二节 个人贷款产品的种类",
+      "knowledge": "按有无担保分类"
+    },
+    {
+      "questionId": "jpl-5155403",
+      "sourceQuestionId": "5155403",
+      "permissionStatus": "可查看",
+      "chapter": "第一章 个人贷款概述",
+      "section": "第二节 个人贷款产品的种类",
+      "knowledge": "按有无担保分类"
+    },
+    {
+      "questionId": "jpl-5155404",
+      "sourceQuestionId": "5155404",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第一章 个人贷款概述",
+      "section": "第二节 个人贷款产品的种类",
+      "knowledge": "按产品用途分类"
+    },
+    {
+      "questionId": "jpl-5155405",
+      "sourceQuestionId": "5155405",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第一章 个人贷款概述",
+      "section": "第二节 个人贷款产品的种类",
+      "knowledge": "按贷款是否可循环分类"
+    },
+    {
+      "questionId": "jpl-5155406",
+      "sourceQuestionId": "5155406",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第一章 个人贷款概述",
+      "section": "第三节 个人贷款产品的要素",
+      "knowledge": "担保方式和贷款额度"
+    },
+    {
+      "questionId": "jpl-5155407",
+      "sourceQuestionId": "5155407",
+      "permissionStatus": "可查看",
+      "chapter": "第一章 个人贷款概述",
+      "section": "第一节 个人贷款的性质和发展",
+      "knowledge": "个人贷款的特征"
+    },
+    {
+      "questionId": "jpl-5155408",
+      "sourceQuestionId": "5155408",
+      "permissionStatus": "可查看",
+      "chapter": "第一章 个人贷款概述",
+      "section": "第二节 个人贷款产品的种类",
+      "knowledge": "按产品用途分类"
+    },
+    {
+      "questionId": "jpl-5155409",
+      "sourceQuestionId": "5155409",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第一章 个人贷款概述",
+      "section": "第三节 个人贷款产品的要素",
+      "knowledge": "担保方式和贷款额度"
+    },
+    {
+      "questionId": "jpl-5155410",
+      "sourceQuestionId": "5155410",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第一章 个人贷款概述",
+      "section": "第一节 个人贷款的性质和发展",
+      "knowledge": "个人贷款的发展历程"
+    },
+    {
+      "questionId": "jpl-5155412",
+      "sourceQuestionId": "5155412",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第一章 个人贷款概述",
+      "section": "第二节 个人贷款产品的种类",
+      "knowledge": "按有无担保分类"
+    },
+    {
+      "questionId": "jpl-5155413",
+      "sourceQuestionId": "5155413",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第一章 个人贷款概述",
+      "section": "第三节 个人贷款产品的要素",
+      "knowledge": "贷款期限"
+    },
+    {
+      "questionId": "jpl-5155414",
+      "sourceQuestionId": "5155414",
+      "permissionStatus": "可查看",
+      "chapter": "第一章 个人贷款概述",
+      "section": "第三节 个人贷款产品的要素",
+      "knowledge": "贷款利率"
+    },
+    {
+      "questionId": "jpl-5155415",
+      "sourceQuestionId": "5155415",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第一章 个人贷款概述",
+      "section": "第二节 个人贷款产品的种类",
+      "knowledge": "按产品用途分类"
+    },
+    {
+      "questionId": "jpl-5155416",
+      "sourceQuestionId": "5155416",
+      "permissionStatus": "可查看",
+      "chapter": "第二章 个人贷款管理",
+      "section": "第六节 个人贷款押品管理",
+      "knowledge": "押品管理基本概念"
+    },
+    {
+      "questionId": "jpl-5155417",
+      "sourceQuestionId": "5155417",
+      "permissionStatus": "可查看",
+      "chapter": "第一章 个人贷款概述",
+      "section": "第三节 个人贷款产品的要素",
+      "knowledge": "还款方式"
+    },
+    {
+      "questionId": "jpl-5155418",
+      "sourceQuestionId": "5155418",
+      "permissionStatus": "可查看",
+      "chapter": "第一章 个人贷款概述",
+      "section": "第三节 个人贷款产品的要素",
+      "knowledge": "贷款利率"
+    },
+    {
+      "questionId": "jpl-5155420",
+      "sourceQuestionId": "5155420",
+      "permissionStatus": "可查看",
+      "chapter": "第一章 个人贷款概述",
+      "section": "第二节 个人贷款产品的种类",
+      "knowledge": "按有无担保分类"
+    },
+    {
+      "questionId": "jpl-5155421",
+      "sourceQuestionId": "5155421",
+      "permissionStatus": "可查看",
+      "chapter": "第一章 个人贷款概述",
+      "section": "第二节 个人贷款产品的种类",
+      "knowledge": "按产品用途分类"
+    },
+    {
+      "questionId": "jpl-5155422",
+      "sourceQuestionId": "5155422",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第二章 个人贷款管理",
+      "section": "第六节 个人贷款押品管理",
+      "knowledge": "押品管理基本概念"
+    },
+    {
+      "questionId": "jpl-5155424",
+      "sourceQuestionId": "5155424",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第一章 个人贷款概述",
+      "section": "第三节 个人贷款产品的要素",
+      "knowledge": "担保方式和贷款额度"
+    },
+    {
+      "questionId": "jpl-5155426",
+      "sourceQuestionId": "5155426",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第一章 个人贷款概述",
+      "section": "第三节 个人贷款产品的要素",
+      "knowledge": "还款方式"
+    },
+    {
+      "questionId": "jpl-5155427",
+      "sourceQuestionId": "5155427",
+      "permissionStatus": "可查看",
+      "chapter": "第一章 个人贷款概述",
+      "section": "第三节 个人贷款产品的要素",
+      "knowledge": "还款方式"
+    },
+    {
+      "questionId": "jpl-5155428",
+      "sourceQuestionId": "5155428",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第一章 个人贷款概述",
+      "section": "第三节 个人贷款产品的要素",
+      "knowledge": "担保方式和贷款额度"
+    },
+    {
+      "questionId": "jpl-5155430",
+      "sourceQuestionId": "5155430",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第一章 个人贷款概述",
+      "section": "第三节 个人贷款产品的要素",
+      "knowledge": "还款方式"
+    },
+    {
+      "questionId": "jpl-5155431",
+      "sourceQuestionId": "5155431",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第一章 个人贷款概述",
+      "section": "第三节 个人贷款产品的要素",
+      "knowledge": "贷款利率"
+    },
+    {
+      "questionId": "jpl-5155432",
+      "sourceQuestionId": "5155432",
+      "permissionStatus": "可查看",
+      "chapter": "第一章 个人贷款概述",
+      "section": "第二节 个人贷款产品的种类",
+      "knowledge": "按产品用途分类"
+    },
+    {
+      "questionId": "jpl-5155435",
+      "sourceQuestionId": "5155435",
+      "permissionStatus": "可查看",
+      "chapter": "第一章 个人贷款概述",
+      "section": "第三节 个人贷款产品的要素",
+      "knowledge": "还款方式"
+    },
+    {
+      "questionId": "jpl-5155436",
+      "sourceQuestionId": "5155436",
+      "permissionStatus": "可查看",
+      "chapter": "第一章 个人贷款概述",
+      "section": "第二节 个人贷款产品的种类",
+      "knowledge": "按有无担保分类"
+    },
+    {
+      "questionId": "jpl-5155438",
+      "sourceQuestionId": "5155438",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第一章 个人贷款概述",
+      "section": "第三节 个人贷款产品的要素",
+      "knowledge": "还款方式"
+    },
+    {
+      "questionId": "jpl-5155439",
+      "sourceQuestionId": "5155439",
+      "permissionStatus": "可查看",
+      "chapter": "第一章 个人贷款概述",
+      "section": "第三节 个人贷款产品的要素",
+      "knowledge": "担保方式和贷款额度"
+    },
+    {
+      "questionId": "jpl-5155441",
+      "sourceQuestionId": "5155441",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第一章 个人贷款概述",
+      "section": "第三节 个人贷款产品的要素",
+      "knowledge": "还款方式"
+    },
+    {
+      "questionId": "jpl-5155443",
+      "sourceQuestionId": "5155443",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第一章 个人贷款概述",
+      "section": "第一节 个人贷款的性质和发展",
+      "knowledge": "个人贷款的概念和意义"
+    },
+    {
+      "questionId": "jpl-5155444",
+      "sourceQuestionId": "5155444",
+      "permissionStatus": "可查看",
+      "chapter": "第一章 个人贷款概述",
+      "section": "第一节 个人贷款的性质和发展",
+      "knowledge": "个人贷款的发展历程"
+    },
+    {
+      "questionId": "jpl-5155445",
+      "sourceQuestionId": "5155445",
+      "permissionStatus": "可查看",
+      "chapter": "第一章 个人贷款概述",
+      "section": "第三节 个人贷款产品的要素",
+      "knowledge": "还款方式"
+    },
+    {
+      "questionId": "jpl-5155446",
+      "sourceQuestionId": "5155446",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第一章 个人贷款概述",
+      "section": "第一节 个人贷款的性质和发展",
+      "knowledge": "个人贷款的特征"
+    },
+    {
+      "questionId": "jpl-5155447",
+      "sourceQuestionId": "5155447",
+      "permissionStatus": "可查看",
+      "chapter": "第一章 个人贷款概述",
+      "section": "第二节 个人贷款产品的种类",
+      "knowledge": "按产品用途分类"
+    },
+    {
+      "questionId": "jpl-5155448",
+      "sourceQuestionId": "5155448",
+      "permissionStatus": "可查看",
+      "chapter": "第一章 个人贷款概述",
+      "section": "第二节 个人贷款产品的种类",
+      "knowledge": "按产品用途分类"
+    },
+    {
+      "questionId": "jpl-5155450",
+      "sourceQuestionId": "5155450",
+      "permissionStatus": "可查看",
+      "chapter": "第一章 个人贷款概述",
+      "section": "第二节 个人贷款产品的种类",
+      "knowledge": "按产品用途分类"
+    },
+    {
+      "questionId": "jpl-5155453",
+      "sourceQuestionId": "5155453",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第一章 个人贷款概述",
+      "section": "第二节 个人贷款产品的种类",
+      "knowledge": "按有无担保分类"
+    },
+    {
+      "questionId": "jpl-5155454",
+      "sourceQuestionId": "5155454",
+      "permissionStatus": "可查看",
+      "chapter": "第一章 个人贷款概述",
+      "section": "第二节 个人贷款产品的种类",
+      "knowledge": "按有无担保分类"
+    },
+    {
+      "questionId": "jpl-5155456",
+      "sourceQuestionId": "5155456",
+      "permissionStatus": "可查看",
+      "chapter": "第一章 个人贷款概述",
+      "section": "第二节 个人贷款产品的种类",
+      "knowledge": "按有无担保分类"
+    },
+    {
+      "questionId": "jpl-5155457",
+      "sourceQuestionId": "5155457",
+      "permissionStatus": "可查看",
+      "chapter": "第一章 个人贷款概述",
+      "section": "第二节 个人贷款产品的种类",
+      "knowledge": "按贷款是否可循环分类"
+    },
+    {
+      "questionId": "jpl-5155458",
+      "sourceQuestionId": "5155458",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第一章 个人贷款概述",
+      "section": "第三节 个人贷款产品的要素",
+      "knowledge": "贷款对象"
+    },
+    {
+      "questionId": "jpl-5155459",
+      "sourceQuestionId": "5155459",
+      "permissionStatus": "可查看",
+      "chapter": "第一章 个人贷款概述",
+      "section": "第三节 个人贷款产品的要素",
+      "knowledge": "贷款对象"
+    },
+    {
+      "questionId": "jpl-5155460",
+      "sourceQuestionId": "5155460",
+      "permissionStatus": "可查看",
+      "chapter": "第一章 个人贷款概述",
+      "section": "第三节 个人贷款产品的要素",
+      "knowledge": "还款方式"
+    },
+    {
+      "questionId": "jpl-5155461",
+      "sourceQuestionId": "5155461",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第一章 个人贷款概述",
+      "section": "第三节 个人贷款产品的要素",
+      "knowledge": "还款方式"
+    },
+    {
+      "questionId": "jpl-5155462",
+      "sourceQuestionId": "5155462",
+      "permissionStatus": "可查看",
+      "chapter": "第一章 个人贷款概述",
+      "section": "第三节 个人贷款产品的要素",
+      "knowledge": "还款方式"
+    },
+    {
+      "questionId": "jpl-5155465",
+      "sourceQuestionId": "5155465",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第一章 个人贷款概述",
+      "section": "第三节 个人贷款产品的要素",
+      "knowledge": "还款方式"
+    },
+    {
+      "questionId": "jpl-5155466",
+      "sourceQuestionId": "5155466",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第一章 个人贷款概述",
+      "section": "第三节 个人贷款产品的要素",
+      "knowledge": "还款方式"
+    },
+    {
+      "questionId": "jpl-5155467",
+      "sourceQuestionId": "5155467",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第一章 个人贷款概述",
+      "section": "第一节 个人贷款的性质和发展",
+      "knowledge": "个人贷款的特征"
+    },
+    {
+      "questionId": "jpl-5155468",
+      "sourceQuestionId": "5155468",
+      "permissionStatus": "可查看",
+      "chapter": "第一章 个人贷款概述",
+      "section": "第三节 个人贷款产品的要素",
+      "knowledge": "贷款利率"
+    },
+    {
+      "questionId": "jpl-5155469",
+      "sourceQuestionId": "5155469",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第一章 个人贷款概述",
+      "section": "第二节 个人贷款产品的种类",
+      "knowledge": "按贷款是否可循环分类"
+    },
+    {
+      "questionId": "jpl-5155470",
+      "sourceQuestionId": "5155470",
+      "permissionStatus": "可查看",
+      "chapter": "第一章 个人贷款概述",
+      "section": "第三节 个人贷款产品的要素",
+      "knowledge": ""
+    },
+    {
+      "questionId": "jpl-5155472",
+      "sourceQuestionId": "5155472",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第一章 个人贷款概述",
+      "section": "第二节 个人贷款产品的种类",
+      "knowledge": "按有无担保分类"
+    },
+    {
+      "questionId": "jpl-5155473",
+      "sourceQuestionId": "5155473",
+      "permissionStatus": "可查看",
+      "chapter": "第一章 个人贷款概述",
+      "section": "第二节 个人贷款产品的种类",
+      "knowledge": "按有无担保分类"
+    },
+    {
+      "questionId": "jpl-5155474",
+      "sourceQuestionId": "5155474",
+      "permissionStatus": "可查看",
+      "chapter": "第一章 个人贷款概述",
+      "section": "第三节 个人贷款产品的要素",
+      "knowledge": "还款方式"
+    },
+    {
+      "questionId": "jpl-5155476",
+      "sourceQuestionId": "5155476",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第一章 个人贷款概述",
+      "section": "第三节 个人贷款产品的要素",
+      "knowledge": "担保方式和贷款额度"
+    },
+    {
+      "questionId": "jpl-5155477",
+      "sourceQuestionId": "5155477",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第一章 个人贷款概述",
+      "section": "第三节 个人贷款产品的要素",
+      "knowledge": "贷款利率"
+    },
+    {
+      "questionId": "jpl-5155478",
+      "sourceQuestionId": "5155478",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第一章 个人贷款概述",
+      "section": "第二节 个人贷款产品的种类",
+      "knowledge": "按有无担保分类"
+    },
+    {
+      "questionId": "jpl-5155479",
+      "sourceQuestionId": "5155479",
+      "permissionStatus": "可查看",
+      "chapter": "第一章 个人贷款概述",
+      "section": "第二节 个人贷款产品的种类",
+      "knowledge": "按有无担保分类"
+    },
+    {
+      "questionId": "jpl-5155480",
+      "sourceQuestionId": "5155480",
+      "permissionStatus": "可查看",
+      "chapter": "第一章 个人贷款概述",
+      "section": "第一节 个人贷款的性质和发展",
+      "knowledge": "个人贷款的概念和意义"
+    },
+    {
+      "questionId": "jpl-5155481",
+      "sourceQuestionId": "5155481",
+      "permissionStatus": "可查看",
+      "chapter": "第一章 个人贷款概述",
+      "section": "第二节 个人贷款产品的种类",
+      "knowledge": "按有无担保分类"
+    },
+    {
+      "questionId": "jpl-5155483",
+      "sourceQuestionId": "5155483",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第一章 个人贷款概述",
+      "section": "第三节 个人贷款产品的要素",
+      "knowledge": "还款方式"
+    },
+    {
+      "questionId": "jpl-5155484",
+      "sourceQuestionId": "5155484",
+      "permissionStatus": "可查看",
+      "chapter": "第一章 个人贷款概述",
+      "section": "第二节 个人贷款产品的种类",
+      "knowledge": "按产品用途分类"
+    },
+    {
+      "questionId": "jpl-5155485",
+      "sourceQuestionId": "5155485",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第一章 个人贷款概述",
+      "section": "第二节 个人贷款产品的种类",
+      "knowledge": "按产品用途分类"
+    },
+    {
+      "questionId": "jpl-5155486",
+      "sourceQuestionId": "5155486",
+      "permissionStatus": "可查看",
+      "chapter": "第一章 个人贷款概述",
+      "section": "第三节 个人贷款产品的要素",
+      "knowledge": "贷款对象"
+    },
+    {
+      "questionId": "jpl-5155487",
+      "sourceQuestionId": "5155487",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第一章 个人贷款概述",
+      "section": "第一节 个人贷款的性质和发展",
+      "knowledge": "个人贷款的特征"
+    },
+    {
+      "questionId": "jpl-5155488",
+      "sourceQuestionId": "5155488",
+      "permissionStatus": "可查看",
+      "chapter": "第一章 个人贷款概述",
+      "section": "第二节 个人贷款产品的种类",
+      "knowledge": "按产品用途分类"
+    },
+    {
+      "questionId": "jpl-5155489",
+      "sourceQuestionId": "5155489",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第一章 个人贷款概述",
+      "section": "第二节 个人贷款产品的种类",
+      "knowledge": "按产品用途分类"
+    },
+    {
+      "questionId": "jpl-5155490",
+      "sourceQuestionId": "5155490",
+      "permissionStatus": "可查看",
+      "chapter": "第一章 个人贷款概述",
+      "section": "第二节 个人贷款产品的种类",
+      "knowledge": "按产品用途分类"
+    },
+    {
+      "questionId": "jpl-5155491",
+      "sourceQuestionId": "5155491",
+      "permissionStatus": "可查看",
+      "chapter": "第一章 个人贷款概述",
+      "section": "第二节 个人贷款产品的种类",
+      "knowledge": "按产品用途分类"
+    },
+    {
+      "questionId": "jpl-5155492",
+      "sourceQuestionId": "5155492",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第一章 个人贷款概述",
+      "section": "第二节 个人贷款产品的种类",
+      "knowledge": "按产品用途分类"
+    },
+    {
+      "questionId": "jpl-5155493",
+      "sourceQuestionId": "5155493",
+      "permissionStatus": "可查看",
+      "chapter": "第一章 个人贷款概述",
+      "section": "第二节 个人贷款产品的种类",
+      "knowledge": "按产品用途分类"
+    },
+    {
+      "questionId": "jpl-5155496",
+      "sourceQuestionId": "5155496",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第一章 个人贷款概述",
+      "section": "第三节 个人贷款产品的要素",
+      "knowledge": "贷款利率"
+    },
+    {
+      "questionId": "jpl-5155497",
+      "sourceQuestionId": "5155497",
+      "permissionStatus": "可查看",
+      "chapter": "第一章 个人贷款概述",
+      "section": "第三节 个人贷款产品的要素",
+      "knowledge": "还款方式"
+    },
+    {
+      "questionId": "jpl-5155499",
+      "sourceQuestionId": "5155499",
+      "permissionStatus": "可查看",
+      "chapter": "第一章 个人贷款概述",
+      "section": "第二节 个人贷款产品的种类",
+      "knowledge": "按有无担保分类"
+    },
+    {
+      "questionId": "jpl-5155500",
+      "sourceQuestionId": "5155500",
+      "permissionStatus": "可查看",
+      "chapter": "第一章 个人贷款概述",
+      "section": "第二节 个人贷款产品的种类",
+      "knowledge": "按有无担保分类"
+    },
+    {
+      "questionId": "jpl-5155501",
+      "sourceQuestionId": "5155501",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第一章 个人贷款概述",
+      "section": "第二节 个人贷款产品的种类",
+      "knowledge": "按产品用途分类"
+    },
+    {
+      "questionId": "jpl-5155502",
+      "sourceQuestionId": "5155502",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第一章 个人贷款概述",
+      "section": "第一节 个人贷款的性质和发展",
+      "knowledge": "个人贷款的特征"
+    },
+    {
+      "questionId": "jpl-5155506",
+      "sourceQuestionId": "5155506",
+      "permissionStatus": "可查看",
+      "chapter": "第一章 个人贷款概述",
+      "section": "第二节 个人贷款产品的种类",
+      "knowledge": "按有无担保分类"
+    },
+    {
+      "questionId": "jpl-5155507",
+      "sourceQuestionId": "5155507",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第一章 个人贷款概述",
+      "section": "第二节 个人贷款产品的种类",
+      "knowledge": "按有无担保分类"
+    },
+    {
+      "questionId": "jpl-5155508",
+      "sourceQuestionId": "5155508",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第一章 个人贷款概述",
+      "section": "第二节 个人贷款产品的种类",
+      "knowledge": "按有无担保分类"
+    },
+    {
+      "questionId": "jpl-5155509",
+      "sourceQuestionId": "5155509",
+      "permissionStatus": "可查看",
+      "chapter": "第一章 个人贷款概述",
+      "section": "第三节 个人贷款产品的要素",
+      "knowledge": "贷款利率"
+    },
+    {
+      "questionId": "jpl-5155510",
+      "sourceQuestionId": "5155510",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第一章 个人贷款概述",
+      "section": "第二节 个人贷款产品的种类",
+      "knowledge": "按有无担保分类"
+    },
+    {
+      "questionId": "jpl-5155511",
+      "sourceQuestionId": "5155511",
+      "permissionStatus": "可查看",
+      "chapter": "第一章 个人贷款概述",
+      "section": "第二节 个人贷款产品的种类",
+      "knowledge": "按产品用途分类"
+    },
+    {
+      "questionId": "jpl-5155512",
+      "sourceQuestionId": "5155512",
+      "permissionStatus": "可查看",
+      "chapter": "第一章 个人贷款概述",
+      "section": "第一节 个人贷款的性质和发展",
+      "knowledge": "个人贷款的概念和意义"
+    },
+    {
+      "questionId": "jpl-5155514",
+      "sourceQuestionId": "5155514",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第一章 个人贷款概述",
+      "section": "第三节 个人贷款产品的要素",
+      "knowledge": "还款方式"
+    },
+    {
+      "questionId": "jpl-5155516",
+      "sourceQuestionId": "5155516",
+      "permissionStatus": "可查看",
+      "chapter": "第一章 个人贷款概述",
+      "section": "第二节 个人贷款产品的种类",
+      "knowledge": "按产品用途分类"
+    },
+    {
+      "questionId": "jpl-5155517",
+      "sourceQuestionId": "5155517",
+      "permissionStatus": "可查看",
+      "chapter": "第一章 个人贷款概述",
+      "section": "第二节 个人贷款产品的种类",
+      "knowledge": "按产品用途分类"
+    },
+    {
+      "questionId": "jpl-5155518",
+      "sourceQuestionId": "5155518",
+      "permissionStatus": "可查看",
+      "chapter": "第一章 个人贷款概述",
+      "section": "第二节 个人贷款产品的种类",
+      "knowledge": "按有无担保分类"
+    },
+    {
+      "questionId": "jpl-5155519",
+      "sourceQuestionId": "5155519",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第一章 个人贷款概述",
+      "section": "第二节 个人贷款产品的种类",
+      "knowledge": "按有无担保分类"
+    },
+    {
+      "questionId": "jpl-5155520",
+      "sourceQuestionId": "5155520",
+      "permissionStatus": "可查看",
+      "chapter": "第一章 个人贷款概述",
+      "section": "第二节 个人贷款产品的种类",
+      "knowledge": "按有无担保分类"
+    },
+    {
+      "questionId": "jpl-5155521",
+      "sourceQuestionId": "5155521",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第一章 个人贷款概述",
+      "section": "第二节 个人贷款产品的种类",
+      "knowledge": "按有无担保分类"
+    },
+    {
+      "questionId": "jpl-5155522",
+      "sourceQuestionId": "5155522",
+      "permissionStatus": "可查看",
+      "chapter": "第一章 个人贷款概述",
+      "section": "第三节 个人贷款产品的要素",
+      "knowledge": "贷款利率"
+    },
+    {
+      "questionId": "jpl-5155524",
+      "sourceQuestionId": "5155524",
+      "permissionStatus": "可查看",
+      "chapter": "第一章 个人贷款概述",
+      "section": "第三节 个人贷款产品的要素",
+      "knowledge": "贷款期限"
+    },
+    {
+      "questionId": "jpl-5155525",
+      "sourceQuestionId": "5155525",
+      "permissionStatus": "可查看",
+      "chapter": "第一章 个人贷款概述",
+      "section": "第三节 个人贷款产品的要素",
+      "knowledge": "还款方式"
+    },
+    {
+      "questionId": "jpl-5155526",
+      "sourceQuestionId": "5155526",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第一章 个人贷款概述",
+      "section": "第三节 个人贷款产品的要素",
+      "knowledge": "还款方式"
+    },
+    {
+      "questionId": "jpl-5155527",
+      "sourceQuestionId": "5155527",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第一章 个人贷款概述",
+      "section": "第三节 个人贷款产品的要素",
+      "knowledge": "担保方式和贷款额度"
+    },
+    {
+      "questionId": "jpl-5155538",
+      "sourceQuestionId": "5155538",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第二章 个人贷款管理",
+      "section": "第四节 个人贷款定价管理",
+      "knowledge": "个人贷款定价原则"
+    },
+    {
+      "questionId": "jpl-5155539",
+      "sourceQuestionId": "5155539",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第二章 个人贷款管理",
+      "section": "第二节 个人贷款流程",
+      "knowledge": "贷后管理"
+    },
+    {
+      "questionId": "jpl-5155540",
+      "sourceQuestionId": "5155540",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第二章 个人贷款管理",
+      "section": "第三节 个人贷款营销管理",
+      "knowledge": "个人贷款营销渠道"
+    },
+    {
+      "questionId": "jpl-5155542",
+      "sourceQuestionId": "5155542",
+      "permissionStatus": "可查看",
+      "chapter": "第二章 个人贷款管理",
+      "section": "第三节 个人贷款营销管理",
+      "knowledge": "个人贷款营销渠道"
+    },
+    {
+      "questionId": "jpl-5155545",
+      "sourceQuestionId": "5155545",
+      "permissionStatus": "可查看",
+      "chapter": "第二章 个人贷款管理",
+      "section": "第二节 个人贷款流程",
+      "knowledge": "贷款的审查与审批"
+    },
+    {
+      "questionId": "jpl-5155546",
+      "sourceQuestionId": "5155546",
+      "permissionStatus": "可查看",
+      "chapter": "第二章 个人贷款管理",
+      "section": "第二节 个人贷款流程",
+      "knowledge": "贷款的受理与调查"
+    },
+    {
+      "questionId": "jpl-5155548",
+      "sourceQuestionId": "5155548",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第二章 个人贷款管理",
+      "section": "第六节 个人贷款押品管理",
+      "knowledge": "押品管理基本概念"
+    },
+    {
+      "questionId": "jpl-5155549",
+      "sourceQuestionId": "5155549",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第二章 个人贷款管理",
+      "section": "第二节 个人贷款流程",
+      "knowledge": "贷款的审查与审批"
+    },
+    {
+      "questionId": "jpl-5155550",
+      "sourceQuestionId": "5155550",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第二章 个人贷款管理",
+      "section": "第四节 个人贷款定价管理",
+      "knowledge": "个人贷款定价原则"
+    },
+    {
+      "questionId": "jpl-5155552",
+      "sourceQuestionId": "5155552",
+      "permissionStatus": "可查看",
+      "chapter": "第二章 个人贷款管理",
+      "section": "第二节 个人贷款流程",
+      "knowledge": "贷后管理"
+    },
+    {
+      "questionId": "jpl-5155553",
+      "sourceQuestionId": "5155553",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第二章 个人贷款管理",
+      "section": "第三节 个人贷款营销管理",
+      "knowledge": "个人贷款营销渠道"
+    },
+    {
+      "questionId": "jpl-5155554",
+      "sourceQuestionId": "5155554",
+      "permissionStatus": "可查看",
+      "chapter": "第二章 个人贷款管理",
+      "section": "第二节 个人贷款流程",
+      "knowledge": "贷款的签约与发放"
+    },
+    {
+      "questionId": "jpl-5155555",
+      "sourceQuestionId": "5155555",
+      "permissionStatus": "可查看",
+      "chapter": "第二章 个人贷款管理",
+      "section": "第二节 个人贷款流程",
+      "knowledge": "贷款的审查与审批"
+    },
+    {
+      "questionId": "jpl-5155556",
+      "sourceQuestionId": "5155556",
+      "permissionStatus": "可查看",
+      "chapter": "第二章 个人贷款管理",
+      "section": "第二节 个人贷款流程",
+      "knowledge": "贷后管理"
+    },
+    {
+      "questionId": "jpl-5155557",
+      "sourceQuestionId": "5155557",
+      "permissionStatus": "可查看",
+      "chapter": "第二章 个人贷款管理",
+      "section": "第三节 个人贷款营销管理",
+      "knowledge": "个人贷款营销渠道"
+    },
+    {
+      "questionId": "jpl-5155558",
+      "sourceQuestionId": "5155558",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第二章 个人贷款管理",
+      "section": "第二节 个人贷款流程",
+      "knowledge": "贷后管理"
+    },
+    {
+      "questionId": "jpl-5155559",
+      "sourceQuestionId": "5155559",
+      "permissionStatus": "可查看",
+      "chapter": "第二章 个人贷款管理",
+      "section": "第二节 个人贷款流程",
+      "knowledge": "贷后管理"
+    },
+    {
+      "questionId": "jpl-5155561",
+      "sourceQuestionId": "5155561",
+      "permissionStatus": "可查看",
+      "chapter": "第二章 个人贷款管理",
+      "section": "第二节 个人贷款流程",
+      "knowledge": "贷后管理"
+    },
+    {
+      "questionId": "jpl-5155562",
+      "sourceQuestionId": "5155562",
+      "permissionStatus": "可查看",
+      "chapter": "第二章 个人贷款管理",
+      "section": "第二节 个人贷款流程",
+      "knowledge": "贷款支付"
+    },
+    {
+      "questionId": "jpl-5155563",
+      "sourceQuestionId": "5155563",
+      "permissionStatus": "可查看",
+      "chapter": "第二章 个人贷款管理",
+      "section": "第二节 个人贷款流程",
+      "knowledge": "贷款的受理与调查"
+    },
+    {
+      "questionId": "jpl-5155565",
+      "sourceQuestionId": "5155565",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第二章 个人贷款管理",
+      "section": "第三节 个人贷款营销管理",
+      "knowledge": "个人贷款营销渠道"
+    },
+    {
+      "questionId": "jpl-5155566",
+      "sourceQuestionId": "5155566",
+      "permissionStatus": "可查看",
+      "chapter": "第二章 个人贷款管理",
+      "section": "第三节 个人贷款营销管理",
+      "knowledge": "个人贷款营销渠道"
+    },
+    {
+      "questionId": "jpl-5155567",
+      "sourceQuestionId": "5155567",
+      "permissionStatus": "可查看",
+      "chapter": "第二章 个人贷款管理",
+      "section": "第三节 个人贷款营销管理",
+      "knowledge": "个人贷款营销渠道"
+    },
+    {
+      "questionId": "jpl-5155568",
+      "sourceQuestionId": "5155568",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第二章 个人贷款管理",
+      "section": "第二节 个人贷款流程",
+      "knowledge": "贷款的受理与调查"
+    },
+    {
+      "questionId": "jpl-5155569",
+      "sourceQuestionId": "5155569",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第二章 个人贷款管理",
+      "section": "第二节 个人贷款流程",
+      "knowledge": "贷款的受理与调查"
+    },
+    {
+      "questionId": "jpl-5155570",
+      "sourceQuestionId": "5155570",
+      "permissionStatus": "可查看",
+      "chapter": "第二章 个人贷款管理",
+      "section": "第二节 个人贷款流程",
+      "knowledge": "贷后管理"
+    },
+    {
+      "questionId": "jpl-5155571",
+      "sourceQuestionId": "5155571",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第二章 个人贷款管理",
+      "section": "第二节 个人贷款流程",
+      "knowledge": "贷后管理"
+    },
+    {
+      "questionId": "jpl-5155572",
+      "sourceQuestionId": "5155572",
+      "permissionStatus": "可查看",
+      "chapter": "第二章 个人贷款管理",
+      "section": "第二节 个人贷款流程",
+      "knowledge": "贷款的签约与发放"
+    },
+    {
+      "questionId": "jpl-5155573",
+      "sourceQuestionId": "5155573",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第二章 个人贷款管理",
+      "section": "第二节 个人贷款流程",
+      "knowledge": "贷款的受理与调查"
+    },
+    {
+      "questionId": "jpl-5155574",
+      "sourceQuestionId": "5155574",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第二章 个人贷款管理",
+      "section": "第二节 个人贷款流程",
+      "knowledge": "贷款的受理与调查"
+    },
+    {
+      "questionId": "jpl-5155575",
+      "sourceQuestionId": "5155575",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第二章 个人贷款管理",
+      "section": "第二节 个人贷款流程",
+      "knowledge": "贷款的签约与发放"
+    },
+    {
+      "questionId": "jpl-5155577",
+      "sourceQuestionId": "5155577",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第二章 个人贷款管理",
+      "section": "第二节 个人贷款流程",
+      "knowledge": "贷后管理"
+    },
+    {
+      "questionId": "jpl-5155579",
+      "sourceQuestionId": "5155579",
+      "permissionStatus": "可查看",
+      "chapter": "第二章 个人贷款管理",
+      "section": "第三节 个人贷款营销管理",
+      "knowledge": "个人贷款营销渠道"
+    },
+    {
+      "questionId": "jpl-5155580",
+      "sourceQuestionId": "5155580",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第二章 个人贷款管理",
+      "section": "第六节 个人贷款押品管理",
+      "knowledge": "押品管理基本概念"
+    },
+    {
+      "questionId": "jpl-5155581",
+      "sourceQuestionId": "5155581",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第二章 个人贷款管理",
+      "section": "第一节 个人贷款管理原则",
+      "knowledge": "全流程管理原则、诚信申贷原则和协议承诺原则"
+    },
+    {
+      "questionId": "jpl-5155583",
+      "sourceQuestionId": "5155583",
+      "permissionStatus": "可查看",
+      "chapter": "第二章 个人贷款管理",
+      "section": "第二节 个人贷款流程",
+      "knowledge": "贷款的受理与调查"
+    },
+    {
+      "questionId": "jpl-5155584",
+      "sourceQuestionId": "5155584",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第二章 个人贷款管理",
+      "section": "第五节 个人贷款风险管理",
+      "knowledge": "信用风险管理"
+    },
+    {
+      "questionId": "jpl-5155585",
+      "sourceQuestionId": "5155585",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第二章 个人贷款管理",
+      "section": "第二节 个人贷款流程",
+      "knowledge": "贷款的受理与调查"
+    },
+    {
+      "questionId": "jpl-5155586",
+      "sourceQuestionId": "5155586",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第二章 个人贷款管理",
+      "section": "第二节 个人贷款流程",
+      "knowledge": "贷款的受理与调查"
+    },
+    {
+      "questionId": "jpl-5155587",
+      "sourceQuestionId": "5155587",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第二章 个人贷款管理",
+      "section": "第二节 个人贷款流程",
+      "knowledge": "贷款的签约与发放"
+    },
+    {
+      "questionId": "jpl-5155588",
+      "sourceQuestionId": "5155588",
+      "permissionStatus": "可查看",
+      "chapter": "第二章 个人贷款管理",
+      "section": "第二节 个人贷款流程",
+      "knowledge": "贷款支付"
+    },
+    {
+      "questionId": "jpl-5155589",
+      "sourceQuestionId": "5155589",
+      "permissionStatus": "可查看",
+      "chapter": "第二章 个人贷款管理",
+      "section": "第二节 个人贷款流程",
+      "knowledge": "贷款的受理与调查"
+    },
+    {
+      "questionId": "jpl-5155590",
+      "sourceQuestionId": "5155590",
+      "permissionStatus": "可查看",
+      "chapter": "第二章 个人贷款管理",
+      "section": "第二节 个人贷款流程",
+      "knowledge": "贷款的审查与审批"
+    },
+    {
+      "questionId": "jpl-5155591",
+      "sourceQuestionId": "5155591",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第二章 个人贷款管理",
+      "section": "第五节 个人贷款风险管理",
+      "knowledge": "信用风险管理"
+    },
+    {
+      "questionId": "jpl-5155592",
+      "sourceQuestionId": "5155592",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第二章 个人贷款管理",
+      "section": "第二节 个人贷款流程",
+      "knowledge": "贷后管理"
+    },
+    {
+      "questionId": "jpl-5155595",
+      "sourceQuestionId": "5155595",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第二章 个人贷款管理",
+      "section": "第二节 个人贷款流程",
+      "knowledge": "贷款的受理与调查"
+    },
+    {
+      "questionId": "jpl-5155596",
+      "sourceQuestionId": "5155596",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第二章 个人贷款管理",
+      "section": "第二节 个人贷款流程",
+      "knowledge": "贷款的受理与调查"
+    },
+    {
+      "questionId": "jpl-5155597",
+      "sourceQuestionId": "5155597",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第二章 个人贷款管理",
+      "section": "第二节 个人贷款流程",
+      "knowledge": "贷款的审查与审批"
+    },
+    {
+      "questionId": "jpl-5155598",
+      "sourceQuestionId": "5155598",
+      "permissionStatus": "可查看",
+      "chapter": "第二章 个人贷款管理",
+      "section": "第五节 个人贷款风险管理",
+      "knowledge": "信用风险管理"
+    },
+    {
+      "questionId": "jpl-5155599",
+      "sourceQuestionId": "5155599",
+      "permissionStatus": "可查看",
+      "chapter": "第二章 个人贷款管理",
+      "section": "第二节 个人贷款流程",
+      "knowledge": "贷款的受理与调查"
+    },
+    {
+      "questionId": "jpl-5155602",
+      "sourceQuestionId": "5155602",
+      "permissionStatus": "可查看",
+      "chapter": "第二章 个人贷款管理",
+      "section": "第二节 个人贷款流程",
+      "knowledge": "贷后管理"
+    },
+    {
+      "questionId": "jpl-5155603",
+      "sourceQuestionId": "5155603",
+      "permissionStatus": "可查看",
+      "chapter": "第二章 个人贷款管理",
+      "section": "第二节 个人贷款流程",
+      "knowledge": "贷后管理"
+    },
+    {
+      "questionId": "jpl-5155604",
+      "sourceQuestionId": "5155604",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第二章 个人贷款管理",
+      "section": "第二节 个人贷款流程",
+      "knowledge": "贷后管理"
+    },
+    {
+      "questionId": "jpl-5155605",
+      "sourceQuestionId": "5155605",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第二章 个人贷款管理",
+      "section": "第二节 个人贷款流程",
+      "knowledge": "贷款的受理与调查"
+    },
+    {
+      "questionId": "jpl-5155606",
+      "sourceQuestionId": "5155606",
+      "permissionStatus": "可查看",
+      "chapter": "第二章 个人贷款管理",
+      "section": "第二节 个人贷款流程",
+      "knowledge": "贷款的受理与调查"
+    },
+    {
+      "questionId": "jpl-5155607",
+      "sourceQuestionId": "5155607",
+      "permissionStatus": "可查看",
+      "chapter": "第二章 个人贷款管理",
+      "section": "第二节 个人贷款流程",
+      "knowledge": "贷款的受理与调查"
+    },
+    {
+      "questionId": "jpl-5155608",
+      "sourceQuestionId": "5155608",
+      "permissionStatus": "可查看",
+      "chapter": "第二章 个人贷款管理",
+      "section": "第二节 个人贷款流程",
+      "knowledge": "贷款的受理与调查"
+    },
+    {
+      "questionId": "jpl-5155610",
+      "sourceQuestionId": "5155610",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第二章 个人贷款管理",
+      "section": "第二节 个人贷款流程",
+      "knowledge": "贷款的签约与发放"
+    },
+    {
+      "questionId": "jpl-5155611",
+      "sourceQuestionId": "5155611",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第二章 个人贷款管理",
+      "section": "第二节 个人贷款流程",
+      "knowledge": "贷款支付"
+    },
+    {
+      "questionId": "jpl-5155612",
+      "sourceQuestionId": "5155612",
+      "permissionStatus": "可查看",
+      "chapter": "第二章 个人贷款管理",
+      "section": "第二节 个人贷款流程",
+      "knowledge": "贷后管理"
+    },
+    {
+      "questionId": "jpl-5155615",
+      "sourceQuestionId": "5155615",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第二章 个人贷款管理",
+      "section": "第四节 个人贷款定价管理",
+      "knowledge": "个人贷款定价影响因素"
+    },
+    {
+      "questionId": "jpl-5155616",
+      "sourceQuestionId": "5155616",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第二章 个人贷款管理",
+      "section": "第五节 个人贷款风险管理",
+      "knowledge": "操作风险管理"
+    },
+    {
+      "questionId": "jpl-5155618",
+      "sourceQuestionId": "5155618",
+      "permissionStatus": "可查看",
+      "chapter": "第二章 个人贷款管理",
+      "section": "第六节 个人贷款押品管理",
+      "knowledge": "押品管理基本流程"
+    },
+    {
+      "questionId": "jpl-5155619",
+      "sourceQuestionId": "5155619",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第二章 个人贷款管理",
+      "section": "第一节 个人贷款管理原则",
+      "knowledge": "审贷分离原则和重视贷后管理原则"
+    },
+    {
+      "questionId": "jpl-5155620",
+      "sourceQuestionId": "5155620",
+      "permissionStatus": "可查看",
+      "chapter": "第二章 个人贷款管理",
+      "section": "第二节 个人贷款流程",
+      "knowledge": "贷款的受理与调查"
+    },
+    {
+      "questionId": "jpl-5155621",
+      "sourceQuestionId": "5155621",
+      "permissionStatus": "可查看",
+      "chapter": "第二章 个人贷款管理",
+      "section": "第四节 个人贷款定价管理",
+      "knowledge": "个人贷款定价影响因素"
+    },
+    {
+      "questionId": "jpl-5155622",
+      "sourceQuestionId": "5155622",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第二章 个人贷款管理",
+      "section": "第三节 个人贷款营销管理",
+      "knowledge": "个人贷款营销渠道"
+    },
+    {
+      "questionId": "jpl-5155623",
+      "sourceQuestionId": "5155623",
+      "permissionStatus": "可查看",
+      "chapter": "第二章 个人贷款管理",
+      "section": "第三节 个人贷款营销管理",
+      "knowledge": "个人贷款营销渠道"
+    },
+    {
+      "questionId": "jpl-5155624",
+      "sourceQuestionId": "5155624",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第二章 个人贷款管理",
+      "section": "第二节 个人贷款流程",
+      "knowledge": "贷款的受理与调查"
+    },
+    {
+      "questionId": "jpl-5155625",
+      "sourceQuestionId": "5155625",
+      "permissionStatus": "可查看",
+      "chapter": "第二章 个人贷款管理",
+      "section": "第二节 个人贷款流程",
+      "knowledge": "贷款支付"
+    },
+    {
+      "questionId": "jpl-5155626",
+      "sourceQuestionId": "5155626",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第二章 个人贷款管理",
+      "section": "第二节 个人贷款流程",
+      "knowledge": "贷款的受理与调查"
+    },
+    {
+      "questionId": "jpl-5155627",
+      "sourceQuestionId": "5155627",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第二章 个人贷款管理",
+      "section": "第二节 个人贷款流程",
+      "knowledge": "贷款的审查与审批"
+    },
+    {
+      "questionId": "jpl-5155628",
+      "sourceQuestionId": "5155628",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第二章 个人贷款管理",
+      "section": "第二节 个人贷款流程",
+      "knowledge": "贷后管理"
+    },
+    {
+      "questionId": "jpl-5155629",
+      "sourceQuestionId": "5155629",
+      "permissionStatus": "可查看",
+      "chapter": "第二章 个人贷款管理",
+      "section": "第二节 个人贷款流程",
+      "knowledge": "贷款的签约与发放"
+    },
+    {
+      "questionId": "jpl-5155630",
+      "sourceQuestionId": "5155630",
+      "permissionStatus": "可查看",
+      "chapter": "第二章 个人贷款管理",
+      "section": "第二节 个人贷款流程",
+      "knowledge": "贷后管理"
+    },
+    {
+      "questionId": "jpl-5155631",
+      "sourceQuestionId": "5155631",
+      "permissionStatus": "可查看",
+      "chapter": "第二章 个人贷款管理",
+      "section": "第二节 个人贷款流程",
+      "knowledge": "贷后管理"
+    },
+    {
+      "questionId": "jpl-5155632",
+      "sourceQuestionId": "5155632",
+      "permissionStatus": "可查看",
+      "chapter": "第二章 个人贷款管理",
+      "section": "第二节 个人贷款流程",
+      "knowledge": "贷款支付"
+    },
+    {
+      "questionId": "jpl-5155634",
+      "sourceQuestionId": "5155634",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第二章 个人贷款管理",
+      "section": "第二节 个人贷款流程",
+      "knowledge": "贷款的受理与调查"
+    },
+    {
+      "questionId": "jpl-5155635",
+      "sourceQuestionId": "5155635",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第二章 个人贷款管理",
+      "section": "第二节 个人贷款流程",
+      "knowledge": "贷款的受理与调查"
+    },
+    {
+      "questionId": "jpl-5155637",
+      "sourceQuestionId": "5155637",
+      "permissionStatus": "可查看",
+      "chapter": "第二章 个人贷款管理",
+      "section": "第二节 个人贷款流程",
+      "knowledge": "贷后管理"
+    },
+    {
+      "questionId": "jpl-5155638",
+      "sourceQuestionId": "5155638",
+      "permissionStatus": "可查看",
+      "chapter": "第二章 个人贷款管理",
+      "section": "第二节 个人贷款流程",
+      "knowledge": "贷款的签约与发放"
+    },
+    {
+      "questionId": "jpl-5155639",
+      "sourceQuestionId": "5155639",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第二章 个人贷款管理",
+      "section": "第三节 个人贷款营销管理",
+      "knowledge": "银行营销策略"
+    },
+    {
+      "questionId": "jpl-5155640",
+      "sourceQuestionId": "5155640",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第二章 个人贷款管理",
+      "section": "第三节 个人贷款营销管理",
+      "knowledge": "个人贷款营销渠道"
+    },
+    {
+      "questionId": "jpl-5155641",
+      "sourceQuestionId": "5155641",
+      "permissionStatus": "可查看",
+      "chapter": "第二章 个人贷款管理",
+      "section": "第五节 个人贷款风险管理",
+      "knowledge": "信用风险管理"
+    },
+    {
+      "questionId": "jpl-5155642",
+      "sourceQuestionId": "5155642",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第二章 个人贷款管理",
+      "section": "第六节 个人贷款押品管理",
+      "knowledge": "押品管理基本概念"
+    },
+    {
+      "questionId": "jpl-5155643",
+      "sourceQuestionId": "5155643",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第三章 个人住房贷款",
+      "section": "第四节 公积金个人住房贷款",
+      "knowledge": "贷款流程"
+    },
+    {
+      "questionId": "jpl-5155644",
+      "sourceQuestionId": "5155644",
+      "permissionStatus": "可查看",
+      "chapter": "第三章 个人住房贷款",
+      "section": "第四节 公积金个人住房贷款",
+      "knowledge": "贷款流程"
+    },
+    {
+      "questionId": "jpl-5155645",
+      "sourceQuestionId": "5155645",
+      "permissionStatus": "可查看",
+      "chapter": "第三章 个人住房贷款",
+      "section": "第四节 公积金个人住房贷款",
+      "knowledge": "基础知识"
+    },
+    {
+      "questionId": "jpl-5155648",
+      "sourceQuestionId": "5155648",
+      "permissionStatus": "可查看",
+      "chapter": "第三章 个人住房贷款",
+      "section": "第二节 个人住房贷款流程",
+      "knowledge": "单笔贷款流程"
+    },
+    {
+      "questionId": "jpl-5155650",
+      "sourceQuestionId": "5155650",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第三章 个人住房贷款",
+      "section": "第一节 个人住房贷款基础知识",
+      "knowledge": "基础知识"
+    },
+    {
+      "questionId": "jpl-5155651",
+      "sourceQuestionId": "5155651",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第三章 个人住房贷款",
+      "section": "第一节 个人住房贷款基础知识",
+      "knowledge": "基础知识"
+    },
+    {
+      "questionId": "jpl-5155653",
+      "sourceQuestionId": "5155653",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第三章 个人住房贷款",
+      "section": "第一节 个人住房贷款基础知识",
+      "knowledge": "基础知识"
+    },
+    {
+      "questionId": "jpl-5155656",
+      "sourceQuestionId": "5155656",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第三章 个人住房贷款",
+      "section": "第三节 个人住房贷款风险管理",
+      "knowledge": "合作机构风险管理"
+    },
+    {
+      "questionId": "jpl-5155657",
+      "sourceQuestionId": "5155657",
+      "permissionStatus": "可查看",
+      "chapter": "第三章 个人住房贷款",
+      "section": "第三节 个人住房贷款风险管理",
+      "knowledge": "操作风险管理"
+    },
+    {
+      "questionId": "jpl-5155659",
+      "sourceQuestionId": "5155659",
+      "permissionStatus": "可查看",
+      "chapter": "第三章 个人住房贷款",
+      "section": "第三节 个人住房贷款风险管理",
+      "knowledge": "信用风险管理"
+    },
+    {
+      "questionId": "jpl-5155660",
+      "sourceQuestionId": "5155660",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第三章 个人住房贷款",
+      "section": "第四节 公积金个人住房贷款",
+      "knowledge": "贷款流程"
+    },
+    {
+      "questionId": "jpl-5155661",
+      "sourceQuestionId": "5155661",
+      "permissionStatus": "可查看",
+      "chapter": "第三章 个人住房贷款",
+      "section": "第四节 公积金个人住房贷款",
+      "knowledge": "贷款流程"
+    },
+    {
+      "questionId": "jpl-5155663",
+      "sourceQuestionId": "5155663",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第三章 个人住房贷款",
+      "section": "第一节 个人住房贷款基础知识",
+      "knowledge": "基础知识"
+    },
+    {
+      "questionId": "jpl-5155664",
+      "sourceQuestionId": "5155664",
+      "permissionStatus": "可查看",
+      "chapter": "第三章 个人住房贷款",
+      "section": "第一节 个人住房贷款基础知识",
+      "knowledge": "基础知识"
+    },
+    {
+      "questionId": "jpl-5155668",
+      "sourceQuestionId": "5155668",
+      "permissionStatus": "可查看",
+      "chapter": "第三章 个人住房贷款",
+      "section": "第三节 个人住房贷款风险管理",
+      "knowledge": "信用风险管理"
+    },
+    {
+      "questionId": "jpl-5155670",
+      "sourceQuestionId": "5155670",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第三章 个人住房贷款",
+      "section": "第三节 个人住房贷款风险管理",
+      "knowledge": "合作机构风险管理"
+    },
+    {
+      "questionId": "jpl-5155671",
+      "sourceQuestionId": "5155671",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第三章 个人住房贷款",
+      "section": "第四节 公积金个人住房贷款",
+      "knowledge": "基础知识"
+    },
+    {
+      "questionId": "jpl-5155672",
+      "sourceQuestionId": "5155672",
+      "permissionStatus": "可查看",
+      "chapter": "第三章 个人住房贷款",
+      "section": "第四节 公积金个人住房贷款",
+      "knowledge": "贷款流程"
+    },
+    {
+      "questionId": "jpl-5155673",
+      "sourceQuestionId": "5155673",
+      "permissionStatus": "可查看",
+      "chapter": "第三章 个人住房贷款",
+      "section": "第二节 个人住房贷款流程",
+      "knowledge": "单笔贷款流程"
+    },
+    {
+      "questionId": "jpl-5155674",
+      "sourceQuestionId": "5155674",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第三章 个人住房贷款",
+      "section": "第三节 个人住房贷款风险管理",
+      "knowledge": "信用风险管理"
+    },
+    {
+      "questionId": "jpl-5155677",
+      "sourceQuestionId": "5155677",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第三章 个人住房贷款",
+      "section": "第二节 个人住房贷款流程",
+      "knowledge": "单笔贷款流程"
+    },
+    {
+      "questionId": "jpl-5155678",
+      "sourceQuestionId": "5155678",
+      "permissionStatus": "可查看",
+      "chapter": "第三章 个人住房贷款",
+      "section": "第三节 个人住房贷款风险管理",
+      "knowledge": "合作机构风险管理"
+    },
+    {
+      "questionId": "jpl-5155680",
+      "sourceQuestionId": "5155680",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第三章 个人住房贷款",
+      "section": "第三节 个人住房贷款风险管理",
+      "knowledge": "操作风险管理"
+    },
+    {
+      "questionId": "jpl-5155681",
+      "sourceQuestionId": "5155681",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第三章 个人住房贷款",
+      "section": "第三节 个人住房贷款风险管理",
+      "knowledge": "信用风险管理"
+    },
+    {
+      "questionId": "jpl-5155682",
+      "sourceQuestionId": "5155682",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第三章 个人住房贷款",
+      "section": "第四节 公积金个人住房贷款",
+      "knowledge": "基础知识"
+    },
+    {
+      "questionId": "jpl-5155683",
+      "sourceQuestionId": "5155683",
+      "permissionStatus": "可查看",
+      "chapter": "第三章 个人住房贷款",
+      "section": "第四节 公积金个人住房贷款",
+      "knowledge": "基础知识"
+    },
+    {
+      "questionId": "jpl-5155684",
+      "sourceQuestionId": "5155684",
+      "permissionStatus": "可查看",
+      "chapter": "第一章 个人贷款概述",
+      "section": "第三节 个人贷款产品的要素",
+      "knowledge": "贷款利率"
+    },
+    {
+      "questionId": "jpl-5155688",
+      "sourceQuestionId": "5155688",
+      "permissionStatus": "可查看",
+      "chapter": "第三章 个人住房贷款",
+      "section": "第三节 个人住房贷款风险管理",
+      "knowledge": "操作风险管理"
+    },
+    {
+      "questionId": "jpl-5155689",
+      "sourceQuestionId": "5155689",
+      "permissionStatus": "可查看",
+      "chapter": "第三章 个人住房贷款",
+      "section": "第三节 个人住房贷款风险管理",
+      "knowledge": "操作风险管理"
+    },
+    {
+      "questionId": "jpl-5155690",
+      "sourceQuestionId": "5155690",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第三章 个人住房贷款",
+      "section": "第三节 个人住房贷款风险管理",
+      "knowledge": "合作机构风险管理"
+    },
+    {
+      "questionId": "jpl-5155691",
+      "sourceQuestionId": "5155691",
+      "permissionStatus": "可查看",
+      "chapter": "第三章 个人住房贷款",
+      "section": "第三节 个人住房贷款风险管理",
+      "knowledge": "合作机构风险管理"
+    },
+    {
+      "questionId": "jpl-5155692",
+      "sourceQuestionId": "5155692",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第三章 个人住房贷款",
+      "section": "第三节 个人住房贷款风险管理",
+      "knowledge": "信用风险管理"
+    },
+    {
+      "questionId": "jpl-5155693",
+      "sourceQuestionId": "5155693",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第三章 个人住房贷款",
+      "section": "第一节 个人住房贷款基础知识",
+      "knowledge": "基础知识"
+    },
+    {
+      "questionId": "jpl-5155694",
+      "sourceQuestionId": "5155694",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第三章 个人住房贷款",
+      "section": "第三节 个人住房贷款风险管理",
+      "knowledge": "合作机构风险管理"
+    },
+    {
+      "questionId": "jpl-5155695",
+      "sourceQuestionId": "5155695",
+      "permissionStatus": "可查看",
+      "chapter": "第三章 个人住房贷款",
+      "section": "第一节 个人住房贷款基础知识",
+      "knowledge": "基础知识"
+    },
+    {
+      "questionId": "jpl-5155698",
+      "sourceQuestionId": "5155698",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第三章 个人住房贷款",
+      "section": "第三节 个人住房贷款风险管理",
+      "knowledge": "操作风险管理"
+    },
+    {
+      "questionId": "jpl-5155699",
+      "sourceQuestionId": "5155699",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第三章 个人住房贷款",
+      "section": "第三节 个人住房贷款风险管理",
+      "knowledge": "合作机构风险管理"
+    },
+    {
+      "questionId": "jpl-5155701",
+      "sourceQuestionId": "5155701",
+      "permissionStatus": "可查看",
+      "chapter": "第二章 个人贷款管理",
+      "section": "第六节 个人贷款押品管理",
+      "knowledge": "押品管理基本概念"
+    },
+    {
+      "questionId": "jpl-5155703",
+      "sourceQuestionId": "5155703",
+      "permissionStatus": "可查看",
+      "chapter": "第三章 个人住房贷款",
+      "section": "第四节 公积金个人住房贷款",
+      "knowledge": "基础知识"
+    },
+    {
+      "questionId": "jpl-5155706",
+      "sourceQuestionId": "5155706",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "附录",
+      "section": "个人贷款的监管政策和法规",
+      "knowledge": "与个人住房贷款相关的政策和法规"
+    },
+    {
+      "questionId": "jpl-5155707",
+      "sourceQuestionId": "5155707",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第一章 个人贷款概述",
+      "section": "第三节 个人贷款产品的要素",
+      "knowledge": "贷款利率"
+    },
+    {
+      "questionId": "jpl-5155708",
+      "sourceQuestionId": "5155708",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第三章 个人住房贷款",
+      "section": "第一节 个人住房贷款基础知识",
+      "knowledge": "基础知识"
+    },
+    {
+      "questionId": "jpl-5155709",
+      "sourceQuestionId": "5155709",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第三章 个人住房贷款",
+      "section": "第二节 个人住房贷款流程",
+      "knowledge": "合作项目准入流程"
+    },
+    {
+      "questionId": "jpl-5155711",
+      "sourceQuestionId": "5155711",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第三章 个人住房贷款",
+      "section": "第二节 个人住房贷款流程",
+      "knowledge": "单笔贷款流程"
+    },
+    {
+      "questionId": "jpl-5155712",
+      "sourceQuestionId": "5155712",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第三章 个人住房贷款",
+      "section": "第三节 个人住房贷款风险管理",
+      "knowledge": "合作机构风险管理"
+    },
+    {
+      "questionId": "jpl-5155713",
+      "sourceQuestionId": "5155713",
+      "permissionStatus": "可查看",
+      "chapter": "第三章 个人住房贷款",
+      "section": "第三节 个人住房贷款风险管理",
+      "knowledge": "合作机构风险管理"
+    },
+    {
+      "questionId": "jpl-5155714",
+      "sourceQuestionId": "5155714",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第三章 个人住房贷款",
+      "section": "第三节 个人住房贷款风险管理",
+      "knowledge": "操作风险管理"
+    },
+    {
+      "questionId": "jpl-5155715",
+      "sourceQuestionId": "5155715",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第三章 个人住房贷款",
+      "section": "第四节 公积金个人住房贷款",
+      "knowledge": "基础知识"
+    },
+    {
+      "questionId": "jpl-5155716",
+      "sourceQuestionId": "5155716",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第三章 个人住房贷款",
+      "section": "第四节 公积金个人住房贷款",
+      "knowledge": "基础知识"
+    },
+    {
+      "questionId": "jpl-5155717",
+      "sourceQuestionId": "5155717",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第三章 个人住房贷款",
+      "section": "第二节 个人住房贷款流程",
+      "knowledge": "单笔贷款流程"
+    },
+    {
+      "questionId": "jpl-5155718",
+      "sourceQuestionId": "5155718",
+      "permissionStatus": "可查看",
+      "chapter": "第三章 个人住房贷款",
+      "section": "第一节 个人住房贷款基础知识",
+      "knowledge": "基础知识"
+    },
+    {
+      "questionId": "jpl-5155719",
+      "sourceQuestionId": "5155719",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第三章 个人住房贷款",
+      "section": "第二节 个人住房贷款流程",
+      "knowledge": "合作项目准入流程"
+    },
+    {
+      "questionId": "jpl-5155720",
+      "sourceQuestionId": "5155720",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第三章 个人住房贷款",
+      "section": "第三节 个人住房贷款风险管理",
+      "knowledge": "合作机构风险管理"
+    },
+    {
+      "questionId": "jpl-5155721",
+      "sourceQuestionId": "5155721",
+      "permissionStatus": "可查看",
+      "chapter": "第三章 个人住房贷款",
+      "section": "第一节 个人住房贷款基础知识",
+      "knowledge": "基础知识"
+    },
+    {
+      "questionId": "jpl-5155722",
+      "sourceQuestionId": "5155722",
+      "permissionStatus": "可查看",
+      "chapter": "第三章 个人住房贷款",
+      "section": "第二节 个人住房贷款流程",
+      "knowledge": "单笔贷款流程"
+    },
+    {
+      "questionId": "jpl-5155723",
+      "sourceQuestionId": "5155723",
+      "permissionStatus": "可查看",
+      "chapter": "第二章 个人贷款管理",
+      "section": "第二节 个人贷款流程",
+      "knowledge": "贷款的审查与审批"
+    },
+    {
+      "questionId": "jpl-5155725",
+      "sourceQuestionId": "5155725",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第三章 个人住房贷款",
+      "section": "第三节 个人住房贷款风险管理",
+      "knowledge": "合作机构风险管理"
+    },
+    {
+      "questionId": "jpl-5155726",
+      "sourceQuestionId": "5155726",
+      "permissionStatus": "可查看",
+      "chapter": "第三章 个人住房贷款",
+      "section": "第一节 个人住房贷款基础知识",
+      "knowledge": "基础知识"
+    },
+    {
+      "questionId": "jpl-5155727",
+      "sourceQuestionId": "5155727",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第三章 个人住房贷款",
+      "section": "第一节 个人住房贷款基础知识",
+      "knowledge": "基础知识"
+    },
+    {
+      "questionId": "jpl-5155728",
+      "sourceQuestionId": "5155728",
+      "permissionStatus": "可查看",
+      "chapter": "第三章 个人住房贷款",
+      "section": "第二节 个人住房贷款流程",
+      "knowledge": "单笔贷款流程"
+    },
+    {
+      "questionId": "jpl-5155729",
+      "sourceQuestionId": "5155729",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第三章 个人住房贷款",
+      "section": "第二节 个人住房贷款流程",
+      "knowledge": "合作项目准入流程"
+    },
+    {
+      "questionId": "jpl-5155730",
+      "sourceQuestionId": "5155730",
+      "permissionStatus": "可查看",
+      "chapter": "第三章 个人住房贷款",
+      "section": "第三节 个人住房贷款风险管理",
+      "knowledge": "信用风险管理"
+    },
+    {
+      "questionId": "jpl-5155731",
+      "sourceQuestionId": "5155731",
+      "permissionStatus": "可查看",
+      "chapter": "第三章 个人住房贷款",
+      "section": "第四节 公积金个人住房贷款",
+      "knowledge": "贷款流程"
+    },
+    {
+      "questionId": "jpl-5155732",
+      "sourceQuestionId": "5155732",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第三章 个人住房贷款",
+      "section": "第二节 个人住房贷款流程",
+      "knowledge": "单笔贷款流程"
+    },
+    {
+      "questionId": "jpl-5155733",
+      "sourceQuestionId": "5155733",
+      "permissionStatus": "可查看",
+      "chapter": "第三章 个人住房贷款",
+      "section": "第三节 个人住房贷款风险管理",
+      "knowledge": "操作风险管理"
+    },
+    {
+      "questionId": "jpl-5155734",
+      "sourceQuestionId": "5155734",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第三章 个人住房贷款",
+      "section": "第四节 公积金个人住房贷款",
+      "knowledge": "基础知识"
+    },
+    {
+      "questionId": "jpl-5155736",
+      "sourceQuestionId": "5155736",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第三章 个人住房贷款",
+      "section": "第四节 公积金个人住房贷款",
+      "knowledge": "基础知识"
+    },
+    {
+      "questionId": "jpl-5155737",
+      "sourceQuestionId": "5155737",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第三章 个人住房贷款",
+      "section": "第一节 个人住房贷款基础知识",
+      "knowledge": "基础知识"
+    },
+    {
+      "questionId": "jpl-5155739",
+      "sourceQuestionId": "5155739",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第三章 个人住房贷款",
+      "section": "第三节 个人住房贷款风险管理",
+      "knowledge": "合作机构风险管理"
+    },
+    {
+      "questionId": "jpl-5155740",
+      "sourceQuestionId": "5155740",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第三章 个人住房贷款",
+      "section": "第三节 个人住房贷款风险管理",
+      "knowledge": "操作风险管理"
+    },
+    {
+      "questionId": "jpl-5155741",
+      "sourceQuestionId": "5155741",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第三章 个人住房贷款",
+      "section": "第四节 公积金个人住房贷款",
+      "knowledge": "基础知识"
+    },
+    {
+      "questionId": "jpl-5155744",
+      "sourceQuestionId": "5155744",
+      "permissionStatus": "可查看",
+      "chapter": "第三章 个人住房贷款",
+      "section": "第一节 个人住房贷款基础知识",
+      "knowledge": "基础知识"
+    },
+    {
+      "questionId": "jpl-5155745",
+      "sourceQuestionId": "5155745",
+      "permissionStatus": "可查看",
+      "chapter": "第三章 个人住房贷款",
+      "section": "第三节 个人住房贷款风险管理",
+      "knowledge": "操作风险管理"
+    },
+    {
+      "questionId": "jpl-5155746",
+      "sourceQuestionId": "5155746",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第五章 个人经营类贷款",
+      "section": "第一节 个人经营贷款",
+      "knowledge": "贷款流程"
+    },
+    {
+      "questionId": "jpl-5155747",
+      "sourceQuestionId": "5155747",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第三章 个人住房贷款",
+      "section": "第三节 个人住房贷款风险管理",
+      "knowledge": "操作风险管理"
+    },
+    {
+      "questionId": "jpl-5155748",
+      "sourceQuestionId": "5155748",
+      "permissionStatus": "可查看",
+      "chapter": "第三章 个人住房贷款",
+      "section": "第二节 个人住房贷款流程",
+      "knowledge": "合作项目准入流程"
+    },
+    {
+      "questionId": "jpl-5155749",
+      "sourceQuestionId": "5155749",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第三章 个人住房贷款",
+      "section": "第二节 个人住房贷款流程",
+      "knowledge": "单笔贷款流程"
+    },
+    {
+      "questionId": "jpl-5155750",
+      "sourceQuestionId": "5155750",
+      "permissionStatus": "可查看",
+      "chapter": "第三章 个人住房贷款",
+      "section": "第三节 个人住房贷款风险管理",
+      "knowledge": "合作机构风险管理"
+    },
+    {
+      "questionId": "jpl-5155751",
+      "sourceQuestionId": "5155751",
+      "permissionStatus": "可查看",
+      "chapter": "第三章 个人住房贷款",
+      "section": "第三节 个人住房贷款风险管理",
+      "knowledge": "信用风险管理"
+    },
+    {
+      "questionId": "jpl-5155752",
+      "sourceQuestionId": "5155752",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第三章 个人住房贷款",
+      "section": "第三节 个人住房贷款风险管理",
+      "knowledge": "操作风险管理"
+    },
+    {
+      "questionId": "jpl-5155753",
+      "sourceQuestionId": "5155753",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第三章 个人住房贷款",
+      "section": "第三节 个人住房贷款风险管理",
+      "knowledge": "操作风险管理"
+    },
+    {
+      "questionId": "jpl-5155754",
+      "sourceQuestionId": "5155754",
+      "permissionStatus": "可查看",
+      "chapter": "第三章 个人住房贷款",
+      "section": "第三节 个人住房贷款风险管理",
+      "knowledge": "操作风险管理"
+    },
+    {
+      "questionId": "jpl-5155755",
+      "sourceQuestionId": "5155755",
+      "permissionStatus": "可查看",
+      "chapter": "第三章 个人住房贷款",
+      "section": "第三节 个人住房贷款风险管理",
+      "knowledge": "操作风险管理"
+    },
+    {
+      "questionId": "jpl-5155756",
+      "sourceQuestionId": "5155756",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第三章 个人住房贷款",
+      "section": "第三节 个人住房贷款风险管理",
+      "knowledge": "操作风险管理"
+    },
+    {
+      "questionId": "jpl-5155757",
+      "sourceQuestionId": "5155757",
+      "permissionStatus": "可查看",
+      "chapter": "第三章 个人住房贷款",
+      "section": "第四节 公积金个人住房贷款",
+      "knowledge": "基础知识"
+    },
+    {
+      "questionId": "jpl-5155759",
+      "sourceQuestionId": "5155759",
+      "permissionStatus": "可查看",
+      "chapter": "第三章 个人住房贷款",
+      "section": "第四节 公积金个人住房贷款",
+      "knowledge": "贷款流程"
+    },
+    {
+      "questionId": "jpl-5155761",
+      "sourceQuestionId": "5155761",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第三章 个人住房贷款",
+      "section": "第一节 个人住房贷款基础知识",
+      "knowledge": "基础知识"
+    },
+    {
+      "questionId": "jpl-5155762",
+      "sourceQuestionId": "5155762",
+      "permissionStatus": "可查看",
+      "chapter": "第三章 个人住房贷款",
+      "section": "第三节 个人住房贷款风险管理",
+      "knowledge": "信用风险管理"
+    },
+    {
+      "questionId": "jpl-5155763",
+      "sourceQuestionId": "5155763",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第三章 个人住房贷款",
+      "section": "第二节 个人住房贷款流程",
+      "knowledge": "单笔贷款流程"
+    },
+    {
+      "questionId": "jpl-5155765",
+      "sourceQuestionId": "5155765",
+      "permissionStatus": "可查看",
+      "chapter": "第三章 个人住房贷款",
+      "section": "第三节 个人住房贷款风险管理",
+      "knowledge": "操作风险管理"
+    },
+    {
+      "questionId": "jpl-5155766",
+      "sourceQuestionId": "5155766",
+      "permissionStatus": "可查看",
+      "chapter": "第三章 个人住房贷款",
+      "section": "第三节 个人住房贷款风险管理",
+      "knowledge": "合作机构风险管理"
+    },
+    {
+      "questionId": "jpl-5155767",
+      "sourceQuestionId": "5155767",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第三章 个人住房贷款",
+      "section": "第四节 公积金个人住房贷款",
+      "knowledge": "贷款流程"
+    },
+    {
+      "questionId": "jpl-5155768",
+      "sourceQuestionId": "5155768",
+      "permissionStatus": "可查看",
+      "chapter": "第三章 个人住房贷款",
+      "section": "第一节 个人住房贷款基础知识",
+      "knowledge": "基础知识"
+    },
+    {
+      "questionId": "jpl-5155769",
+      "sourceQuestionId": "5155769",
+      "permissionStatus": "可查看",
+      "chapter": "第三章 个人住房贷款",
+      "section": "第一节 个人住房贷款基础知识",
+      "knowledge": "基础知识"
+    },
+    {
+      "questionId": "jpl-5155770",
+      "sourceQuestionId": "5155770",
+      "permissionStatus": "可查看",
+      "chapter": "第三章 个人住房贷款",
+      "section": "第三节 个人住房贷款风险管理",
+      "knowledge": "信用风险管理"
+    },
+    {
+      "questionId": "jpl-5155773",
+      "sourceQuestionId": "5155773",
+      "permissionStatus": "可查看",
+      "chapter": "第三章 个人住房贷款",
+      "section": "第一节 个人住房贷款基础知识",
+      "knowledge": "基础知识"
+    },
+    {
+      "questionId": "jpl-5155774",
+      "sourceQuestionId": "5155774",
+      "permissionStatus": "可查看",
+      "chapter": "第三章 个人住房贷款",
+      "section": "第四节 公积金个人住房贷款",
+      "knowledge": "贷款流程"
+    },
+    {
+      "questionId": "jpl-5155775",
+      "sourceQuestionId": "5155775",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第三章 个人住房贷款",
+      "section": "第四节 公积金个人住房贷款",
+      "knowledge": "贷款流程"
+    },
+    {
+      "questionId": "jpl-5155776",
+      "sourceQuestionId": "5155776",
+      "permissionStatus": "可查看",
+      "chapter": "第三章 个人住房贷款",
+      "section": "第三节 个人住房贷款风险管理",
+      "knowledge": "合作机构风险管理"
+    },
+    {
+      "questionId": "jpl-5155777",
+      "sourceQuestionId": "5155777",
+      "permissionStatus": "可查看",
+      "chapter": "第三章 个人住房贷款",
+      "section": "第四节 公积金个人住房贷款",
+      "knowledge": "贷款流程"
+    },
+    {
+      "questionId": "jpl-5155778",
+      "sourceQuestionId": "5155778",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第三章 个人住房贷款",
+      "section": "第四节 公积金个人住房贷款",
+      "knowledge": "贷款流程"
+    },
+    {
+      "questionId": "jpl-5155779",
+      "sourceQuestionId": "5155779",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第三章 个人住房贷款",
+      "section": "第一节 个人住房贷款基础知识",
+      "knowledge": "基础知识"
+    },
+    {
+      "questionId": "jpl-5155780",
+      "sourceQuestionId": "5155780",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第三章 个人住房贷款",
+      "section": "第一节 个人住房贷款基础知识",
+      "knowledge": "基础知识"
+    },
+    {
+      "questionId": "jpl-5155781",
+      "sourceQuestionId": "5155781",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第三章 个人住房贷款",
+      "section": "第三节 个人住房贷款风险管理",
+      "knowledge": "信用风险管理"
+    },
+    {
+      "questionId": "jpl-5155782",
+      "sourceQuestionId": "5155782",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第三章 个人住房贷款",
+      "section": "第四节 公积金个人住房贷款",
+      "knowledge": "贷款流程"
+    },
+    {
+      "questionId": "jpl-5155783",
+      "sourceQuestionId": "5155783",
+      "permissionStatus": "可查看",
+      "chapter": "第三章 个人住房贷款",
+      "section": "第一节 个人住房贷款基础知识",
+      "knowledge": "基础知识"
+    },
+    {
+      "questionId": "jpl-5155784",
+      "sourceQuestionId": "5155784",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第三章 个人住房贷款",
+      "section": "第一节 个人住房贷款基础知识",
+      "knowledge": "基础知识"
+    },
+    {
+      "questionId": "jpl-5155786",
+      "sourceQuestionId": "5155786",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第三章 个人住房贷款",
+      "section": "第一节 个人住房贷款基础知识",
+      "knowledge": "基础知识"
+    },
+    {
+      "questionId": "jpl-5155787",
+      "sourceQuestionId": "5155787",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第三章 个人住房贷款",
+      "section": "第二节 个人住房贷款流程",
+      "knowledge": "合作项目准入流程"
+    },
+    {
+      "questionId": "jpl-5155788",
+      "sourceQuestionId": "5155788",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第三章 个人住房贷款",
+      "section": "第二节 个人住房贷款流程",
+      "knowledge": "合作项目准入流程"
+    },
+    {
+      "questionId": "jpl-5155789",
+      "sourceQuestionId": "5155789",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第三章 个人住房贷款",
+      "section": "第三节 个人住房贷款风险管理",
+      "knowledge": "信用风险管理"
+    },
+    {
+      "questionId": "jpl-5155790",
+      "sourceQuestionId": "5155790",
+      "permissionStatus": "可查看",
+      "chapter": "第三章 个人住房贷款",
+      "section": "第三节 个人住房贷款风险管理",
+      "knowledge": "信用风险管理"
+    },
+    {
+      "questionId": "jpl-5155791",
+      "sourceQuestionId": "5155791",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第三章 个人住房贷款",
+      "section": "第三节 个人住房贷款风险管理",
+      "knowledge": "操作风险管理"
+    },
+    {
+      "questionId": "jpl-5155792",
+      "sourceQuestionId": "5155792",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第三章 个人住房贷款",
+      "section": "第三节 个人住房贷款风险管理",
+      "knowledge": "操作风险管理"
+    },
+    {
+      "questionId": "jpl-5155793",
+      "sourceQuestionId": "5155793",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第三章 个人住房贷款",
+      "section": "第三节 个人住房贷款风险管理",
+      "knowledge": "操作风险管理"
+    },
+    {
+      "questionId": "jpl-5155794",
+      "sourceQuestionId": "5155794",
+      "permissionStatus": "可查看",
+      "chapter": "第三章 个人住房贷款",
+      "section": "第三节 个人住房贷款风险管理",
+      "knowledge": "操作风险管理"
+    },
+    {
+      "questionId": "jpl-5155795",
+      "sourceQuestionId": "5155795",
+      "permissionStatus": "可查看",
+      "chapter": "第三章 个人住房贷款",
+      "section": "第三节 个人住房贷款风险管理",
+      "knowledge": "操作风险管理"
+    },
+    {
+      "questionId": "jpl-5155796",
+      "sourceQuestionId": "5155796",
+      "permissionStatus": "可查看",
+      "chapter": "第三章 个人住房贷款",
+      "section": "第四节 公积金个人住房贷款",
+      "knowledge": "基础知识"
+    },
+    {
+      "questionId": "jpl-5155797",
+      "sourceQuestionId": "5155797",
+      "permissionStatus": "可查看",
+      "chapter": "第三章 个人住房贷款",
+      "section": "第四节 公积金个人住房贷款",
+      "knowledge": "基础知识"
+    },
+    {
+      "questionId": "jpl-5155798",
+      "sourceQuestionId": "5155798",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第三章 个人住房贷款",
+      "section": "第四节 公积金个人住房贷款",
+      "knowledge": "基础知识"
+    },
+    {
+      "questionId": "jpl-5155799",
+      "sourceQuestionId": "5155799",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第三章 个人住房贷款",
+      "section": "第四节 公积金个人住房贷款",
+      "knowledge": "贷款流程"
+    },
+    {
+      "questionId": "jpl-5155801",
+      "sourceQuestionId": "5155801",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第四章 个人消费类贷款",
+      "section": "第二节 个人教育贷款",
+      "knowledge": "风险管理"
+    },
+    {
+      "questionId": "jpl-5155804",
+      "sourceQuestionId": "5155804",
+      "permissionStatus": "可查看",
+      "chapter": "第四章 个人消费类贷款",
+      "section": "第一节 个人汽车贷款",
+      "knowledge": "基础知识"
+    },
+    {
+      "questionId": "jpl-5155807",
+      "sourceQuestionId": "5155807",
+      "permissionStatus": "可查看",
+      "chapter": "第四章 个人消费类贷款",
+      "section": "第二节 个人教育贷款",
+      "knowledge": "基础知识"
+    },
+    {
+      "questionId": "jpl-5155808",
+      "sourceQuestionId": "5155808",
+      "permissionStatus": "可查看",
+      "chapter": "第四章 个人消费类贷款",
+      "section": "第二节 个人教育贷款",
+      "knowledge": "风险管理"
+    },
+    {
+      "questionId": "jpl-5155813",
+      "sourceQuestionId": "5155813",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第四章 个人消费类贷款",
+      "section": "第一节 个人汽车贷款",
+      "knowledge": "基础知识"
+    },
+    {
+      "questionId": "jpl-5155816",
+      "sourceQuestionId": "5155816",
+      "permissionStatus": "可查看",
+      "chapter": "第二章 个人贷款管理",
+      "section": "第二节 个人贷款流程",
+      "knowledge": "贷后管理"
+    },
+    {
+      "questionId": "jpl-5155817",
+      "sourceQuestionId": "5155817",
+      "permissionStatus": "可查看",
+      "chapter": "第四章 个人消费类贷款",
+      "section": "第一节 个人汽车贷款",
+      "knowledge": "风险管理"
+    },
+    {
+      "questionId": "jpl-5155819",
+      "sourceQuestionId": "5155819",
+      "permissionStatus": "可查看",
+      "chapter": "第四章 个人消费类贷款",
+      "section": "第二节 个人教育贷款",
+      "knowledge": "基础知识"
+    },
+    {
+      "questionId": "jpl-5155820",
+      "sourceQuestionId": "5155820",
+      "permissionStatus": "可查看",
+      "chapter": "第四章 个人消费类贷款",
+      "section": "第二节 个人教育贷款",
+      "knowledge": "风险管理"
+    },
+    {
+      "questionId": "jpl-5155822",
+      "sourceQuestionId": "5155822",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第二章 个人贷款管理",
+      "section": "第二节 个人贷款流程",
+      "knowledge": "贷后管理"
+    },
+    {
+      "questionId": "jpl-5155824",
+      "sourceQuestionId": "5155824",
+      "permissionStatus": "可查看",
+      "chapter": "第四章 个人消费类贷款",
+      "section": "第一节 个人汽车贷款",
+      "knowledge": "风险管理"
+    },
+    {
+      "questionId": "jpl-5155825",
+      "sourceQuestionId": "5155825",
+      "permissionStatus": "可查看",
+      "chapter": "第四章 个人消费类贷款",
+      "section": "第二节 个人教育贷款",
+      "knowledge": "风险管理"
+    },
+    {
+      "questionId": "jpl-5155826",
+      "sourceQuestionId": "5155826",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第一章 个人贷款概述",
+      "section": "第二节 个人贷款产品的种类",
+      "knowledge": "按产品用途分类"
+    },
+    {
+      "questionId": "jpl-5155828",
+      "sourceQuestionId": "5155828",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第二章 个人贷款管理",
+      "section": "第二节 个人贷款流程",
+      "knowledge": "贷款的受理与调查"
+    },
+    {
+      "questionId": "jpl-5155829",
+      "sourceQuestionId": "5155829",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第四章 个人消费类贷款",
+      "section": "第一节 个人汽车贷款",
+      "knowledge": "贷款流程"
+    },
+    {
+      "questionId": "jpl-5155832",
+      "sourceQuestionId": "5155832",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第四章 个人消费类贷款",
+      "section": "第二节 个人教育贷款",
+      "knowledge": "贷款流程"
+    },
+    {
+      "questionId": "jpl-5155835",
+      "sourceQuestionId": "5155835",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第四章 个人消费类贷款",
+      "section": "第一节 个人汽车贷款",
+      "knowledge": "风险管理"
+    },
+    {
+      "questionId": "jpl-5155836",
+      "sourceQuestionId": "5155836",
+      "permissionStatus": "可查看",
+      "chapter": "第四章 个人消费类贷款",
+      "section": "第一节 个人汽车贷款",
+      "knowledge": "风险管理"
+    },
+    {
+      "questionId": "jpl-5155837",
+      "sourceQuestionId": "5155837",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第四章 个人消费类贷款",
+      "section": "第二节 个人教育贷款",
+      "knowledge": "基础知识"
+    },
+    {
+      "questionId": "jpl-5155838",
+      "sourceQuestionId": "5155838",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第四章 个人消费类贷款",
+      "section": "第二节 个人教育贷款",
+      "knowledge": "贷款流程"
+    },
+    {
+      "questionId": "jpl-5155840",
+      "sourceQuestionId": "5155840",
+      "permissionStatus": "可查看",
+      "chapter": "第四章 个人消费类贷款",
+      "section": "第二节 个人教育贷款",
+      "knowledge": "风险管理"
+    },
+    {
+      "questionId": "jpl-5155842",
+      "sourceQuestionId": "5155842",
+      "permissionStatus": "可查看",
+      "chapter": "第四章 个人消费类贷款",
+      "section": "第一节 个人汽车贷款",
+      "knowledge": "基础知识"
+    },
+    {
+      "questionId": "jpl-5155844",
+      "sourceQuestionId": "5155844",
+      "permissionStatus": "可查看",
+      "chapter": "第四章 个人消费类贷款",
+      "section": "第二节 个人教育贷款",
+      "knowledge": "基础知识"
+    },
+    {
+      "questionId": "jpl-5155845",
+      "sourceQuestionId": "5155845",
+      "permissionStatus": "可查看",
+      "chapter": "第四章 个人消费类贷款",
+      "section": "第一节 个人汽车贷款",
+      "knowledge": "基础知识"
+    },
+    {
+      "questionId": "jpl-5155847",
+      "sourceQuestionId": "5155847",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第四章 个人消费类贷款",
+      "section": "第一节 个人汽车贷款",
+      "knowledge": "基础知识"
+    },
+    {
+      "questionId": "jpl-5155848",
+      "sourceQuestionId": "5155848",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第四章 个人消费类贷款",
+      "section": "第二节 个人教育贷款",
+      "knowledge": "基础知识"
+    },
+    {
+      "questionId": "jpl-5155849",
+      "sourceQuestionId": "5155849",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第四章 个人消费类贷款",
+      "section": "第二节 个人教育贷款",
+      "knowledge": "风险管理"
+    },
+    {
+      "questionId": "jpl-5155850",
+      "sourceQuestionId": "5155850",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第四章 个人消费类贷款",
+      "section": "第二节 个人教育贷款",
+      "knowledge": "基础知识"
+    },
+    {
+      "questionId": "jpl-5155854",
+      "sourceQuestionId": "5155854",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第四章 个人消费类贷款",
+      "section": "第一节 个人汽车贷款",
+      "knowledge": "基础知识"
+    },
+    {
+      "questionId": "jpl-5155856",
+      "sourceQuestionId": "5155856",
+      "permissionStatus": "可查看",
+      "chapter": "第四章 个人消费类贷款",
+      "section": "第二节 个人教育贷款",
+      "knowledge": "贷款流程"
+    },
+    {
+      "questionId": "jpl-5155858",
+      "sourceQuestionId": "5155858",
+      "permissionStatus": "可查看",
+      "chapter": "第四章 个人消费类贷款",
+      "section": "第一节 个人汽车贷款",
+      "knowledge": "基础知识"
+    },
+    {
+      "questionId": "jpl-5155860",
+      "sourceQuestionId": "5155860",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第四章 个人消费类贷款",
+      "section": "第一节 个人汽车贷款",
+      "knowledge": "贷款流程"
+    },
+    {
+      "questionId": "jpl-5155861",
+      "sourceQuestionId": "5155861",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第二章 个人贷款管理",
+      "section": "第二节 个人贷款流程",
+      "knowledge": "贷款的签约与发放"
+    },
+    {
+      "questionId": "jpl-5155862",
+      "sourceQuestionId": "5155862",
+      "permissionStatus": "可查看",
+      "chapter": "第四章 个人消费类贷款",
+      "section": "第一节 个人汽车贷款",
+      "knowledge": "贷款流程"
+    },
+    {
+      "questionId": "jpl-5155863",
+      "sourceQuestionId": "5155863",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第四章 个人消费类贷款",
+      "section": "第一节 个人汽车贷款",
+      "knowledge": "贷款流程"
+    },
+    {
+      "questionId": "jpl-5155866",
+      "sourceQuestionId": "5155866",
+      "permissionStatus": "可查看",
+      "chapter": "第四章 个人消费类贷款",
+      "section": "第一节 个人汽车贷款",
+      "knowledge": "风险管理"
+    },
+    {
+      "questionId": "jpl-5155867",
+      "sourceQuestionId": "5155867",
+      "permissionStatus": "可查看",
+      "chapter": "第四章 个人消费类贷款",
+      "section": "第一节 个人汽车贷款",
+      "knowledge": "贷款流程"
+    },
+    {
+      "questionId": "jpl-5155871",
+      "sourceQuestionId": "5155871",
+      "permissionStatus": "可查看",
+      "chapter": "第四章 个人消费类贷款",
+      "section": "第二节 个人教育贷款",
+      "knowledge": "贷款流程"
+    },
+    {
+      "questionId": "jpl-5155873",
+      "sourceQuestionId": "5155873",
+      "permissionStatus": "可查看",
+      "chapter": "第四章 个人消费类贷款",
+      "section": "第二节 个人教育贷款",
+      "knowledge": "贷款流程"
+    },
+    {
+      "questionId": "jpl-5155875",
+      "sourceQuestionId": "5155875",
+      "permissionStatus": "可查看",
+      "chapter": "第四章 个人消费类贷款",
+      "section": "第二节 个人教育贷款",
+      "knowledge": "贷款流程"
+    },
+    {
+      "questionId": "jpl-5155876",
+      "sourceQuestionId": "5155876",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第四章 个人消费类贷款",
+      "section": "第二节 个人教育贷款",
+      "knowledge": "贷款流程"
+    },
+    {
+      "questionId": "jpl-5155877",
+      "sourceQuestionId": "5155877",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第四章 个人消费类贷款",
+      "section": "第二节 个人教育贷款",
+      "knowledge": "基础知识"
+    },
+    {
+      "questionId": "jpl-5155879",
+      "sourceQuestionId": "5155879",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第四章 个人消费类贷款",
+      "section": "第二节 个人教育贷款",
+      "knowledge": "风险管理"
+    },
+    {
+      "questionId": "jpl-5155880",
+      "sourceQuestionId": "5155880",
+      "permissionStatus": "可查看",
+      "chapter": "第四章 个人消费类贷款",
+      "section": "第二节 个人教育贷款",
+      "knowledge": "风险管理"
+    },
+    {
+      "questionId": "jpl-5155881",
+      "sourceQuestionId": "5155881",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第四章 个人消费类贷款",
+      "section": "第二节 个人教育贷款",
+      "knowledge": "风险管理"
+    },
+    {
+      "questionId": "jpl-5155884",
+      "sourceQuestionId": "5155884",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第四章 个人消费类贷款",
+      "section": "第二节 个人教育贷款",
+      "knowledge": "贷款流程"
+    },
+    {
+      "questionId": "jpl-5155885",
+      "sourceQuestionId": "5155885",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第四章 个人消费类贷款",
+      "section": "第二节 个人教育贷款",
+      "knowledge": "基础知识"
+    },
+    {
+      "questionId": "jpl-5155886",
+      "sourceQuestionId": "5155886",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第四章 个人消费类贷款",
+      "section": "第一节 个人汽车贷款",
+      "knowledge": "基础知识"
+    },
+    {
+      "questionId": "jpl-5155887",
+      "sourceQuestionId": "5155887",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第四章 个人消费类贷款",
+      "section": "第一节 个人汽车贷款",
+      "knowledge": "基础知识"
+    },
+    {
+      "questionId": "jpl-5155888",
+      "sourceQuestionId": "5155888",
+      "permissionStatus": "可查看",
+      "chapter": "第四章 个人消费类贷款",
+      "section": "第二节 个人教育贷款",
+      "knowledge": "基础知识"
+    },
+    {
+      "questionId": "jpl-5155893",
+      "sourceQuestionId": "5155893",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第四章 个人消费类贷款",
+      "section": "第二节 个人教育贷款",
+      "knowledge": "基础知识"
+    },
+    {
+      "questionId": "jpl-5155895",
+      "sourceQuestionId": "5155895",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第四章 个人消费类贷款",
+      "section": "第二节 个人教育贷款",
+      "knowledge": "基础知识"
+    },
+    {
+      "questionId": "jpl-5155896",
+      "sourceQuestionId": "5155896",
+      "permissionStatus": "可查看",
+      "chapter": "第四章 个人消费类贷款",
+      "section": "第二节 个人教育贷款",
+      "knowledge": "风险管理"
+    },
+    {
+      "questionId": "jpl-5155897",
+      "sourceQuestionId": "5155897",
+      "permissionStatus": "可查看",
+      "chapter": "第四章 个人消费类贷款",
+      "section": "第一节 个人汽车贷款",
+      "knowledge": "风险管理"
+    },
+    {
+      "questionId": "jpl-5155898",
+      "sourceQuestionId": "5155898",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第四章 个人消费类贷款",
+      "section": "第一节 个人汽车贷款",
+      "knowledge": "贷款流程"
+    },
+    {
+      "questionId": "jpl-5155899",
+      "sourceQuestionId": "5155899",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第四章 个人消费类贷款",
+      "section": "第二节 个人教育贷款",
+      "knowledge": "风险管理"
+    },
+    {
+      "questionId": "jpl-5155900",
+      "sourceQuestionId": "5155900",
+      "permissionStatus": "可查看",
+      "chapter": "第四章 个人消费类贷款",
+      "section": "第二节 个人教育贷款",
+      "knowledge": "风险管理"
+    },
+    {
+      "questionId": "jpl-5155902",
+      "sourceQuestionId": "5155902",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第四章 个人消费类贷款",
+      "section": "第一节 个人汽车贷款",
+      "knowledge": "基础知识"
+    },
+    {
+      "questionId": "jpl-5155903",
+      "sourceQuestionId": "5155903",
+      "permissionStatus": "可查看",
+      "chapter": "第四章 个人消费类贷款",
+      "section": "第一节 个人汽车贷款",
+      "knowledge": "基础知识"
+    },
+    {
+      "questionId": "jpl-5155904",
+      "sourceQuestionId": "5155904",
+      "permissionStatus": "可查看",
+      "chapter": "第四章 个人消费类贷款",
+      "section": "第一节 个人汽车贷款",
+      "knowledge": "基础知识"
+    },
+    {
+      "questionId": "jpl-5155905",
+      "sourceQuestionId": "5155905",
+      "permissionStatus": "可查看",
+      "chapter": "第四章 个人消费类贷款",
+      "section": "第一节 个人汽车贷款",
+      "knowledge": "贷款流程"
+    },
+    {
+      "questionId": "jpl-5155906",
+      "sourceQuestionId": "5155906",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第四章 个人消费类贷款",
+      "section": "第一节 个人汽车贷款",
+      "knowledge": "风险管理"
+    },
+    {
+      "questionId": "jpl-5155907",
+      "sourceQuestionId": "5155907",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第四章 个人消费类贷款",
+      "section": "第二节 个人教育贷款",
+      "knowledge": "贷款流程"
+    },
+    {
+      "questionId": "jpl-5155908",
+      "sourceQuestionId": "5155908",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第四章 个人消费类贷款",
+      "section": "第一节 个人汽车贷款",
+      "knowledge": "贷款流程"
+    },
+    {
+      "questionId": "jpl-5155909",
+      "sourceQuestionId": "5155909",
+      "permissionStatus": "可查看",
+      "chapter": "第二章 个人贷款管理",
+      "section": "第二节 个人贷款流程",
+      "knowledge": "贷款的受理与调查"
+    },
+    {
+      "questionId": "jpl-5155910",
+      "sourceQuestionId": "5155910",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第四章 个人消费类贷款",
+      "section": "第二节 个人教育贷款",
+      "knowledge": "基础知识"
+    },
+    {
+      "questionId": "jpl-5155912",
+      "sourceQuestionId": "5155912",
+      "permissionStatus": "可查看",
+      "chapter": "第四章 个人消费类贷款",
+      "section": "第二节 个人教育贷款",
+      "knowledge": "基础知识"
+    },
+    {
+      "questionId": "jpl-5155914",
+      "sourceQuestionId": "5155914",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第四章 个人消费类贷款",
+      "section": "第二节 个人教育贷款",
+      "knowledge": "贷款流程"
+    },
+    {
+      "questionId": "jpl-5155915",
+      "sourceQuestionId": "5155915",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第四章 个人消费类贷款",
+      "section": "第一节 个人汽车贷款",
+      "knowledge": "基础知识"
+    },
+    {
+      "questionId": "jpl-5155916",
+      "sourceQuestionId": "5155916",
+      "permissionStatus": "可查看",
+      "chapter": "第四章 个人消费类贷款",
+      "section": "第一节 个人汽车贷款",
+      "knowledge": "基础知识"
+    },
+    {
+      "questionId": "jpl-5155917",
+      "sourceQuestionId": "5155917",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第四章 个人消费类贷款",
+      "section": "第一节 个人汽车贷款",
+      "knowledge": "贷款流程"
+    },
+    {
+      "questionId": "jpl-5155919",
+      "sourceQuestionId": "5155919",
+      "permissionStatus": "可查看",
+      "chapter": "第四章 个人消费类贷款",
+      "section": "第一节 个人汽车贷款",
+      "knowledge": "贷款流程"
+    },
+    {
+      "questionId": "jpl-5155920",
+      "sourceQuestionId": "5155920",
+      "permissionStatus": "可查看",
+      "chapter": "第四章 个人消费类贷款",
+      "section": "第一节 个人汽车贷款",
+      "knowledge": "贷款流程"
+    },
+    {
+      "questionId": "jpl-5155921",
+      "sourceQuestionId": "5155921",
+      "permissionStatus": "可查看",
+      "chapter": "第四章 个人消费类贷款",
+      "section": "第一节 个人汽车贷款",
+      "knowledge": "风险管理"
+    },
+    {
+      "questionId": "jpl-5155922",
+      "sourceQuestionId": "5155922",
+      "permissionStatus": "可查看",
+      "chapter": "第四章 个人消费类贷款",
+      "section": "第一节 个人汽车贷款",
+      "knowledge": "风险管理"
+    },
+    {
+      "questionId": "jpl-5155923",
+      "sourceQuestionId": "5155923",
+      "permissionStatus": "可查看",
+      "chapter": "第四章 个人消费类贷款",
+      "section": "第一节 个人汽车贷款",
+      "knowledge": "贷款流程"
+    },
+    {
+      "questionId": "jpl-5155924",
+      "sourceQuestionId": "5155924",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第四章 个人消费类贷款",
+      "section": "第一节 个人汽车贷款",
+      "knowledge": "风险管理"
+    },
+    {
+      "questionId": "jpl-5155925",
+      "sourceQuestionId": "5155925",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第四章 个人消费类贷款",
+      "section": "第二节 个人教育贷款",
+      "knowledge": "基础知识"
+    },
+    {
+      "questionId": "jpl-5155926",
+      "sourceQuestionId": "5155926",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第四章 个人消费类贷款",
+      "section": "第二节 个人教育贷款",
+      "knowledge": "基础知识"
+    },
+    {
+      "questionId": "jpl-5155927",
+      "sourceQuestionId": "5155927",
+      "permissionStatus": "可查看",
+      "chapter": "第四章 个人消费类贷款",
+      "section": "第二节 个人教育贷款",
+      "knowledge": "风险管理"
+    },
+    {
+      "questionId": "jpl-5155928",
+      "sourceQuestionId": "5155928",
+      "permissionStatus": "可查看",
+      "chapter": "第四章 个人消费类贷款",
+      "section": "第二节 个人教育贷款",
+      "knowledge": "风险管理"
+    },
+    {
+      "questionId": "jpl-5155930",
+      "sourceQuestionId": "5155930",
+      "permissionStatus": "可查看",
+      "chapter": "第四章 个人消费类贷款",
+      "section": "第一节 个人汽车贷款",
+      "knowledge": "贷款流程"
+    },
+    {
+      "questionId": "jpl-5155931",
+      "sourceQuestionId": "5155931",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第四章 个人消费类贷款",
+      "section": "第二节 个人教育贷款",
+      "knowledge": "贷款流程"
+    },
+    {
+      "questionId": "jpl-5155932",
+      "sourceQuestionId": "5155932",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第四章 个人消费类贷款",
+      "section": "第一节 个人汽车贷款",
+      "knowledge": "基础知识"
+    },
+    {
+      "questionId": "jpl-5155933",
+      "sourceQuestionId": "5155933",
+      "permissionStatus": "可查看",
+      "chapter": "第四章 个人消费类贷款",
+      "section": "第一节 个人汽车贷款",
+      "knowledge": "风险管理"
+    },
+    {
+      "questionId": "jpl-5155934",
+      "sourceQuestionId": "5155934",
+      "permissionStatus": "可查看",
+      "chapter": "第四章 个人消费类贷款",
+      "section": "第一节 个人汽车贷款",
+      "knowledge": "风险管理"
+    },
+    {
+      "questionId": "jpl-5155936",
+      "sourceQuestionId": "5155936",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第四章 个人消费类贷款",
+      "section": "第一节 个人汽车贷款",
+      "knowledge": "风险管理"
+    },
+    {
+      "questionId": "jpl-5155938",
+      "sourceQuestionId": "5155938",
+      "permissionStatus": "可查看",
+      "chapter": "第四章 个人消费类贷款",
+      "section": "第一节 个人汽车贷款",
+      "knowledge": "基础知识"
+    },
+    {
+      "questionId": "jpl-5155939",
+      "sourceQuestionId": "5155939",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第四章 个人消费类贷款",
+      "section": "第一节 个人汽车贷款",
+      "knowledge": "风险管理"
+    },
+    {
+      "questionId": "jpl-5155940",
+      "sourceQuestionId": "5155940",
+      "permissionStatus": "可查看",
+      "chapter": "第四章 个人消费类贷款",
+      "section": "第一节 个人汽车贷款",
+      "knowledge": "风险管理"
+    },
+    {
+      "questionId": "jpl-5155942",
+      "sourceQuestionId": "5155942",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第四章 个人消费类贷款",
+      "section": "第一节 个人汽车贷款",
+      "knowledge": "基础知识"
+    },
+    {
+      "questionId": "jpl-5155943",
+      "sourceQuestionId": "5155943",
+      "permissionStatus": "可查看",
+      "chapter": "第四章 个人消费类贷款",
+      "section": "第一节 个人汽车贷款",
+      "knowledge": "基础知识"
+    },
+    {
+      "questionId": "jpl-5155945",
+      "sourceQuestionId": "5155945",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第四章 个人消费类贷款",
+      "section": "第一节 个人汽车贷款",
+      "knowledge": "风险管理"
+    },
+    {
+      "questionId": "jpl-5155946",
+      "sourceQuestionId": "5155946",
+      "permissionStatus": "可查看",
+      "chapter": "第四章 个人消费类贷款",
+      "section": "第一节 个人汽车贷款",
+      "knowledge": "基础知识"
+    },
+    {
+      "questionId": "jpl-5155947",
+      "sourceQuestionId": "5155947",
+      "permissionStatus": "可查看",
+      "chapter": "第四章 个人消费类贷款",
+      "section": "第一节 个人汽车贷款",
+      "knowledge": "贷款流程"
+    },
+    {
+      "questionId": "jpl-5155948",
+      "sourceQuestionId": "5155948",
+      "permissionStatus": "可查看",
+      "chapter": "第四章 个人消费类贷款",
+      "section": "第二节 个人教育贷款",
+      "knowledge": "基础知识"
+    },
+    {
+      "questionId": "jpl-5155949",
+      "sourceQuestionId": "5155949",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第四章 个人消费类贷款",
+      "section": "第二节 个人教育贷款",
+      "knowledge": "贷款流程"
+    },
+    {
+      "questionId": "jpl-5155950",
+      "sourceQuestionId": "5155950",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第四章 个人消费类贷款",
+      "section": "第二节 个人教育贷款",
+      "knowledge": "贷款流程"
+    },
+    {
+      "questionId": "jpl-5155951",
+      "sourceQuestionId": "5155951",
+      "permissionStatus": "可查看",
+      "chapter": "第四章 个人消费类贷款",
+      "section": "第二节 个人教育贷款",
+      "knowledge": "基础知识"
+    },
+    {
+      "questionId": "jpl-5155953",
+      "sourceQuestionId": "5155953",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第四章 个人消费类贷款",
+      "section": "第一节 个人汽车贷款",
+      "knowledge": "基础知识"
+    },
+    {
+      "questionId": "jpl-5155955",
+      "sourceQuestionId": "5155955",
+      "permissionStatus": "可查看",
+      "chapter": "第四章 个人消费类贷款",
+      "section": "第一节 个人汽车贷款",
+      "knowledge": "基础知识"
+    },
+    {
+      "questionId": "jpl-5155956",
+      "sourceQuestionId": "5155956",
+      "permissionStatus": "可查看",
+      "chapter": "第四章 个人消费类贷款",
+      "section": "第一节 个人汽车贷款",
+      "knowledge": "贷款流程"
+    },
+    {
+      "questionId": "jpl-5155957",
+      "sourceQuestionId": "5155957",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第四章 个人消费类贷款",
+      "section": "第一节 个人汽车贷款",
+      "knowledge": "贷款流程"
+    },
+    {
+      "questionId": "jpl-5155958",
+      "sourceQuestionId": "5155958",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第四章 个人消费类贷款",
+      "section": "第一节 个人汽车贷款",
+      "knowledge": "贷款流程"
+    },
+    {
+      "questionId": "jpl-5155959",
+      "sourceQuestionId": "5155959",
+      "permissionStatus": "可查看",
+      "chapter": "第四章 个人消费类贷款",
+      "section": "第一节 个人汽车贷款",
+      "knowledge": "贷款流程"
+    },
+    {
+      "questionId": "jpl-5155960",
+      "sourceQuestionId": "5155960",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第二章 个人贷款管理",
+      "section": "第二节 个人贷款流程",
+      "knowledge": "贷后管理"
+    },
+    {
+      "questionId": "jpl-5155961",
+      "sourceQuestionId": "5155961",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第四章 个人消费类贷款",
+      "section": "第一节 个人汽车贷款",
+      "knowledge": "风险管理"
+    },
+    {
+      "questionId": "jpl-5155962",
+      "sourceQuestionId": "5155962",
+      "permissionStatus": "可查看",
+      "chapter": "第四章 个人消费类贷款",
+      "section": "第一节 个人汽车贷款",
+      "knowledge": "风险管理"
+    },
+    {
+      "questionId": "jpl-5155963",
+      "sourceQuestionId": "5155963",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第四章 个人消费类贷款",
+      "section": "第一节 个人汽车贷款",
+      "knowledge": "贷款流程"
+    },
+    {
+      "questionId": "jpl-5155964",
+      "sourceQuestionId": "5155964",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第四章 个人消费类贷款",
+      "section": "第一节 个人汽车贷款",
+      "knowledge": "风险管理"
+    },
+    {
+      "questionId": "jpl-5155965",
+      "sourceQuestionId": "5155965",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第四章 个人消费类贷款",
+      "section": "第二节 个人教育贷款",
+      "knowledge": "基础知识"
+    },
+    {
+      "questionId": "jpl-5155966",
+      "sourceQuestionId": "5155966",
+      "permissionStatus": "可查看",
+      "chapter": "第四章 个人消费类贷款",
+      "section": "第二节 个人教育贷款",
+      "knowledge": "基础知识"
+    },
+    {
+      "questionId": "jpl-5155967",
+      "sourceQuestionId": "5155967",
+      "permissionStatus": "可查看",
+      "chapter": "第四章 个人消费类贷款",
+      "section": "第二节 个人教育贷款",
+      "knowledge": "基础知识"
+    },
+    {
+      "questionId": "jpl-5155968",
+      "sourceQuestionId": "5155968",
+      "permissionStatus": "可查看",
+      "chapter": "第四章 个人消费类贷款",
+      "section": "第二节 个人教育贷款",
+      "knowledge": "贷款流程"
+    },
+    {
+      "questionId": "jpl-5155969",
+      "sourceQuestionId": "5155969",
+      "permissionStatus": "可查看",
+      "chapter": "第四章 个人消费类贷款",
+      "section": "第二节 个人教育贷款",
+      "knowledge": "基础知识"
+    },
+    {
+      "questionId": "jpl-5155970",
+      "sourceQuestionId": "5155970",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第四章 个人消费类贷款",
+      "section": "第二节 个人教育贷款",
+      "knowledge": "基础知识"
+    },
+    {
+      "questionId": "jpl-5155971",
+      "sourceQuestionId": "5155971",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第四章 个人消费类贷款",
+      "section": "第二节 个人教育贷款",
+      "knowledge": "基础知识"
+    },
+    {
+      "questionId": "jpl-5155972",
+      "sourceQuestionId": "5155972",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第四章 个人消费类贷款",
+      "section": "第二节 个人教育贷款",
+      "knowledge": "贷款流程"
+    },
+    {
+      "questionId": "jpl-5155973",
+      "sourceQuestionId": "5155973",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第四章 个人消费类贷款",
+      "section": "第二节 个人教育贷款",
+      "knowledge": "基础知识"
+    },
+    {
+      "questionId": "jpl-5155974",
+      "sourceQuestionId": "5155974",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第四章 个人消费类贷款",
+      "section": "第二节 个人教育贷款",
+      "knowledge": "贷款流程"
+    },
+    {
+      "questionId": "jpl-5155975",
+      "sourceQuestionId": "5155975",
+      "permissionStatus": "可查看",
+      "chapter": "第四章 个人消费类贷款",
+      "section": "第二节 个人教育贷款",
+      "knowledge": "贷款流程"
+    },
+    {
+      "questionId": "jpl-5155980",
+      "sourceQuestionId": "5155980",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第五章 个人经营类贷款",
+      "section": "第一节 个人经营贷款",
+      "knowledge": "基础知识"
+    },
+    {
+      "questionId": "jpl-5155981",
+      "sourceQuestionId": "5155981",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第五章 个人经营类贷款",
+      "section": "第二节 个人商用房贷款",
+      "knowledge": "贷款流程"
+    },
+    {
+      "questionId": "jpl-5155983",
+      "sourceQuestionId": "5155983",
+      "permissionStatus": "可查看",
+      "chapter": "第五章 个人经营类贷款",
+      "section": "第二节 个人商用房贷款",
+      "knowledge": "贷款流程"
+    },
+    {
+      "questionId": "jpl-5155985",
+      "sourceQuestionId": "5155985",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第五章 个人经营类贷款",
+      "section": "第二节 个人商用房贷款",
+      "knowledge": "贷款流程"
+    },
+    {
+      "questionId": "jpl-5155986",
+      "sourceQuestionId": "5155986",
+      "permissionStatus": "可查看",
+      "chapter": "第五章 个人经营类贷款",
+      "section": "第一节 个人经营贷款",
+      "knowledge": "贷款流程"
+    },
+    {
+      "questionId": "jpl-5155987",
+      "sourceQuestionId": "5155987",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第五章 个人经营类贷款",
+      "section": "第一节 个人经营贷款",
+      "knowledge": "风险管理"
+    },
+    {
+      "questionId": "jpl-5155988",
+      "sourceQuestionId": "5155988",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第五章 个人经营类贷款",
+      "section": "第一节 个人经营贷款",
+      "knowledge": "贷款流程"
+    },
+    {
+      "questionId": "jpl-5155990",
+      "sourceQuestionId": "5155990",
+      "permissionStatus": "可查看",
+      "chapter": "第五章 个人经营类贷款",
+      "section": "第一节 个人经营贷款",
+      "knowledge": "风险管理"
+    },
+    {
+      "questionId": "jpl-5155993",
+      "sourceQuestionId": "5155993",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第五章 个人经营类贷款",
+      "section": "第二节 个人商用房贷款",
+      "knowledge": "基础知识"
+    },
+    {
+      "questionId": "jpl-5155994",
+      "sourceQuestionId": "5155994",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第五章 个人经营类贷款",
+      "section": "第二节 个人商用房贷款",
+      "knowledge": "贷款流程"
+    },
+    {
+      "questionId": "jpl-5155995",
+      "sourceQuestionId": "5155995",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第五章 个人经营类贷款",
+      "section": "第一节 个人经营贷款",
+      "knowledge": "风险管理"
+    },
+    {
+      "questionId": "jpl-5155996",
+      "sourceQuestionId": "5155996",
+      "permissionStatus": "可查看",
+      "chapter": "第五章 个人经营类贷款",
+      "section": "第一节 个人经营贷款",
+      "knowledge": "基础知识"
+    },
+    {
+      "questionId": "jpl-5155997",
+      "sourceQuestionId": "5155997",
+      "permissionStatus": "可查看",
+      "chapter": "第五章 个人经营类贷款",
+      "section": "第一节 个人经营贷款",
+      "knowledge": "基础知识"
+    },
+    {
+      "questionId": "jpl-5155999",
+      "sourceQuestionId": "5155999",
+      "permissionStatus": "可查看",
+      "chapter": "第二章 个人贷款管理",
+      "section": "第二节 个人贷款流程",
+      "knowledge": "贷款的审查与审批"
+    },
+    {
+      "questionId": "jpl-5156001",
+      "sourceQuestionId": "5156001",
+      "permissionStatus": "可查看",
+      "chapter": "第五章 个人经营类贷款",
+      "section": "第二节 个人商用房贷款",
+      "knowledge": "基础知识"
+    },
+    {
+      "questionId": "jpl-5156002",
+      "sourceQuestionId": "5156002",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第五章 个人经营类贷款",
+      "section": "第二节 个人商用房贷款",
+      "knowledge": "基础知识"
+    },
+    {
+      "questionId": "jpl-5156005",
+      "sourceQuestionId": "5156005",
+      "permissionStatus": "可查看",
+      "chapter": "第五章 个人经营类贷款",
+      "section": "第一节 个人经营贷款",
+      "knowledge": "贷款流程"
+    },
+    {
+      "questionId": "jpl-5156006",
+      "sourceQuestionId": "5156006",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第五章 个人经营类贷款",
+      "section": "第一节 个人经营贷款",
+      "knowledge": "基础知识"
+    },
+    {
+      "questionId": "jpl-5156007",
+      "sourceQuestionId": "5156007",
+      "permissionStatus": "可查看",
+      "chapter": "第五章 个人经营类贷款",
+      "section": "第二节 个人商用房贷款",
+      "knowledge": "风险管理"
+    },
+    {
+      "questionId": "jpl-5156008",
+      "sourceQuestionId": "5156008",
+      "permissionStatus": "可查看",
+      "chapter": "第五章 个人经营类贷款",
+      "section": "第一节 个人经营贷款",
+      "knowledge": "贷款流程"
+    },
+    {
+      "questionId": "jpl-5156010",
+      "sourceQuestionId": "5156010",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "附录",
+      "section": "个人贷款的监管政策和法规",
+      "knowledge": "与个人贷款相关的政策法规"
+    },
+    {
+      "questionId": "jpl-5156013",
+      "sourceQuestionId": "5156013",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第五章 个人经营类贷款",
+      "section": "第二节 个人商用房贷款",
+      "knowledge": "基础知识"
+    },
+    {
+      "questionId": "jpl-5156014",
+      "sourceQuestionId": "5156014",
+      "permissionStatus": "可查看",
+      "chapter": "第五章 个人经营类贷款",
+      "section": "第二节 个人商用房贷款",
+      "knowledge": "风险管理"
+    },
+    {
+      "questionId": "jpl-5156015",
+      "sourceQuestionId": "5156015",
+      "permissionStatus": "可查看",
+      "chapter": "第五章 个人经营类贷款",
+      "section": "第二节 个人商用房贷款",
+      "knowledge": "风险管理"
+    },
+    {
+      "questionId": "jpl-5156018",
+      "sourceQuestionId": "5156018",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第五章 个人经营类贷款",
+      "section": "第一节 个人经营贷款",
+      "knowledge": "基础知识"
+    },
+    {
+      "questionId": "jpl-5156019",
+      "sourceQuestionId": "5156019",
+      "permissionStatus": "可查看",
+      "chapter": "第五章 个人经营类贷款",
+      "section": "第一节 个人经营贷款",
+      "knowledge": "贷款流程"
+    },
+    {
+      "questionId": "jpl-5156020",
+      "sourceQuestionId": "5156020",
+      "permissionStatus": "可查看",
+      "chapter": "第五章 个人经营类贷款",
+      "section": "第二节 个人商用房贷款",
+      "knowledge": "风险管理"
+    },
+    {
+      "questionId": "jpl-5156022",
+      "sourceQuestionId": "5156022",
+      "permissionStatus": "可查看",
+      "chapter": "第五章 个人经营类贷款",
+      "section": "第一节 个人经营贷款",
+      "knowledge": "风险管理"
+    },
+    {
+      "questionId": "jpl-5156023",
+      "sourceQuestionId": "5156023",
+      "permissionStatus": "可查看",
+      "chapter": "第五章 个人经营类贷款",
+      "section": "第一节 个人经营贷款",
+      "knowledge": "风险管理"
+    },
+    {
+      "questionId": "jpl-5156024",
+      "sourceQuestionId": "5156024",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第五章 个人经营类贷款",
+      "section": "第一节 个人经营贷款",
+      "knowledge": "风险管理"
+    },
+    {
+      "questionId": "jpl-5156025",
+      "sourceQuestionId": "5156025",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第五章 个人经营类贷款",
+      "section": "第二节 个人商用房贷款",
+      "knowledge": "基础知识"
+    },
+    {
+      "questionId": "jpl-5156026",
+      "sourceQuestionId": "5156026",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第五章 个人经营类贷款",
+      "section": "第二节 个人商用房贷款",
+      "knowledge": "基础知识"
+    },
+    {
+      "questionId": "jpl-5156027",
+      "sourceQuestionId": "5156027",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第五章 个人经营类贷款",
+      "section": "第二节 个人商用房贷款",
+      "knowledge": "风险管理"
+    },
+    {
+      "questionId": "jpl-5156029",
+      "sourceQuestionId": "5156029",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第五章 个人经营类贷款",
+      "section": "第三节 涉农贷款",
+      "knowledge": "农户贷款"
+    },
+    {
+      "questionId": "jpl-5156030",
+      "sourceQuestionId": "5156030",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第五章 个人经营类贷款",
+      "section": "第三节 涉农贷款",
+      "knowledge": "农户贷款"
+    },
+    {
+      "questionId": "jpl-5156031",
+      "sourceQuestionId": "5156031",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第五章 个人经营类贷款",
+      "section": "第二节 个人商用房贷款",
+      "knowledge": "风险管理"
+    },
+    {
+      "questionId": "jpl-5156032",
+      "sourceQuestionId": "5156032",
+      "permissionStatus": "可查看",
+      "chapter": "附录",
+      "section": "个人贷款的监管政策和法规",
+      "knowledge": "农户贷款管理办法"
+    },
+    {
+      "questionId": "jpl-5156033",
+      "sourceQuestionId": "5156033",
+      "permissionStatus": "可查看",
+      "chapter": "第五章 个人经营类贷款",
+      "section": "第三节 涉农贷款",
+      "knowledge": "农户贷款"
+    },
+    {
+      "questionId": "jpl-5156035",
+      "sourceQuestionId": "5156035",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第五章 个人经营类贷款",
+      "section": "第二节 个人商用房贷款",
+      "knowledge": "贷款流程"
+    },
+    {
+      "questionId": "jpl-5156036",
+      "sourceQuestionId": "5156036",
+      "permissionStatus": "可查看",
+      "chapter": "第五章 个人经营类贷款",
+      "section": "第二节 个人商用房贷款",
+      "knowledge": "贷款流程"
+    },
+    {
+      "questionId": "jpl-5156037",
+      "sourceQuestionId": "5156037",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第五章 个人经营类贷款",
+      "section": "第三节 涉农贷款",
+      "knowledge": ""
+    },
+    {
+      "questionId": "jpl-5156039",
+      "sourceQuestionId": "5156039",
+      "permissionStatus": "可查看",
+      "chapter": "第五章 个人经营类贷款",
+      "section": "第一节 个人经营贷款",
+      "knowledge": "基础知识"
+    },
+    {
+      "questionId": "jpl-5156041",
+      "sourceQuestionId": "5156041",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第五章 个人经营类贷款",
+      "section": "第二节 个人商用房贷款",
+      "knowledge": "贷款流程"
+    },
+    {
+      "questionId": "jpl-5156042",
+      "sourceQuestionId": "5156042",
+      "permissionStatus": "可查看",
+      "chapter": "第五章 个人经营类贷款",
+      "section": "第一节 个人经营贷款",
+      "knowledge": "风险管理"
+    },
+    {
+      "questionId": "jpl-5156044",
+      "sourceQuestionId": "5156044",
+      "permissionStatus": "可查看",
+      "chapter": "第五章 个人经营类贷款",
+      "section": "第一节 个人经营贷款",
+      "knowledge": "风险管理"
+    },
+    {
+      "questionId": "jpl-5156047",
+      "sourceQuestionId": "5156047",
+      "permissionStatus": "可查看",
+      "chapter": "第五章 个人经营类贷款",
+      "section": "第二节 个人商用房贷款",
+      "knowledge": "贷款流程"
+    },
+    {
+      "questionId": "jpl-5156048",
+      "sourceQuestionId": "5156048",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第五章 个人经营类贷款",
+      "section": "第一节 个人经营贷款",
+      "knowledge": "基础知识"
+    },
+    {
+      "questionId": "jpl-5156049",
+      "sourceQuestionId": "5156049",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第五章 个人经营类贷款",
+      "section": "第二节 个人商用房贷款",
+      "knowledge": "风险管理"
+    },
+    {
+      "questionId": "jpl-5156050",
+      "sourceQuestionId": "5156050",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第五章 个人经营类贷款",
+      "section": "第二节 个人商用房贷款",
+      "knowledge": "基础知识"
+    },
+    {
+      "questionId": "jpl-5156051",
+      "sourceQuestionId": "5156051",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第五章 个人经营类贷款",
+      "section": "第一节 个人经营贷款",
+      "knowledge": "基础知识"
+    },
+    {
+      "questionId": "jpl-5156053",
+      "sourceQuestionId": "5156053",
+      "permissionStatus": "可查看",
+      "chapter": "第五章 个人经营类贷款",
+      "section": "第一节 个人经营贷款",
+      "knowledge": "贷款流程"
+    },
+    {
+      "questionId": "jpl-5156054",
+      "sourceQuestionId": "5156054",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第五章 个人经营类贷款",
+      "section": "第一节 个人经营贷款",
+      "knowledge": "贷款流程"
+    },
+    {
+      "questionId": "jpl-5156055",
+      "sourceQuestionId": "5156055",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第五章 个人经营类贷款",
+      "section": "第一节 个人经营贷款",
+      "knowledge": "贷款流程"
+    },
+    {
+      "questionId": "jpl-5156056",
+      "sourceQuestionId": "5156056",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第五章 个人经营类贷款",
+      "section": "第一节 个人经营贷款",
+      "knowledge": "贷款流程"
+    },
+    {
+      "questionId": "jpl-5156057",
+      "sourceQuestionId": "5156057",
+      "permissionStatus": "可查看",
+      "chapter": "第五章 个人经营类贷款",
+      "section": "第一节 个人经营贷款",
+      "knowledge": "风险管理"
+    },
+    {
+      "questionId": "jpl-5156058",
+      "sourceQuestionId": "5156058",
+      "permissionStatus": "可查看",
+      "chapter": "第五章 个人经营类贷款",
+      "section": "第一节 个人经营贷款",
+      "knowledge": "风险管理"
+    },
+    {
+      "questionId": "jpl-5156059",
+      "sourceQuestionId": "5156059",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第五章 个人经营类贷款",
+      "section": "第一节 个人经营贷款",
+      "knowledge": "风险管理"
+    },
+    {
+      "questionId": "jpl-5156060",
+      "sourceQuestionId": "5156060",
+      "permissionStatus": "可查看",
+      "chapter": "第五章 个人经营类贷款",
+      "section": "第一节 个人经营贷款",
+      "knowledge": "风险管理"
+    },
+    {
+      "questionId": "jpl-5156061",
+      "sourceQuestionId": "5156061",
+      "permissionStatus": "可查看",
+      "chapter": "第五章 个人经营类贷款",
+      "section": "第一节 个人经营贷款",
+      "knowledge": "贷款流程"
+    },
+    {
+      "questionId": "jpl-5156062",
+      "sourceQuestionId": "5156062",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第五章 个人经营类贷款",
+      "section": "第二节 个人商用房贷款",
+      "knowledge": "贷款流程"
+    },
+    {
+      "questionId": "jpl-5156063",
+      "sourceQuestionId": "5156063",
+      "permissionStatus": "可查看",
+      "chapter": "第五章 个人经营类贷款",
+      "section": "第二节 个人商用房贷款",
+      "knowledge": "贷款流程"
+    },
+    {
+      "questionId": "jpl-5156064",
+      "sourceQuestionId": "5156064",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第五章 个人经营类贷款",
+      "section": "第一节 个人经营贷款",
+      "knowledge": "贷款流程"
+    },
+    {
+      "questionId": "jpl-5156065",
+      "sourceQuestionId": "5156065",
+      "permissionStatus": "可查看",
+      "chapter": "第五章 个人经营类贷款",
+      "section": "第二节 个人商用房贷款",
+      "knowledge": "贷款流程"
+    },
+    {
+      "questionId": "jpl-5156066",
+      "sourceQuestionId": "5156066",
+      "permissionStatus": "可查看",
+      "chapter": "第五章 个人经营类贷款",
+      "section": "第二节 个人商用房贷款",
+      "knowledge": "贷款流程"
+    },
+    {
+      "questionId": "jpl-5156067",
+      "sourceQuestionId": "5156067",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第五章 个人经营类贷款",
+      "section": "第二节 个人商用房贷款",
+      "knowledge": "风险管理"
+    },
+    {
+      "questionId": "jpl-5156068",
+      "sourceQuestionId": "5156068",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第五章 个人经营类贷款",
+      "section": "第二节 个人商用房贷款",
+      "knowledge": "风险管理"
+    },
+    {
+      "questionId": "jpl-5156069",
+      "sourceQuestionId": "5156069",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第五章 个人经营类贷款",
+      "section": "第二节 个人商用房贷款",
+      "knowledge": "风险管理"
+    },
+    {
+      "questionId": "jpl-5156070",
+      "sourceQuestionId": "5156070",
+      "permissionStatus": "可查看",
+      "chapter": "第五章 个人经营类贷款",
+      "section": "第二节 个人商用房贷款",
+      "knowledge": "贷款流程"
+    },
+    {
+      "questionId": "jpl-5156071",
+      "sourceQuestionId": "5156071",
+      "permissionStatus": "可查看",
+      "chapter": "第五章 个人经营类贷款",
+      "section": "第一节 个人经营贷款",
+      "knowledge": "贷款流程"
+    },
+    {
+      "questionId": "jpl-5156072",
+      "sourceQuestionId": "5156072",
+      "permissionStatus": "可查看",
+      "chapter": "第五章 个人经营类贷款",
+      "section": "第二节 个人商用房贷款",
+      "knowledge": "基础知识"
+    },
+    {
+      "questionId": "jpl-5156073",
+      "sourceQuestionId": "5156073",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第五章 个人经营类贷款",
+      "section": "第一节 个人经营贷款",
+      "knowledge": "贷款流程"
+    },
+    {
+      "questionId": "jpl-5156074",
+      "sourceQuestionId": "5156074",
+      "permissionStatus": "可查看",
+      "chapter": "第五章 个人经营类贷款",
+      "section": "第一节 个人经营贷款",
+      "knowledge": "风险管理"
+    },
+    {
+      "questionId": "jpl-5156075",
+      "sourceQuestionId": "5156075",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第五章 个人经营类贷款",
+      "section": "第二节 个人商用房贷款",
+      "knowledge": "风险管理"
+    },
+    {
+      "questionId": "jpl-5156076",
+      "sourceQuestionId": "5156076",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第五章 个人经营类贷款",
+      "section": "第一节 个人经营贷款",
+      "knowledge": "基础知识"
+    },
+    {
+      "questionId": "jpl-5156077",
+      "sourceQuestionId": "5156077",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第五章 个人经营类贷款",
+      "section": "第二节 个人商用房贷款",
+      "knowledge": "基础知识"
+    },
+    {
+      "questionId": "jpl-5156078",
+      "sourceQuestionId": "5156078",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第五章 个人经营类贷款",
+      "section": "第一节 个人经营贷款",
+      "knowledge": "风险管理"
+    },
+    {
+      "questionId": "jpl-5156079",
+      "sourceQuestionId": "5156079",
+      "permissionStatus": "可查看",
+      "chapter": "第五章 个人经营类贷款",
+      "section": "第一节 个人经营贷款",
+      "knowledge": "风险管理"
+    },
+    {
+      "questionId": "jpl-5156080",
+      "sourceQuestionId": "5156080",
+      "permissionStatus": "可查看",
+      "chapter": "第五章 个人经营类贷款",
+      "section": "第三节 涉农贷款",
+      "knowledge": "农户贷款"
+    },
+    {
+      "questionId": "jpl-5156081",
+      "sourceQuestionId": "5156081",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第五章 个人经营类贷款",
+      "section": "第二节 个人商用房贷款",
+      "knowledge": "基础知识"
+    },
+    {
+      "questionId": "jpl-5156082",
+      "sourceQuestionId": "5156082",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第五章 个人经营类贷款",
+      "section": "第三节 涉农贷款",
+      "knowledge": ""
+    },
+    {
+      "questionId": "jpl-5156083",
+      "sourceQuestionId": "5156083",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第六章 信用卡业务",
+      "section": "第二节 信用卡业务流程",
+      "knowledge": "信用卡的使用"
+    },
+    {
+      "questionId": "jpl-5156084",
+      "sourceQuestionId": "5156084",
+      "permissionStatus": "可查看",
+      "chapter": "第六章 信用卡业务",
+      "section": "第一节 信用卡概述",
+      "knowledge": "信用卡的产生和发展"
+    },
+    {
+      "questionId": "jpl-5156085",
+      "sourceQuestionId": "5156085",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第六章 信用卡业务",
+      "section": "第一节 信用卡概述",
+      "knowledge": "信用卡的产生和发展"
+    },
+    {
+      "questionId": "jpl-5156086",
+      "sourceQuestionId": "5156086",
+      "permissionStatus": "可查看",
+      "chapter": "第六章 信用卡业务",
+      "section": "第一节 信用卡概述",
+      "knowledge": "信用卡的产生和发展"
+    },
+    {
+      "questionId": "jpl-5156087",
+      "sourceQuestionId": "5156087",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第六章 信用卡业务",
+      "section": "第一节 信用卡概述",
+      "knowledge": "信用卡业务与一般个人贷款业务的异同"
+    },
+    {
+      "questionId": "jpl-5156089",
+      "sourceQuestionId": "5156089",
+      "permissionStatus": "可查看",
+      "chapter": "第六章 信用卡业务",
+      "section": "第二节 信用卡业务流程",
+      "knowledge": "信用卡的使用"
+    },
+    {
+      "questionId": "jpl-5156091",
+      "sourceQuestionId": "5156091",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第六章 信用卡业务",
+      "section": "第二节 信用卡业务流程",
+      "knowledge": "信用卡的使用"
+    },
+    {
+      "questionId": "jpl-5156093",
+      "sourceQuestionId": "5156093",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第六章 信用卡业务",
+      "section": "第三节 分期付款业务",
+      "knowledge": "定义及基本规定"
+    },
+    {
+      "questionId": "jpl-5156094",
+      "sourceQuestionId": "5156094",
+      "permissionStatus": "可查看",
+      "chapter": "第六章 信用卡业务",
+      "section": "第三节 分期付款业务",
+      "knowledge": "分期业务的分类"
+    },
+    {
+      "questionId": "jpl-5156095",
+      "sourceQuestionId": "5156095",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第六章 信用卡业务",
+      "section": "第一节 信用卡概述",
+      "knowledge": "信用卡业务与一般个人贷款业务的异同"
+    },
+    {
+      "questionId": "jpl-5156096",
+      "sourceQuestionId": "5156096",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第六章 信用卡业务",
+      "section": "第一节 信用卡概述",
+      "knowledge": "定义"
+    },
+    {
+      "questionId": "jpl-5156097",
+      "sourceQuestionId": "5156097",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第六章 信用卡业务",
+      "section": "第一节 信用卡概述",
+      "knowledge": "定义"
+    },
+    {
+      "questionId": "jpl-5156099",
+      "sourceQuestionId": "5156099",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第六章 信用卡业务",
+      "section": "第二节 信用卡业务流程",
+      "knowledge": "信用卡申请"
+    },
+    {
+      "questionId": "jpl-5156100",
+      "sourceQuestionId": "5156100",
+      "permissionStatus": "可查看",
+      "chapter": "第六章 信用卡业务",
+      "section": "第二节 信用卡业务流程",
+      "knowledge": "信用卡的使用"
+    },
+    {
+      "questionId": "jpl-5156101",
+      "sourceQuestionId": "5156101",
+      "permissionStatus": "可查看",
+      "chapter": "第六章 信用卡业务",
+      "section": "第二节 信用卡业务流程",
+      "knowledge": "信用卡的使用"
+    },
+    {
+      "questionId": "jpl-5156102",
+      "sourceQuestionId": "5156102",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第六章 信用卡业务",
+      "section": "第三节 分期付款业务",
+      "knowledge": "定义及基本规定"
+    },
+    {
+      "questionId": "jpl-5156103",
+      "sourceQuestionId": "5156103",
+      "permissionStatus": "可查看",
+      "chapter": "第六章 信用卡业务",
+      "section": "第三节 分期付款业务",
+      "knowledge": "分期业务的分类"
+    },
+    {
+      "questionId": "jpl-5156104",
+      "sourceQuestionId": "5156104",
+      "permissionStatus": "可查看",
+      "chapter": "第六章 信用卡业务",
+      "section": "第四节 风险管理",
+      "knowledge": ""
+    },
+    {
+      "questionId": "jpl-5156105",
+      "sourceQuestionId": "5156105",
+      "permissionStatus": "可查看",
+      "chapter": "第六章 信用卡业务",
+      "section": "第四节 风险管理",
+      "knowledge": "信用卡催收"
+    },
+    {
+      "questionId": "jpl-5156106",
+      "sourceQuestionId": "5156106",
+      "permissionStatus": "可查看",
+      "chapter": "第六章 信用卡业务",
+      "section": "第四节 风险管理",
+      "knowledge": "逾期资产处置"
+    },
+    {
+      "questionId": "jpl-5156108",
+      "sourceQuestionId": "5156108",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第六章 信用卡业务",
+      "section": "第六节 信用卡业务的发展趋势",
+      "knowledge": ""
+    },
+    {
+      "questionId": "jpl-5156109",
+      "sourceQuestionId": "5156109",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第六章 信用卡业务",
+      "section": "第一节 信用卡概述",
+      "knowledge": "信用卡的分类"
+    },
+    {
+      "questionId": "jpl-5156110",
+      "sourceQuestionId": "5156110",
+      "permissionStatus": "可查看",
+      "chapter": "第六章 信用卡业务",
+      "section": "第一节 信用卡概述",
+      "knowledge": "信用卡业务与一般个人贷款业务的异同"
+    },
+    {
+      "questionId": "jpl-5156112",
+      "sourceQuestionId": "5156112",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第六章 信用卡业务",
+      "section": "第一节 信用卡概述",
+      "knowledge": "信用卡业务与一般个人贷款业务的异同"
+    },
+    {
+      "questionId": "jpl-5156113",
+      "sourceQuestionId": "5156113",
+      "permissionStatus": "可查看",
+      "chapter": "第六章 信用卡业务",
+      "section": "第一节 信用卡概述",
+      "knowledge": "信用卡业务与一般个人贷款业务的异同"
+    },
+    {
+      "questionId": "jpl-5156114",
+      "sourceQuestionId": "5156114",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第六章 信用卡业务",
+      "section": "第二节 信用卡业务流程",
+      "knowledge": "信用卡申请"
+    },
+    {
+      "questionId": "jpl-5156115",
+      "sourceQuestionId": "5156115",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第六章 信用卡业务",
+      "section": "第二节 信用卡业务流程",
+      "knowledge": "信用卡申请"
+    },
+    {
+      "questionId": "jpl-5156116",
+      "sourceQuestionId": "5156116",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第六章 信用卡业务",
+      "section": "第二节 信用卡业务流程",
+      "knowledge": "信用卡调查、授信审批"
+    },
+    {
+      "questionId": "jpl-5156117",
+      "sourceQuestionId": "5156117",
+      "permissionStatus": "可查看",
+      "chapter": "第六章 信用卡业务",
+      "section": "第二节 信用卡业务流程",
+      "knowledge": "信用卡的使用"
+    },
+    {
+      "questionId": "jpl-5156119",
+      "sourceQuestionId": "5156119",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第六章 信用卡业务",
+      "section": "第二节 信用卡业务流程",
+      "knowledge": "信用卡的使用"
+    },
+    {
+      "questionId": "jpl-5156120",
+      "sourceQuestionId": "5156120",
+      "permissionStatus": "可查看",
+      "chapter": "第六章 信用卡业务",
+      "section": "第二节 信用卡业务流程",
+      "knowledge": "信用卡的使用"
+    },
+    {
+      "questionId": "jpl-5156121",
+      "sourceQuestionId": "5156121",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第六章 信用卡业务",
+      "section": "第二节 信用卡业务流程",
+      "knowledge": "信用卡的使用"
+    },
+    {
+      "questionId": "jpl-5156122",
+      "sourceQuestionId": "5156122",
+      "permissionStatus": "可查看",
+      "chapter": "第六章 信用卡业务",
+      "section": "第二节 信用卡业务流程",
+      "knowledge": "信用卡的使用"
+    },
+    {
+      "questionId": "jpl-5156123",
+      "sourceQuestionId": "5156123",
+      "permissionStatus": "可查看",
+      "chapter": "第六章 信用卡业务",
+      "section": "第二节 信用卡业务流程",
+      "knowledge": "信用卡的使用"
+    },
+    {
+      "questionId": "jpl-5156124",
+      "sourceQuestionId": "5156124",
+      "permissionStatus": "可查看",
+      "chapter": "第六章 信用卡业务",
+      "section": "第二节 信用卡业务流程",
+      "knowledge": "信用卡的使用"
+    },
+    {
+      "questionId": "jpl-5156125",
+      "sourceQuestionId": "5156125",
+      "permissionStatus": "可查看",
+      "chapter": "第六章 信用卡业务",
+      "section": "第二节 信用卡业务流程",
+      "knowledge": "信用卡的使用"
+    },
+    {
+      "questionId": "jpl-5156126",
+      "sourceQuestionId": "5156126",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第六章 信用卡业务",
+      "section": "第三节 分期付款业务",
+      "knowledge": "定义及基本规定"
+    },
+    {
+      "questionId": "jpl-5156127",
+      "sourceQuestionId": "5156127",
+      "permissionStatus": "可查看",
+      "chapter": "第六章 信用卡业务",
+      "section": "第三节 分期付款业务",
+      "knowledge": "定义及基本规定"
+    },
+    {
+      "questionId": "jpl-5156128",
+      "sourceQuestionId": "5156128",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第六章 信用卡业务",
+      "section": "第三节 分期付款业务",
+      "knowledge": "定义及基本规定"
+    },
+    {
+      "questionId": "jpl-5156129",
+      "sourceQuestionId": "5156129",
+      "permissionStatus": "可查看",
+      "chapter": "第六章 信用卡业务",
+      "section": "第四节 风险管理",
+      "knowledge": ""
+    },
+    {
+      "questionId": "jpl-5156130",
+      "sourceQuestionId": "5156130",
+      "permissionStatus": "可查看",
+      "chapter": "第六章 信用卡业务",
+      "section": "第四节 风险管理",
+      "knowledge": "信用卡催收"
+    },
+    {
+      "questionId": "jpl-5156131",
+      "sourceQuestionId": "5156131",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第六章 信用卡业务",
+      "section": "第六节 信用卡业务的发展趋势",
+      "knowledge": ""
+    },
+    {
+      "questionId": "jpl-5156132",
+      "sourceQuestionId": "5156132",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第六章 信用卡业务",
+      "section": "第六节 信用卡业务的发展趋势",
+      "knowledge": ""
+    },
+    {
+      "questionId": "jpl-5156134",
+      "sourceQuestionId": "5156134",
+      "permissionStatus": "可查看",
+      "chapter": "第八章 个人征信系统",
+      "section": "第二节 个人征信系统的管理及应用",
+      "knowledge": "个人征信报告内容介绍"
+    },
+    {
+      "questionId": "jpl-5156135",
+      "sourceQuestionId": "5156135",
+      "permissionStatus": "可查看",
+      "chapter": "第八章 个人征信系统",
+      "section": "第二节 个人征信系统的管理及应用",
+      "knowledge": "个人征信系统的信息查询"
+    },
+    {
+      "questionId": "jpl-5156137",
+      "sourceQuestionId": "5156137",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第八章 个人征信系统",
+      "section": "第二节 个人征信系统的管理及应用",
+      "knowledge": "个人征信系统的信息查询"
+    },
+    {
+      "questionId": "jpl-5156140",
+      "sourceQuestionId": "5156140",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第八章 个人征信系统",
+      "section": "第二节 个人征信系统的管理及应用",
+      "knowledge": "个人征信报告异议处理"
+    },
+    {
+      "questionId": "jpl-5156141",
+      "sourceQuestionId": "5156141",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第八章 个人征信系统",
+      "section": "第一节 概述",
+      "knowledge": "个人征信系统的含义和内容"
+    },
+    {
+      "questionId": "jpl-5156143",
+      "sourceQuestionId": "5156143",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第八章 个人征信系统",
+      "section": "第二节 个人征信系统的管理及应用",
+      "knowledge": "个人征信报告异议处理"
+    },
+    {
+      "questionId": "jpl-5156145",
+      "sourceQuestionId": "5156145",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第八章 个人征信系统",
+      "section": "第一节 概述",
+      "knowledge": "个人征信系统的含义和内容"
+    },
+    {
+      "questionId": "jpl-5156146",
+      "sourceQuestionId": "5156146",
+      "permissionStatus": "可查看",
+      "chapter": "第八章 个人征信系统",
+      "section": "第二节 个人征信系统的管理及应用",
+      "knowledge": "个人征信报告异议处理"
+    },
+    {
+      "questionId": "jpl-5156147",
+      "sourceQuestionId": "5156147",
+      "permissionStatus": "可查看",
+      "chapter": "第八章 个人征信系统",
+      "section": "第一节 概述",
+      "knowledge": "个人征信系统的含义和内容"
+    },
+    {
+      "questionId": "jpl-5156149",
+      "sourceQuestionId": "5156149",
+      "permissionStatus": "可查看",
+      "chapter": "第八章 个人征信系统",
+      "section": "第一节 概述",
+      "knowledge": "个人征信的相关法律法规"
+    },
+    {
+      "questionId": "jpl-5156150",
+      "sourceQuestionId": "5156150",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第八章 个人征信系统",
+      "section": "第二节 个人征信系统的管理及应用",
+      "knowledge": "个人征信系统的信息查询"
+    },
+    {
+      "questionId": "jpl-5156151",
+      "sourceQuestionId": "5156151",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第八章 个人征信系统",
+      "section": "第二节 个人征信系统的管理及应用",
+      "knowledge": "个人征信系统的信息查询"
+    },
+    {
+      "questionId": "jpl-5156152",
+      "sourceQuestionId": "5156152",
+      "permissionStatus": "可查看",
+      "chapter": "第八章 个人征信系统",
+      "section": "第二节 个人征信系统的管理及应用",
+      "knowledge": "个人征信系统的信息查询"
+    },
+    {
+      "questionId": "jpl-5156153",
+      "sourceQuestionId": "5156153",
+      "permissionStatus": "可查看",
+      "chapter": "第八章 个人征信系统",
+      "section": "第二节 个人征信系统的管理及应用",
+      "knowledge": "个人征信报告异议处理"
+    },
+    {
+      "questionId": "jpl-5156154",
+      "sourceQuestionId": "5156154",
+      "permissionStatus": "可查看",
+      "chapter": "第八章 个人征信系统",
+      "section": "第二节 个人征信系统的管理及应用",
+      "knowledge": "个人征信报告内容介绍"
+    },
+    {
+      "questionId": "jpl-5156156",
+      "sourceQuestionId": "5156156",
+      "permissionStatus": "可查看",
+      "chapter": "第八章 个人征信系统",
+      "section": "第二节 个人征信系统的管理及应用",
+      "knowledge": "个人征信报告异议处理"
+    },
+    {
+      "questionId": "jpl-5156157",
+      "sourceQuestionId": "5156157",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第八章 个人征信系统",
+      "section": "第二节 个人征信系统的管理及应用",
+      "knowledge": "个人征信系统的信息查询"
+    },
+    {
+      "questionId": "jpl-5156158",
+      "sourceQuestionId": "5156158",
+      "permissionStatus": "可查看",
+      "chapter": "第八章 个人征信系统",
+      "section": "第一节 概述",
+      "knowledge": "个人征信的相关法律法规"
+    },
+    {
+      "questionId": "jpl-5156159",
+      "sourceQuestionId": "5156159",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第八章 个人征信系统",
+      "section": "第二节 个人征信系统的管理及应用",
+      "knowledge": "个人征信报告异议处理"
+    },
+    {
+      "questionId": "jpl-5156160",
+      "sourceQuestionId": "5156160",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第八章 个人征信系统",
+      "section": "第一节 概述",
+      "knowledge": "个人征信系统的含义和内容"
+    },
+    {
+      "questionId": "jpl-5156161",
+      "sourceQuestionId": "5156161",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第三章 个人住房贷款",
+      "section": "第三节 个人住房贷款风险管理",
+      "knowledge": "合作机构风险管理"
+    },
+    {
+      "questionId": "jpl-5156162",
+      "sourceQuestionId": "5156162",
+      "permissionStatus": "可查看",
+      "chapter": "第八章 个人征信系统",
+      "section": "第一节 概述",
+      "knowledge": "个人征信系统的主要功能和意义"
+    },
+    {
+      "questionId": "jpl-5156163",
+      "sourceQuestionId": "5156163",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第八章 个人征信系统",
+      "section": "第一节 概述",
+      "knowledge": "个人征信系统的主要功能和意义"
+    },
+    {
+      "questionId": "jpl-5156164",
+      "sourceQuestionId": "5156164",
+      "permissionStatus": "可查看",
+      "chapter": "第八章 个人征信系统",
+      "section": "第二节 个人征信系统的管理及应用",
+      "knowledge": "个人征信报告内容介绍"
+    },
+    {
+      "questionId": "jpl-5376234",
+      "sourceQuestionId": "5376234",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第一章 个人贷款概述",
+      "section": "第一节 个人贷款的性质和发展",
+      "knowledge": "个人贷款的发展历程"
+    },
+    {
+      "questionId": "jpl-5376249",
+      "sourceQuestionId": "5376249",
+      "permissionStatus": "可查看",
+      "chapter": "第一章 个人贷款概述",
+      "section": "第二节 个人贷款产品的种类",
+      "knowledge": "按有无担保分类"
+    },
+    {
+      "questionId": "jpl-5376281",
+      "sourceQuestionId": "5376281",
+      "permissionStatus": "可查看",
+      "chapter": "附录",
+      "section": "个人贷款的监管政策和法规",
+      "knowledge": "与个人贷款相关的政策法规"
+    },
+    {
+      "questionId": "jpl-5376302",
+      "sourceQuestionId": "5376302",
+      "permissionStatus": "可查看",
+      "chapter": "第一章 个人贷款概述",
+      "section": "第二节 个人贷款产品的种类",
+      "knowledge": "按有无担保分类"
+    },
+    {
+      "questionId": "jpl-5376310",
+      "sourceQuestionId": "5376310",
+      "permissionStatus": "可查看",
+      "chapter": "第一章 个人贷款概述",
+      "section": "第二节 个人贷款产品的种类",
+      "knowledge": "按有无担保分类"
+    },
+    {
+      "questionId": "jpl-5376314",
+      "sourceQuestionId": "5376314",
+      "permissionStatus": "可查看",
+      "chapter": "第一章 个人贷款概述",
+      "section": "第一节 个人贷款的性质和发展",
+      "knowledge": "个人贷款的特征"
+    },
+    {
+      "questionId": "jpl-5376317",
+      "sourceQuestionId": "5376317",
+      "permissionStatus": "可查看",
+      "chapter": "附录",
+      "section": "个人贷款的相关法律",
+      "knowledge": "中华人民共和国民法典"
+    },
+    {
+      "questionId": "jpl-5376348",
+      "sourceQuestionId": "5376348",
+      "permissionStatus": "可查看",
+      "chapter": "第二章 个人贷款管理",
+      "section": "第二节 个人贷款流程",
+      "knowledge": "贷款的受理与调查"
+    },
+    {
+      "questionId": "jpl-5376353",
+      "sourceQuestionId": "5376353",
+      "permissionStatus": "可查看",
+      "chapter": "第二章 个人贷款管理",
+      "section": "第二节 个人贷款流程",
+      "knowledge": "贷款的审查与审批"
+    },
+    {
+      "questionId": "jpl-5376359",
+      "sourceQuestionId": "5376359",
+      "permissionStatus": "可查看",
+      "chapter": "第二章 个人贷款管理",
+      "section": "第二节 个人贷款流程",
+      "knowledge": "贷后管理"
+    },
+    {
+      "questionId": "jpl-5376367",
+      "sourceQuestionId": "5376367",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第二章 个人贷款管理",
+      "section": "第二节 个人贷款流程",
+      "knowledge": "贷后管理"
+    },
+    {
+      "questionId": "jpl-5376368",
+      "sourceQuestionId": "5376368",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第二章 个人贷款管理",
+      "section": "第二节 个人贷款流程",
+      "knowledge": "贷款的受理与调查"
+    },
+    {
+      "questionId": "jpl-5376379",
+      "sourceQuestionId": "5376379",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第三章 个人住房贷款",
+      "section": "第三节 个人住房贷款风险管理",
+      "knowledge": "合作机构风险管理"
+    },
+    {
+      "questionId": "jpl-5376383",
+      "sourceQuestionId": "5376383",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "附录",
+      "section": "个人贷款的监管政策和法规",
+      "knowledge": "与个人贷款相关的政策法规"
+    },
+    {
+      "questionId": "jpl-5376384",
+      "sourceQuestionId": "5376384",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第二章 个人贷款管理",
+      "section": "第二节 个人贷款流程",
+      "knowledge": "贷款的受理与调查"
+    },
+    {
+      "questionId": "jpl-5376396",
+      "sourceQuestionId": "5376396",
+      "permissionStatus": "可查看",
+      "chapter": "第二章 个人贷款管理",
+      "section": "第四节 个人贷款定价管理",
+      "knowledge": "个人贷款定价原则"
+    },
+    {
+      "questionId": "jpl-5376399",
+      "sourceQuestionId": "5376399",
+      "permissionStatus": "可查看",
+      "chapter": "第二章 个人贷款管理",
+      "section": "第四节 个人贷款定价管理",
+      "knowledge": "个人贷款定价影响因素"
+    },
+    {
+      "questionId": "jpl-5376400",
+      "sourceQuestionId": "5376400",
+      "permissionStatus": "可查看",
+      "chapter": "第二章 个人贷款管理",
+      "section": "第四节 个人贷款定价管理",
+      "knowledge": "个人贷款定价原则"
+    },
+    {
+      "questionId": "jpl-5376413",
+      "sourceQuestionId": "5376413",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第二章 个人贷款管理",
+      "section": "第五节 个人贷款风险管理",
+      "knowledge": "信用风险管理"
+    },
+    {
+      "questionId": "jpl-5376415",
+      "sourceQuestionId": "5376415",
+      "permissionStatus": "可查看",
+      "chapter": "第二章 个人贷款管理",
+      "section": "第五节 个人贷款风险管理",
+      "knowledge": "信用风险管理"
+    },
+    {
+      "questionId": "jpl-5377636",
+      "sourceQuestionId": "5377636",
+      "permissionStatus": "可查看",
+      "chapter": "第三章 个人住房贷款",
+      "section": "第一节 个人住房贷款基础知识",
+      "knowledge": "基础知识"
+    },
+    {
+      "questionId": "jpl-5377638",
+      "sourceQuestionId": "5377638",
+      "permissionStatus": "可查看",
+      "chapter": "第三章 个人住房贷款",
+      "section": "第一节 个人住房贷款基础知识",
+      "knowledge": "基础知识"
+    },
+    {
+      "questionId": "jpl-5377695",
+      "sourceQuestionId": "5377695",
+      "permissionStatus": "可查看",
+      "chapter": "第三章 个人住房贷款",
+      "section": "第二节 个人住房贷款流程",
+      "knowledge": "单笔贷款流程"
+    },
+    {
+      "questionId": "jpl-5377700",
+      "sourceQuestionId": "5377700",
+      "permissionStatus": "可查看",
+      "chapter": "第二章 个人贷款管理",
+      "section": "第二节 个人贷款流程",
+      "knowledge": "贷款的审查与审批"
+    },
+    {
+      "questionId": "jpl-5377701",
+      "sourceQuestionId": "5377701",
+      "permissionStatus": "可查看",
+      "chapter": "第三章 个人住房贷款",
+      "section": "第一节 个人住房贷款基础知识",
+      "knowledge": "基础知识"
+    },
+    {
+      "questionId": "jpl-5377705",
+      "sourceQuestionId": "5377705",
+      "permissionStatus": "可查看",
+      "chapter": "第三章 个人住房贷款",
+      "section": "第二节 个人住房贷款流程",
+      "knowledge": "单笔贷款流程"
+    },
+    {
+      "questionId": "jpl-5377709",
+      "sourceQuestionId": "5377709",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第二章 个人贷款管理",
+      "section": "第二节 个人贷款流程",
+      "knowledge": "贷款的签约与发放"
+    },
+    {
+      "questionId": "jpl-5377710",
+      "sourceQuestionId": "5377710",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "附录",
+      "section": "个人贷款的监管政策和法规",
+      "knowledge": "与个人贷款相关的政策法规"
+    },
+    {
+      "questionId": "jpl-5377722",
+      "sourceQuestionId": "5377722",
+      "permissionStatus": "可查看",
+      "chapter": "第三章 个人住房贷款",
+      "section": "第三节 个人住房贷款风险管理",
+      "knowledge": "合作机构风险管理"
+    },
+    {
+      "questionId": "jpl-5377731",
+      "sourceQuestionId": "5377731",
+      "permissionStatus": "可查看",
+      "chapter": "第二章 个人贷款管理",
+      "section": "第五节 个人贷款风险管理",
+      "knowledge": "风险管理概述"
+    },
+    {
+      "questionId": "jpl-5377745",
+      "sourceQuestionId": "5377745",
+      "permissionStatus": "可查看",
+      "chapter": "第三章 个人住房贷款",
+      "section": "第三节 个人住房贷款风险管理",
+      "knowledge": "信用风险管理"
+    },
+    {
+      "questionId": "jpl-5377765",
+      "sourceQuestionId": "5377765",
+      "permissionStatus": "可查看",
+      "chapter": "第三章 个人住房贷款",
+      "section": "第三节 个人住房贷款风险管理",
+      "knowledge": "操作风险管理"
+    },
+    {
+      "questionId": "jpl-5377773",
+      "sourceQuestionId": "5377773",
+      "permissionStatus": "可查看",
+      "chapter": "第三章 个人住房贷款",
+      "section": "第三节 个人住房贷款风险管理",
+      "knowledge": "操作风险管理"
+    },
+    {
+      "questionId": "jpl-5377790",
+      "sourceQuestionId": "5377790",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第三章 个人住房贷款",
+      "section": "第三节 个人住房贷款风险管理",
+      "knowledge": "操作风险管理"
+    },
+    {
+      "questionId": "jpl-5377811",
+      "sourceQuestionId": "5377811",
+      "permissionStatus": "可查看",
+      "chapter": "第三章 个人住房贷款",
+      "section": "第四节 公积金个人住房贷款",
+      "knowledge": "贷款流程"
+    },
+    {
+      "questionId": "jpl-5377819",
+      "sourceQuestionId": "5377819",
+      "permissionStatus": "可查看",
+      "chapter": "第一章 个人贷款概述",
+      "section": "第二节 个人贷款产品的种类",
+      "knowledge": "按产品用途分类"
+    },
+    {
+      "questionId": "jpl-5377822",
+      "sourceQuestionId": "5377822",
+      "permissionStatus": "可查看",
+      "chapter": "第三章 个人住房贷款",
+      "section": "第四节 公积金个人住房贷款",
+      "knowledge": "基础知识"
+    },
+    {
+      "questionId": "jpl-5377825",
+      "sourceQuestionId": "5377825",
+      "permissionStatus": "可查看",
+      "chapter": "第三章 个人住房贷款",
+      "section": "第四节 公积金个人住房贷款",
+      "knowledge": "基础知识"
+    },
+    {
+      "questionId": "jpl-5377826",
+      "sourceQuestionId": "5377826",
+      "permissionStatus": "可查看",
+      "chapter": "第三章 个人住房贷款",
+      "section": "第四节 公积金个人住房贷款",
+      "knowledge": "基础知识"
+    },
+    {
+      "questionId": "jpl-5377828",
+      "sourceQuestionId": "5377828",
+      "permissionStatus": "可查看",
+      "chapter": "第三章 个人住房贷款",
+      "section": "第四节 公积金个人住房贷款",
+      "knowledge": "贷款流程"
+    },
+    {
+      "questionId": "jpl-5377831",
+      "sourceQuestionId": "5377831",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第三章 个人住房贷款",
+      "section": "第四节 公积金个人住房贷款",
+      "knowledge": "贷款流程"
+    },
+    {
+      "questionId": "jpl-5377880",
+      "sourceQuestionId": "5377880",
+      "permissionStatus": "可查看",
+      "chapter": "第四章 个人消费类贷款",
+      "section": "第一节 个人汽车贷款",
+      "knowledge": "风险管理"
+    },
+    {
+      "questionId": "jpl-5377887",
+      "sourceQuestionId": "5377887",
+      "permissionStatus": "可查看",
+      "chapter": "第四章 个人消费类贷款",
+      "section": "第一节 个人汽车贷款",
+      "knowledge": "贷款流程"
+    },
+    {
+      "questionId": "jpl-5377901",
+      "sourceQuestionId": "5377901",
+      "permissionStatus": "可查看",
+      "chapter": "第四章 个人消费类贷款",
+      "section": "第一节 个人汽车贷款",
+      "knowledge": "基础知识"
+    },
+    {
+      "questionId": "jpl-5377905",
+      "sourceQuestionId": "5377905",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第四章 个人消费类贷款",
+      "section": "第一节 个人汽车贷款",
+      "knowledge": "贷款流程"
+    },
+    {
+      "questionId": "jpl-5377906",
+      "sourceQuestionId": "5377906",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第二章 个人贷款管理",
+      "section": "第二节 个人贷款流程",
+      "knowledge": "贷款的签约与发放"
+    },
+    {
+      "questionId": "jpl-5377918",
+      "sourceQuestionId": "5377918",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第四章 个人消费类贷款",
+      "section": "第一节 个人汽车贷款",
+      "knowledge": "基础知识"
+    },
+    {
+      "questionId": "jpl-5377923",
+      "sourceQuestionId": "5377923",
+      "permissionStatus": "可查看",
+      "chapter": "第二章 个人贷款管理",
+      "section": "第二节 个人贷款流程",
+      "knowledge": "贷款的受理与调查"
+    },
+    {
+      "questionId": "jpl-5377926",
+      "sourceQuestionId": "5377926",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第四章 个人消费类贷款",
+      "section": "第一节 个人汽车贷款",
+      "knowledge": "贷款流程"
+    },
+    {
+      "questionId": "jpl-5377927",
+      "sourceQuestionId": "5377927",
+      "permissionStatus": "可查看",
+      "chapter": "第四章 个人消费类贷款",
+      "section": "第一节 个人汽车贷款",
+      "knowledge": "贷款流程"
+    },
+    {
+      "questionId": "jpl-5377929",
+      "sourceQuestionId": "5377929",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第二章 个人贷款管理",
+      "section": "第二节 个人贷款流程",
+      "knowledge": "贷后管理"
+    },
+    {
+      "questionId": "jpl-5377932",
+      "sourceQuestionId": "5377932",
+      "permissionStatus": "可查看",
+      "chapter": "第四章 个人消费类贷款",
+      "section": "第一节 个人汽车贷款",
+      "knowledge": "风险管理"
+    },
+    {
+      "questionId": "jpl-5377933",
+      "sourceQuestionId": "5377933",
+      "permissionStatus": "可查看",
+      "chapter": "第四章 个人消费类贷款",
+      "section": "第一节 个人汽车贷款",
+      "knowledge": "风险管理"
+    },
+    {
+      "questionId": "jpl-5377934",
+      "sourceQuestionId": "5377934",
+      "permissionStatus": "可查看",
+      "chapter": "第四章 个人消费类贷款",
+      "section": "第一节 个人汽车贷款",
+      "knowledge": "风险管理"
+    },
+    {
+      "questionId": "jpl-5377937",
+      "sourceQuestionId": "5377937",
+      "permissionStatus": "可查看",
+      "chapter": "第四章 个人消费类贷款",
+      "section": "第一节 个人汽车贷款",
+      "knowledge": "风险管理"
+    },
+    {
+      "questionId": "jpl-5377949",
+      "sourceQuestionId": "5377949",
+      "permissionStatus": "可查看",
+      "chapter": "附录",
+      "section": "个人贷款的监管政策和法规",
+      "knowledge": "与个人教育贷款相关的政策和法规"
+    },
+    {
+      "questionId": "jpl-5377953",
+      "sourceQuestionId": "5377953",
+      "permissionStatus": "可查看",
+      "chapter": "第四章 个人消费类贷款",
+      "section": "第二节 个人教育贷款",
+      "knowledge": "基础知识"
+    },
+    {
+      "questionId": "jpl-5377962",
+      "sourceQuestionId": "5377962",
+      "permissionStatus": "可查看",
+      "chapter": "第四章 个人消费类贷款",
+      "section": "第二节 个人教育贷款",
+      "knowledge": "贷款流程"
+    },
+    {
+      "questionId": "jpl-5377973",
+      "sourceQuestionId": "5377973",
+      "permissionStatus": "可查看",
+      "chapter": "第四章 个人消费类贷款",
+      "section": "第二节 个人教育贷款",
+      "knowledge": "基础知识"
+    },
+    {
+      "questionId": "jpl-5377977",
+      "sourceQuestionId": "5377977",
+      "permissionStatus": "可查看",
+      "chapter": "附录",
+      "section": "个人贷款的监管政策和法规",
+      "knowledge": "与个人教育贷款相关的政策和法规"
+    },
+    {
+      "questionId": "jpl-5377998",
+      "sourceQuestionId": "5377998",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第二章 个人贷款管理",
+      "section": "第二节 个人贷款流程",
+      "knowledge": "贷款的受理与调查"
+    },
+    {
+      "questionId": "jpl-5378001",
+      "sourceQuestionId": "5378001",
+      "permissionStatus": "可查看",
+      "chapter": "第二章 个人贷款管理",
+      "section": "第二节 个人贷款流程",
+      "knowledge": "贷款的签约与发放"
+    },
+    {
+      "questionId": "jpl-5378020",
+      "sourceQuestionId": "5378020",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第四章 个人消费类贷款",
+      "section": "第二节 个人教育贷款",
+      "knowledge": "基础知识"
+    },
+    {
+      "questionId": "jpl-5378021",
+      "sourceQuestionId": "5378021",
+      "permissionStatus": "可查看",
+      "chapter": "第五章 个人经营类贷款",
+      "section": "第一节 个人经营贷款",
+      "knowledge": "风险管理"
+    },
+    {
+      "questionId": "jpl-5378023",
+      "sourceQuestionId": "5378023",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "附录",
+      "section": "个人贷款的监管政策和法规",
+      "knowledge": "与个人教育贷款相关的政策和法规"
+    },
+    {
+      "questionId": "jpl-5378036",
+      "sourceQuestionId": "5378036",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第四章 个人消费类贷款",
+      "section": "第二节 个人教育贷款",
+      "knowledge": "风险管理"
+    },
+    {
+      "questionId": "jpl-5378073",
+      "sourceQuestionId": "5378073",
+      "permissionStatus": "可查看",
+      "chapter": "第五章 个人经营类贷款",
+      "section": "第二节 个人商用房贷款",
+      "knowledge": "风险管理"
+    },
+    {
+      "questionId": "jpl-5378087",
+      "sourceQuestionId": "5378087",
+      "permissionStatus": "可查看",
+      "chapter": "第五章 个人经营类贷款",
+      "section": "第一节 个人经营贷款",
+      "knowledge": "贷款流程"
+    },
+    {
+      "questionId": "jpl-5378090",
+      "sourceQuestionId": "5378090",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第四章 个人消费类贷款",
+      "section": "第一节 个人汽车贷款",
+      "knowledge": "贷款流程"
+    },
+    {
+      "questionId": "jpl-5378097",
+      "sourceQuestionId": "5378097",
+      "permissionStatus": "可查看",
+      "chapter": "第二章 个人贷款管理",
+      "section": "第二节 个人贷款流程",
+      "knowledge": "贷后管理"
+    },
+    {
+      "questionId": "jpl-5378115",
+      "sourceQuestionId": "5378115",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第五章 个人经营类贷款",
+      "section": "第二节 个人商用房贷款",
+      "knowledge": "基础知识"
+    },
+    {
+      "questionId": "jpl-5378122",
+      "sourceQuestionId": "5378122",
+      "permissionStatus": "可查看",
+      "chapter": "第五章 个人经营类贷款",
+      "section": "第二节 个人商用房贷款",
+      "knowledge": "风险管理"
+    },
+    {
+      "questionId": "jpl-5378138",
+      "sourceQuestionId": "5378138",
+      "permissionStatus": "可查看",
+      "chapter": "第二章 个人贷款管理",
+      "section": "第二节 个人贷款流程",
+      "knowledge": "贷后管理"
+    },
+    {
+      "questionId": "jpl-5378141",
+      "sourceQuestionId": "5378141",
+      "permissionStatus": "可查看",
+      "chapter": "第五章 个人经营类贷款",
+      "section": "第一节 个人经营贷款",
+      "knowledge": "风险管理"
+    },
+    {
+      "questionId": "jpl-5378154",
+      "sourceQuestionId": "5378154",
+      "permissionStatus": "可查看",
+      "chapter": "第五章 个人经营类贷款",
+      "section": "第一节 个人经营贷款",
+      "knowledge": "风险管理"
+    },
+    {
+      "questionId": "jpl-5378160",
+      "sourceQuestionId": "5378160",
+      "permissionStatus": "可查看",
+      "chapter": "第二章 个人贷款管理",
+      "section": "第二节 个人贷款流程",
+      "knowledge": "贷后管理"
+    },
+    {
+      "questionId": "jpl-5378179",
+      "sourceQuestionId": "5378179",
+      "permissionStatus": "可查看",
+      "chapter": "第二章 个人贷款管理",
+      "section": "第二节 个人贷款流程",
+      "knowledge": "贷后管理"
+    },
+    {
+      "questionId": "jpl-5378180",
+      "sourceQuestionId": "5378180",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第二章 个人贷款管理",
+      "section": "第二节 个人贷款流程",
+      "knowledge": "贷后管理"
+    },
+    {
+      "questionId": "jpl-5378195",
+      "sourceQuestionId": "5378195",
+      "permissionStatus": "可查看",
+      "chapter": "第五章 个人经营类贷款",
+      "section": "第三节 涉农贷款",
+      "knowledge": "农户贷款"
+    },
+    {
+      "questionId": "jpl-5378211",
+      "sourceQuestionId": "5378211",
+      "permissionStatus": "可查看",
+      "chapter": "第八章 个人征信系统",
+      "section": "第一节 概述",
+      "knowledge": "个人征信系统的含义和内容"
+    },
+    {
+      "questionId": "jpl-5378215",
+      "sourceQuestionId": "5378215",
+      "permissionStatus": "可查看",
+      "chapter": "第八章 个人征信系统",
+      "section": "第一节 概述",
+      "knowledge": "个人征信系统的含义和内容"
+    },
+    {
+      "questionId": "jpl-5378225",
+      "sourceQuestionId": "5378225",
+      "permissionStatus": "可查看",
+      "chapter": "第八章 个人征信系统",
+      "section": "第三节 互联网金融背景下征信业务的新发展",
+      "knowledge": "互联网金融背景下征信业务的新发展"
+    },
+    {
+      "questionId": "jpl-5378232",
+      "sourceQuestionId": "5378232",
+      "permissionStatus": "可查看",
+      "chapter": "第八章 个人征信系统",
+      "section": "第一节 概述",
+      "knowledge": "个人征信的相关法律法规"
+    },
+    {
+      "questionId": "jpl-5394923",
+      "sourceQuestionId": "5394923",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第八章 个人征信系统",
+      "section": "第二节 个人征信系统的管理及应用",
+      "knowledge": "个人征信报告异议处理"
+    },
+    {
+      "questionId": "jpl-5394927",
+      "sourceQuestionId": "5394927",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "附录",
+      "section": "个人贷款的监管政策和法规",
+      "knowledge": "与个人住房贷款相关的政策和法规"
+    },
+    {
+      "questionId": "jpl-5394929",
+      "sourceQuestionId": "5394929",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第三章 个人住房贷款",
+      "section": "第一节 个人住房贷款基础知识",
+      "knowledge": "基础知识"
+    },
+    {
+      "questionId": "jpl-5394930",
+      "sourceQuestionId": "5394930",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第一章 个人贷款概述",
+      "section": "第二节 个人贷款产品的种类",
+      "knowledge": "按有无担保分类"
+    },
+    {
+      "questionId": "jpl-5394931",
+      "sourceQuestionId": "5394931",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第四章 个人消费类贷款",
+      "section": "第一节 个人汽车贷款",
+      "knowledge": "风险管理"
+    },
+    {
+      "questionId": "jpl-5395058",
+      "sourceQuestionId": "5395058",
+      "permissionStatus": "可查看",
+      "chapter": "第四章 个人消费类贷款",
+      "section": "第二节 个人教育贷款",
+      "knowledge": "基础知识"
+    },
+    {
+      "questionId": "jpl-5395059",
+      "sourceQuestionId": "5395059",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第一章 个人贷款概述",
+      "section": "第一节 个人贷款的性质和发展",
+      "knowledge": "个人贷款的特征"
+    },
+    {
+      "questionId": "jpl-5395061",
+      "sourceQuestionId": "5395061",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第一章 个人贷款概述",
+      "section": "第二节 个人贷款产品的种类",
+      "knowledge": "按产品用途分类"
+    },
+    {
+      "questionId": "jpl-5395062",
+      "sourceQuestionId": "5395062",
+      "permissionStatus": "可查看",
+      "chapter": "第二章 个人贷款管理",
+      "section": "第二节 个人贷款流程",
+      "knowledge": "贷款的受理与调查"
+    },
+    {
+      "questionId": "jpl-5395063",
+      "sourceQuestionId": "5395063",
+      "permissionStatus": "可查看",
+      "chapter": "第四章 个人消费类贷款",
+      "section": "第一节 个人汽车贷款",
+      "knowledge": "基础知识"
+    },
+    {
+      "questionId": "jpl-5395064",
+      "sourceQuestionId": "5395064",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第一章 个人贷款概述",
+      "section": "第三节 个人贷款产品的要素",
+      "knowledge": "贷款利率"
+    },
+    {
+      "questionId": "jpl-5395065",
+      "sourceQuestionId": "5395065",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第五章 个人经营类贷款",
+      "section": "第一节 个人经营贷款",
+      "knowledge": "基础知识"
+    },
+    {
+      "questionId": "jpl-5395198",
+      "sourceQuestionId": "5395198",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第四章 个人消费类贷款",
+      "section": "第一节 个人汽车贷款",
+      "knowledge": "风险管理"
+    },
+    {
+      "questionId": "jpl-5395199",
+      "sourceQuestionId": "5395199",
+      "permissionStatus": "可查看",
+      "chapter": "第二章 个人贷款管理",
+      "section": "第三节 个人贷款营销管理",
+      "knowledge": "银行营销策略"
+    },
+    {
+      "questionId": "jpl-5395202",
+      "sourceQuestionId": "5395202",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第二章 个人贷款管理",
+      "section": "第五节 个人贷款风险管理",
+      "knowledge": "风险管理概述"
+    },
+    {
+      "questionId": "jpl-5395206",
+      "sourceQuestionId": "5395206",
+      "permissionStatus": "可查看",
+      "chapter": "第二章 个人贷款管理",
+      "section": "第二节 个人贷款流程",
+      "knowledge": "贷后管理"
+    },
+    {
+      "questionId": "jpl-5395207",
+      "sourceQuestionId": "5395207",
+      "permissionStatus": "可查看",
+      "chapter": "第二章 个人贷款管理",
+      "section": "第三节 个人贷款营销管理",
+      "knowledge": "银行营销策略"
+    },
+    {
+      "questionId": "jpl-5395208",
+      "sourceQuestionId": "5395208",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第一章 个人贷款概述",
+      "section": "第二节 个人贷款产品的种类",
+      "knowledge": "按有无担保分类"
+    },
+    {
+      "questionId": "jpl-5395211",
+      "sourceQuestionId": "5395211",
+      "permissionStatus": "可查看",
+      "chapter": "第三章 个人住房贷款",
+      "section": "第一节 个人住房贷款基础知识",
+      "knowledge": "基础知识"
+    },
+    {
+      "questionId": "jpl-5395338",
+      "sourceQuestionId": "5395338",
+      "permissionStatus": "可查看",
+      "chapter": "第一章 个人贷款概述",
+      "section": "第二节 个人贷款产品的种类",
+      "knowledge": "按产品用途分类"
+    },
+    {
+      "questionId": "jpl-5395339",
+      "sourceQuestionId": "5395339",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第三章 个人住房贷款",
+      "section": "第一节 个人住房贷款基础知识",
+      "knowledge": "基础知识"
+    },
+    {
+      "questionId": "jpl-5395342",
+      "sourceQuestionId": "5395342",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第三章 个人住房贷款",
+      "section": "第四节 公积金个人住房贷款",
+      "knowledge": "基础知识"
+    },
+    {
+      "questionId": "jpl-5395346",
+      "sourceQuestionId": "5395346",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第五章 个人经营类贷款",
+      "section": "第三节 涉农贷款",
+      "knowledge": ""
+    },
+    {
+      "questionId": "jpl-5395347",
+      "sourceQuestionId": "5395347",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第二章 个人贷款管理",
+      "section": "第五节 个人贷款风险管理",
+      "knowledge": "风险管理概述"
+    },
+    {
+      "questionId": "jpl-5395349",
+      "sourceQuestionId": "5395349",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第八章 个人征信系统",
+      "section": "第三节 互联网金融背景下征信业务的新发展",
+      "knowledge": "互联网金融背景下征信业务的新发展"
+    },
+    {
+      "questionId": "jpl-5413580",
+      "sourceQuestionId": "5413580",
+      "permissionStatus": "可查看",
+      "chapter": "附录",
+      "section": "个人贷款的监管政策和法规",
+      "knowledge": "与个人贷款相关的政策法规"
+    },
+    {
+      "questionId": "jpl-5418385",
+      "sourceQuestionId": "5418385",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第五章 个人经营类贷款",
+      "section": "第二节 个人商用房贷款",
+      "knowledge": "风险管理"
+    },
+    {
+      "questionId": "jpl-5418390",
+      "sourceQuestionId": "5418390",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第一章 个人贷款概述",
+      "section": "第二节 个人贷款产品的种类",
+      "knowledge": "按产品用途分类"
+    },
+    {
+      "questionId": "jpl-5418397",
+      "sourceQuestionId": "5418397",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第五章 个人经营类贷款",
+      "section": "第一节 个人经营贷款",
+      "knowledge": "风险管理"
+    },
+    {
+      "questionId": "jpl-5418534",
+      "sourceQuestionId": "5418534",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "附录",
+      "section": "个人贷款的监管政策和法规",
+      "knowledge": "与个人教育贷款相关的政策和法规"
+    },
+    {
+      "questionId": "jpl-5418539",
+      "sourceQuestionId": "5418539",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第四章 个人消费类贷款",
+      "section": "第二节 个人教育贷款",
+      "knowledge": "基础知识"
+    },
+    {
+      "questionId": "jpl-5418674",
+      "sourceQuestionId": "5418674",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第一章 个人贷款概述",
+      "section": "第三节 个人贷款产品的要素",
+      "knowledge": "贷款利率"
+    },
+    {
+      "questionId": "jpl-5418685",
+      "sourceQuestionId": "5418685",
+      "permissionStatus": "权限不足/收费题",
+      "chapter": "第四章 个人消费类贷款",
+      "section": "第二节 个人教育贷款",
+      "knowledge": "基础知识"
+    },
+    {
+      "questionId": "jpl-6919027",
+      "sourceQuestionId": "6919027",
+      "permissionStatus": "可查看",
+      "chapter": "第六章 信用卡业务",
+      "section": "第四节 风险管理",
+      "knowledge": "信用卡催收"
+    },
+    {
+      "questionId": "jpl-6919030",
+      "sourceQuestionId": "6919030",
+      "permissionStatus": "可查看",
+      "chapter": "第六章 信用卡业务",
+      "section": "第四节 风险管理",
+      "knowledge": "逾期资产处置"
+    },
+    {
+      "questionId": "jpl-6919031",
+      "sourceQuestionId": "6919031",
+      "permissionStatus": "可查看",
+      "chapter": "第六章 信用卡业务",
+      "section": "第五节 信用卡业务的消费者权益保护",
+      "knowledge": "信息披露"
+    },
+    {
+      "questionId": "jpl-6919032",
+      "sourceQuestionId": "6919032",
+      "permissionStatus": "可查看",
+      "chapter": "第六章 信用卡业务",
+      "section": "第五节 信用卡业务的消费者权益保护",
+      "knowledge": "信息留存及个人信息保护"
+    },
+    {
+      "questionId": "jpl-6919034",
+      "sourceQuestionId": "6919034",
+      "permissionStatus": "可查看",
+      "chapter": "第六章 信用卡业务",
+      "section": "第五节 信用卡业务的消费者权益保护",
+      "knowledge": "信息披露"
+    },
+    {
+      "questionId": "jpl-6919035",
+      "sourceQuestionId": "6919035",
+      "permissionStatus": "可查看",
+      "chapter": "第二章 个人贷款管理",
+      "section": "第四节 个人贷款定价管理",
+      "knowledge": "个人贷款LPR定价"
+    }
+  ]
+}

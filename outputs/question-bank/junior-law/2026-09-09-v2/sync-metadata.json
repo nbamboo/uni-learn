@@ -1,0 +1,18 @@
+{
+  "schemaVersion": 1,
+  "runId": "20260909T190230-786565ce",
+  "source": "233网校",
+  "sourceSubjectId": 384,
+  "subjectId": "junior-law",
+  "version": "2026-09-09-v2",
+  "sourceUrl": "https://wx.233.com/center/study/tiku/chapter?domain=ccbp&subjectId=384&chapterType=1",
+  "sourceQuestionCount": 1773,
+  "statusCounts": {
+    "可查看": 820,
+    "权限不足/收费题": 953
+  },
+  "warnings": [],
+  "workbookSha256": "62ee6ec02e4438a645acc2fe6dfe9395adc4bf09d03af04b4cc4b5e553f0e262",
+  "acceptedQuestionCount": 820,
+  "reusedExplanationCount": 5
+}

@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "runId": "20260910T091122-c2f614d5",
+  "source": "233网校",
+  "sourceSubjectId": 1249,
+  "subjectId": "middle-corporate-credit",
+  "version": "2026-09-10-v1",
+  "sourceUrl": "https://wx.233.com/center/study/tiku/chapter?domain=ccbp&subjectId=1249&chapterType=1",
+  "sourceQuestionCount": 1287,
+  "statusCounts": {
+    "可查看": 666,
+    "权限不足/收费题": 621
+  },
+  "warnings": [],
+  "workbookSha256": "8f5a01bab859091c127de043a68bc4a4e05a776bde7c83a8ddf5c8ec5e5dbc84",
+  "acceptedQuestionCount": 663,
+  "reusedExplanationCount": 0,
+  "ocrAttemptedQuestionCount": 4,
+  "ocrSucceededQuestionCount": 1,
+  "ocrFailedQuestionCount": 3,
+  "ocrImageCount": 4
+}

@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "runId": "20260910T091122-c2f614d5",
+  "source": "233网校",
+  "sourceSubjectId": 1311,
+  "subjectId": "middle-bank-management",
+  "version": "2026-09-10-v1",
+  "sourceUrl": "https://wx.233.com/center/study/tiku/chapter?domain=ccbp&subjectId=1311&chapterType=1",
+  "sourceQuestionCount": 1050,
+  "statusCounts": {
+    "可查看": 616,
+    "权限不足/收费题": 434
+  },
+  "warnings": [],
+  "workbookSha256": "2d69b432fd19cfdfed81ac806565ce166d87e5e4690084455b294c925429f31d",
+  "acceptedQuestionCount": 616,
+  "reusedExplanationCount": 0,
+  "ocrAttemptedQuestionCount": 1,
+  "ocrSucceededQuestionCount": 1,
+  "ocrFailedQuestionCount": 0,
+  "ocrImageCount": 1
+}

@@ -1,0 +1,18 @@
+{
+  "schemaVersion": 1,
+  "runId": "20260909T190230-786565ce",
+  "source": "233网校",
+  "sourceSubjectId": 1247,
+  "subjectId": "junior-bank-management",
+  "version": "2026-09-09-v2",
+  "sourceUrl": "https://wx.233.com/center/study/tiku/chapter?domain=ccbp&subjectId=1247&chapterType=1",
+  "sourceQuestionCount": 1100,
+  "statusCounts": {
+    "可查看": 647,
+    "权限不足/收费题": 453
+  },
+  "warnings": [],
+  "workbookSha256": "c5dfa95ce4db290875e332dec067c501feea119fd750440a9092fe1408daa759",
+  "acceptedQuestionCount": 647,
+  "reusedExplanationCount": 1
+}

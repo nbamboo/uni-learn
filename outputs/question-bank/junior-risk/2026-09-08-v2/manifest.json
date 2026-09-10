@@ -1,0 +1,29 @@
+{
+  "schemaVersion": 1,
+  "subjectId": "junior-risk",
+  "version": "2026-09-08-v2",
+  "questionCount": 647,
+  "files": [
+    {
+      "name": "questions.json",
+      "bytes": 675626,
+      "sha256": "97d09a2b2d972a934b598ad0e0fed7d81eab3a60d8aad172b556cfce933c373b"
+    },
+    {
+      "name": "catalog.json",
+      "bytes": 19342,
+      "sha256": "295ee4d81f77295417c40b8bf132d8a4cdcf349d1124aed4a1efe44e2f8da477"
+    },
+    {
+      "name": "rejected.json",
+      "bytes": 1779,
+      "sha256": "6e6595cfa41ed753937d962ea02872175f23396e0cbba8e9b51f584fc9f5fe5e"
+    },
+    {
+      "name": "validation-report.json",
+      "bytes": 2836,
+      "sha256": "5028cd018d72f1db67abc037561b651bf05f828502adabd0557dab2fb4185fd7"
+    }
+  ],
+  "generatedAt": "2026-09-08T15:46:58.326071+00:00"
+}

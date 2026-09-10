@@ -1,0 +1,123 @@
+{
+  "status": "passed_with_rejections",
+  "input": "/Users/shenyongliang/Documents/GitHub/uni-learn/resources/topic/银行从业中级公司信贷_章节练习_题目整理.xlsx",
+  "sourceSubject": "银行从业中级公司信贷",
+  "subject": {
+    "subjectId": "middle-corporate-credit",
+    "name": "中级公司信贷",
+    "level": "中级",
+    "questionPrefix": "mcc"
+  },
+  "version": "2026-09-10-v1",
+  "counts": {
+    "sourceRows": 1287,
+    "visibleRows": 666,
+    "permissionSkippedRows": 621,
+    "acceptedQuestions": 663,
+    "rejectedQuestions": 3,
+    "chapters": 13,
+    "knowledgeGroups": 142
+  },
+  "statusCounts": {
+    "可查看": 666,
+    "权限不足/收费题": 621
+  },
+  "rejectionReasons": {
+    "contains_image": 3
+  },
+  "warnings": {
+    "duplicateTitleGroups": 1,
+    "note": "相同题干但选项不同不按重复题处理；可结合 rejected.json 和源数据人工复核。"
+  },
+  "chapterCounts": [
+    {
+      "id": "1",
+      "subjectId": "middle-corporate-credit",
+      "name": "第一章 公司信贷概述",
+      "count": 56
+    },
+    {
+      "id": "2",
+      "subjectId": "middle-corporate-credit",
+      "name": "第二章 信贷申请受理和贷前调查",
+      "count": 63
+    },
+    {
+      "id": "3",
+      "subjectId": "middle-corporate-credit",
+      "name": "第三章 借款需求分析",
+      "count": 27
+    },
+    {
+      "id": "4",
+      "subjectId": "middle-corporate-credit",
+      "name": "第四章 贷款环境风险分析",
+      "count": 63
+    },
+    {
+      "id": "5",
+      "subjectId": "middle-corporate-credit",
+      "name": "第五章 客户分析与信用评级",
+      "count": 95
+    },
+    {
+      "id": "6",
+      "subjectId": "middle-corporate-credit",
+      "name": "第六章 固定资产贷款项目评估",
+      "count": 17
+    },
+    {
+      "id": "7",
+      "subjectId": "middle-corporate-credit",
+      "name": "第七章 担保管理",
+      "count": 73
+    },
+    {
+      "id": "8",
+      "subjectId": "middle-corporate-credit",
+      "name": "第八章 信贷审批",
+      "count": 41
+    },
+    {
+      "id": "9",
+      "subjectId": "middle-corporate-credit",
+      "name": "第九章 贷款合同与发放支付",
+      "count": 47
+    },
+    {
+      "id": "10",
+      "subjectId": "middle-corporate-credit",
+      "name": "第十章 贷后管理",
+      "count": 74
+    },
+    {
+      "id": "11",
+      "subjectId": "middle-corporate-credit",
+      "name": "第十一章 贷款风险分类与贷款损失准备金的计提",
+      "count": 25
+    },
+    {
+      "id": "12",
+      "subjectId": "middle-corporate-credit",
+      "name": "第十二章 不良贷款管理",
+      "count": 42
+    },
+    {
+      "id": "13",
+      "subjectId": "middle-corporate-credit",
+      "name": "附录",
+      "count": 40
+    }
+  ],
+  "checks": {
+    "uniqueQuestionIds": true,
+    "uniqueDocumentIds": true,
+    "denseSortOrder": true,
+    "catalogCountMatches": true,
+    "chapterCountsMatch": true,
+    "knowledgeCountsMatch": true,
+    "answersMatchOptions": true,
+    "noImageMarkers": true
+  },
+  "generatedAt": "2026-09-10T01:13:13.433418+00:00"
+}

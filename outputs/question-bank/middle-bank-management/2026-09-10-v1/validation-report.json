@@ -1,0 +1,181 @@
+{
+  "status": "passed",
+  "input": "/Users/shenyongliang/Documents/GitHub/uni-learn/resources/topic/银行从业中级银行管理_章节练习_题目整理.xlsx",
+  "sourceSubject": "银行从业中级银行管理",
+  "subject": {
+    "subjectId": "middle-bank-management",
+    "name": "中级银行管理",
+    "level": "中级",
+    "questionPrefix": "mbm"
+  },
+  "version": "2026-09-10-v1",
+  "counts": {
+    "sourceRows": 1050,
+    "visibleRows": 616,
+    "permissionSkippedRows": 434,
+    "acceptedQuestions": 616,
+    "rejectedQuestions": 0,
+    "chapters": 23,
+    "knowledgeGroups": 230
+  },
+  "statusCounts": {
+    "可查看": 616,
+    "权限不足/收费题": 434
+  },
+  "rejectionReasons": {},
+  "warnings": {
+    "duplicateTitleGroups": 0,
+    "note": "相同题干但选项不同不按重复题处理；可结合 rejected.json 和源数据人工复核。"
+  },
+  "chapterCounts": [
+    {
+      "id": "1",
+      "subjectId": "middle-bank-management",
+      "name": "第一章 宏观经济金融环境",
+      "count": 13
+    },
+    {
+      "id": "2",
+      "subjectId": "middle-bank-management",
+      "name": "第二章 监管概述",
+      "count": 52
+    },
+    {
+      "id": "3",
+      "subjectId": "middle-bank-management",
+      "name": "第三章 市场准入、非现场监管和现场检查",
+      "count": 23
+    },
+    {
+      "id": "4",
+      "subjectId": "middle-bank-management",
+      "name": "第四章 监管措施、行政处罚与行政救济",
+      "count": 30
+    },
+    {
+      "id": "5",
+      "subjectId": "middle-bank-management",
+      "name": "第五章 负债业务",
+      "count": 26
+    },
+    {
+      "id": "6",
+      "subjectId": "middle-bank-management",
+      "name": "第六章 资产业务",
+      "count": 29
+    },
+    {
+      "id": "7",
+      "subjectId": "middle-bank-management",
+      "name": "第七章 其他业务",
+      "count": 50
+    },
+    {
+      "id": "8",
+      "subjectId": "middle-bank-management",
+      "name": "第八章 公司治理",
+      "count": 15
+    },
+    {
+      "id": "9",
+      "subjectId": "middle-bank-management",
+      "name": "第九章 全面风险管理",
+      "count": 42
+    },
+    {
+      "id": "10",
+      "subjectId": "middle-bank-management",
+      "name": "第十章 内部控制、合规管理和审计",
+      "count": 31
+    },
+    {
+      "id": "11",
+      "subjectId": "middle-bank-management",
+      "name": "第十一章 资本管理",
+      "count": 24
+    },
+    {
+      "id": "12",
+      "subjectId": "middle-bank-management",
+      "name": "第十二章 资产负债管理",
+      "count": 29
+    },
+    {
+      "id": "13",
+      "subjectId": "middle-bank-management",
+      "name": "第十三章 流动性风险管理",
+      "count": 32
+    },
+    {
+      "id": "14",
+      "subjectId": "middle-bank-management",
+      "name": "第十四章 经营绩效管理",
+      "count": 28
+    },
+    {
+      "id": "15",
+      "subjectId": "middle-bank-management",
+      "name": "第十五章 信息科技管理",
+      "count": 17
+    },
+    {
+      "id": "16",
+      "subjectId": "middle-bank-management",
+      "name": "第十六章 开发性金融机构与政策性银行业务与监管",
+      "count": 8
+    },
+    {
+      "id": "17",
+      "subjectId": "middle-bank-management",
+      "name": "第十七章 金融资产管理公司业务与监管",
+      "count": 35
+    },
+    {
+      "id": "18",
+      "subjectId": "middle-bank-management",
+      "name": "第十八章 信托公司业务与监管",
+      "count": 28
+    },
+    {
+      "id": "19",
+      "subjectId": "middle-bank-management",
+      "name": "第十九章 企业集团财务公司业务与监管",
+      "count": 14
+    },
+    {
+      "id": "20",
+      "subjectId": "middle-bank-management",
+      "name": "第二十章 金融租赁公司业务与监管",
+      "count": 18
+    },
+    {
+      "id": "21",
+      "subjectId": "middle-bank-management",
+      "name": "第二十一章 汽车金融公司、消费金融公司、货币经纪公司业务与监管",
+      "count": 25
+    },
+    {
+      "id": "22",
+      "subjectId": "middle-bank-management",
+      "name": "第二十二章 金融创新管理",
+      "count": 23
+    },
+    {
+      "id": "23",
+      "subjectId": "middle-bank-management",
+      "name": "第二十三章 银行业消费者权益保护",
+      "count": 24
+    }
+  ],
+  "checks": {
+    "uniqueQuestionIds": true,
+    "uniqueDocumentIds": true,
+    "denseSortOrder": true,
+    "catalogCountMatches": true,
+    "chapterCountsMatch": true,
+    "knowledgeCountsMatch": true,
+    "answersMatchOptions": true,
+    "noImageMarkers": true
+  },
+  "generatedAt": "2026-09-10T01:14:10.973242+00:00"
+}

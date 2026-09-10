@@ -1,0 +1,39 @@
+{
+  "schemaVersion": 1,
+  "subjectId": "junior-personal-finance",
+  "version": "2026-09-10-v1",
+  "questionCount": 822,
+  "files": [
+    {
+      "name": "catalog.json",
+      "bytes": 15325,
+      "sha256": "b736233f7f9aa157c09973658b0a81e72d24f3ac9d1bb52aa54cc8e2bbff59b2"
+    },
+    {
+      "name": "questions.json",
+      "bytes": 943967,
+      "sha256": "3f89d5fe371a1c8c1df98fee8317e9dffaedb8bc2a3632f977522b278166dfd2"
+    },
+    {
+      "name": "rejected.json",
+      "bytes": 5970,
+      "sha256": "73d8bf53c754ddcff57e1ff8f7d4246e9e9c441c8d62667b373164f6dc0221ac"
+    },
+    {
+      "name": "source-index.json",
+      "bytes": 419798,
+      "sha256": "8d2a434724a0accbe52009d3fb514fb4152a0233de7c14ae991bfb9ba968a3ea"
+    },
+    {
+      "name": "sync-metadata.json",
+      "bytes": 693,
+      "sha256": "d7c9b6a3ec6a0cb2b6c1b0256927501d5c101d28c81ad5282c303127e2b33068"
+    },
+    {
+      "name": "validation-report.json",
+      "bytes": 2471,
+      "sha256": "aa719216c3395732cd05780fccdc0219c8063149e7eb15f5f981a569fd808f29"
+    }
+  ],
+  "generatedAt": "2026-09-09T16:15:06.028361+00:00"
+}

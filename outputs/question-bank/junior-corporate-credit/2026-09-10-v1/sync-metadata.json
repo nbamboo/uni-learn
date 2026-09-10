@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "runId": "20260910T001415-869cc695",
+  "source": "233网校",
+  "sourceSubjectId": 752,
+  "subjectId": "junior-corporate-credit",
+  "version": "2026-09-10-v1",
+  "sourceUrl": "https://wx.233.com/center/study/tiku/chapter?domain=ccbp&subjectId=752&chapterType=1",
+  "sourceQuestionCount": 687,
+  "statusCounts": {
+    "可查看": 342,
+    "权限不足/收费题": 345
+  },
+  "warnings": [],
+  "workbookSha256": "c1ea2c8e90fe4dd258c6c5376ca647e654cb46fad209b63ae8792a17eed0c563",
+  "acceptedQuestionCount": 341,
+  "reusedExplanationCount": 1,
+  "ocrAttemptedQuestionCount": 0,
+  "ocrSucceededQuestionCount": 0,
+  "ocrFailedQuestionCount": 0,
+  "ocrImageCount": 0
+}

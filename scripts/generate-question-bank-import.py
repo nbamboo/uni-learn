@@ -36,6 +36,36 @@ SUBJECT_CONFIGS = {
         "level": "中级",
         "questionPrefix": "mpf",
     },
+    "银行从业中级银行业法律法规与综合能力": {
+        "subjectId": "middle-law",
+        "name": "中级银行业法律法规与综合能力",
+        "level": "中级",
+        "questionPrefix": "mlaw",
+    },
+    "银行从业中级个人贷款": {
+        "subjectId": "middle-personal-loan",
+        "name": "中级个人贷款",
+        "level": "中级",
+        "questionPrefix": "mpl",
+    },
+    "银行从业中级公司信贷": {
+        "subjectId": "middle-corporate-credit",
+        "name": "中级公司信贷",
+        "level": "中级",
+        "questionPrefix": "mcc",
+    },
+    "银行从业中级风险管理": {
+        "subjectId": "middle-risk",
+        "name": "中级风险管理",
+        "level": "中级",
+        "questionPrefix": "mrisk",
+    },
+    "银行从业中级银行管理": {
+        "subjectId": "middle-bank-management",
+        "name": "中级银行管理",
+        "level": "中级",
+        "questionPrefix": "mbm",
+    },
     "银行从业初级银行业法律法规与综合能力": {
         "subjectId": "junior-law",
         "name": "初级银行业法律法规与综合能力",

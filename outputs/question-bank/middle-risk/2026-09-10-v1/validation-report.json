@@ -1,0 +1,118 @@
+{
+  "status": "passed_with_rejections",
+  "input": "/Users/shenyongliang/Documents/GitHub/uni-learn/resources/topic/银行从业中级风险管理_章节练习_题目整理.xlsx",
+  "sourceSubject": "银行从业中级风险管理",
+  "subject": {
+    "subjectId": "middle-risk",
+    "name": "中级风险管理",
+    "level": "中级",
+    "questionPrefix": "mrisk"
+  },
+  "version": "2026-09-10-v1",
+  "counts": {
+    "sourceRows": 1075,
+    "visibleRows": 594,
+    "permissionSkippedRows": 481,
+    "acceptedQuestions": 565,
+    "rejectedQuestions": 29,
+    "chapters": 12,
+    "knowledgeGroups": 164
+  },
+  "statusCounts": {
+    "可查看": 594,
+    "权限不足/收费题": 481
+  },
+  "rejectionReasons": {
+    "contains_image": 24,
+    "missing_actual_question": 13
+  },
+  "warnings": {
+    "duplicateTitleGroups": 0,
+    "note": "相同题干但选项不同不按重复题处理；可结合 rejected.json 和源数据人工复核。"
+  },
+  "chapterCounts": [
+    {
+      "id": "1",
+      "subjectId": "middle-risk",
+      "name": "第一章 风险管理基础",
+      "count": 68
+    },
+    {
+      "id": "2",
+      "subjectId": "middle-risk",
+      "name": "第二章 风险管理体系",
+      "count": 27
+    },
+    {
+      "id": "3",
+      "subjectId": "middle-risk",
+      "name": "第三章 信用风险管理",
+      "count": 138
+    },
+    {
+      "id": "4",
+      "subjectId": "middle-risk",
+      "name": "第四章 市场风险管理",
+      "count": 63
+    },
+    {
+      "id": "5",
+      "subjectId": "middle-risk",
+      "name": "第五章 操作风险管理",
+      "count": 51
+    },
+    {
+      "id": "6",
+      "subjectId": "middle-risk",
+      "name": "第六章 流动性风险管理",
+      "count": 33
+    },
+    {
+      "id": "7",
+      "subjectId": "middle-risk",
+      "name": "第七章 国别风险管理",
+      "count": 18
+    },
+    {
+      "id": "8",
+      "subjectId": "middle-risk",
+      "name": "第八章 声誉风险与战略风险管理",
+      "count": 34
+    },
+    {
+      "id": "9",
+      "subjectId": "middle-risk",
+      "name": "第九章 其他风险管理",
+      "count": 23
+    },
+    {
+      "id": "10",
+      "subjectId": "middle-risk",
+      "name": "第十章 压力测试",
+      "count": 14
+    },
+    {
+      "id": "11",
+      "subjectId": "middle-risk",
+      "name": "第十一章 资本管理",
+      "count": 51
+    },
+    {
+      "id": "12",
+      "subjectId": "middle-risk",
+      "name": "第十二章 银行监督管理",
+      "count": 45
+    }
+  ],
+  "checks": {
+    "uniqueQuestionIds": true,
+    "uniqueDocumentIds": true,
+    "denseSortOrder": true,
+    "catalogCountMatches": true,
+    "chapterCountsMatch": true,
+    "knowledgeCountsMatch": true,
+    "answersMatchOptions": true,
+    "noImageMarkers": true
+  },
+  "generatedAt": "2026-09-10T01:13:36.831332+00:00"
+}

@@ -1,0 +1,118 @@
+{
+  "status": "passed_with_rejections",
+  "input": "/Users/shenyongliang/Documents/GitHub/uni-learn/resources/topic/银行从业初级风险管理_章节练习_题目整理.xlsx",
+  "sourceSubject": "银行从业初级风险管理",
+  "subject": {
+    "subjectId": "junior-risk",
+    "name": "初级风险管理",
+    "level": "初级",
+    "questionPrefix": "jrisk"
+  },
+  "version": "2026-09-08-v2",
+  "counts": {
+    "sourceRows": 1249,
+    "visibleRows": 651,
+    "permissionSkippedRows": 598,
+    "acceptedQuestions": 647,
+    "rejectedQuestions": 4,
+    "chapters": 12,
+    "knowledgeGroups": 172
+  },
+  "statusCounts": {
+    "可查看": 651,
+    "权限不足/收费题": 598
+  },
+  "rejectionReasons": {
+    "missing_knowledge": 3,
+    "contains_image": 1
+  },
+  "warnings": {
+    "duplicateTitleGroups": 1,
+    "note": "相同题干但选项不同不按重复题处理；可结合 rejected.json 和源数据人工复核。"
+  },
+  "chapterCounts": [
+    {
+      "id": "1",
+      "subjectId": "junior-risk",
+      "name": "第一章 风险管理基础",
+      "count": 77
+    },
+    {
+      "id": "2",
+      "subjectId": "junior-risk",
+      "name": "第二章 风险管理体系",
+      "count": 50
+    },
+    {
+      "id": "3",
+      "subjectId": "junior-risk",
+      "name": "第三章信用风险管理",
+      "count": 108
+    },
+    {
+      "id": "4",
+      "subjectId": "junior-risk",
+      "name": "第四章 市场风险管理",
+      "count": 95
+    },
+    {
+      "id": "5",
+      "subjectId": "junior-risk",
+      "name": "第五章 操作风险管理",
+      "count": 75
+    },
+    {
+      "id": "6",
+      "subjectId": "junior-risk",
+      "name": "第六章 流动性风险管理",
+      "count": 60
+    },
+    {
+      "id": "7",
+      "subjectId": "junior-risk",
+      "name": "第七章 国别风险管理",
+      "count": 18
+    },
+    {
+      "id": "8",
+      "subjectId": "junior-risk",
+      "name": "第八章 声誉风险与战略风险管理",
+      "count": 27
+    },
+    {
+      "id": "9",
+      "subjectId": "junior-risk",
+      "name": "第九章其他风险管理",
+      "count": 22
+    },
+    {
+      "id": "10",
+      "subjectId": "junior-risk",
+      "name": "第十章 压力测试",
+      "count": 14
+    },
+    {
+      "id": "11",
+      "subjectId": "junior-risk",
+      "name": "第十一章 资本管理",
+      "count": 51
+    },
+    {
+      "id": "12",
+      "subjectId": "junior-risk",
+      "name": "第十二章 银行监管管理",
+      "count": 50
+    }
+  ],
+  "checks": {
+    "uniqueQuestionIds": true,
+    "uniqueDocumentIds": true,
+    "denseSortOrder": true,
+    "catalogCountMatches": true,
+    "chapterCountsMatch": true,
+    "knowledgeCountsMatch": true,
+    "answersMatchOptions": true,
+    "noImageMarkers": true
+  },
+  "generatedAt": "2026-09-08T15:46:58.326071+00:00"
+}

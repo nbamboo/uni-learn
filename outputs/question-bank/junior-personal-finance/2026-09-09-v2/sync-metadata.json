@@ -1,0 +1,18 @@
+{
+  "schemaVersion": 1,
+  "runId": "20260909T190230-786565ce",
+  "source": "233网校",
+  "sourceSubjectId": 385,
+  "subjectId": "junior-personal-finance",
+  "version": "2026-09-09-v2",
+  "sourceUrl": "https://wx.233.com/center/study/tiku/chapter?domain=ccbp&subjectId=385&chapterType=1",
+  "sourceQuestionCount": 1422,
+  "statusCounts": {
+    "可查看": 827,
+    "权限不足/收费题": 595
+  },
+  "warnings": [],
+  "workbookSha256": "fa6532775f8294ba6f13dfcd64f2995e8a1c46a26c61dc0c59919f4fc39621e1",
+  "acceptedQuestionCount": 822,
+  "reusedExplanationCount": 44
+}

@@ -1,0 +1,39 @@
+{
+  "schemaVersion": 1,
+  "subjectId": "junior-bank-management",
+  "version": "2026-09-09-v2",
+  "questionCount": 647,
+  "files": [
+    {
+      "name": "catalog.json",
+      "bytes": 23053,
+      "sha256": "2ad62b6d2b5f0cfbee7a414de3cdcfee512851052016c2520bc1e7ea768cd5f2"
+    },
+    {
+      "name": "questions.json",
+      "bytes": 626649,
+      "sha256": "e118bf2cb78a51d36811ceafbf2a81072c419f9cd21803981857ad8bb1fe3a66"
+    },
+    {
+      "name": "rejected.json",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "source-index.json",
+      "bytes": 312971,
+      "sha256": "f423e43f5d05f0b99a200cf8bad7a25eaf3839ad1e047d7be5fa2a6794b62356"
+    },
+    {
+      "name": "sync-metadata.json",
+      "bytes": 572,
+      "sha256": "7bd86f6a3275f2dea5256c3cb2a60d118dcbc022192f7f1aa153bbf51f1c3a62"
+    },
+    {
+      "name": "validation-report.json",
+      "bytes": 3849,
+      "sha256": "87849d3af4fc1d864618a6f57b38b07d718f2e009ed88ab03d192d4853ba238e"
+    }
+  ],
+  "generatedAt": "2026-09-09T11:04:43.708620+00:00"
+}

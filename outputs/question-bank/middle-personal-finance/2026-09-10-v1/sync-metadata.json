@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "runId": "20260910T091122-c2f614d5",
+  "source": "233网校",
+  "sourceSubjectId": 1201,
+  "subjectId": "middle-personal-finance",
+  "version": "2026-09-10-v1",
+  "sourceUrl": "https://wx.233.com/center/study/tiku/chapter?domain=ccbp&subjectId=1201&chapterType=1",
+  "sourceQuestionCount": 1501,
+  "statusCounts": {
+    "可查看": 923,
+    "权限不足/收费题": 578
+  },
+  "warnings": [],
+  "workbookSha256": "8cad055c9078904cd4a1abe96e4f6c9dcf4a63e6528726a5bbe9303d910f1272",
+  "acceptedQuestionCount": 894,
+  "reusedExplanationCount": 0,
+  "ocrAttemptedQuestionCount": 10,
+  "ocrSucceededQuestionCount": 3,
+  "ocrFailedQuestionCount": 7,
+  "ocrImageCount": 10
+}

@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "runId": "20260910T091122-c2f614d5",
+  "source": "233网校",
+  "sourceSubjectId": 1200,
+  "subjectId": "middle-law",
+  "version": "2026-09-10-v1",
+  "sourceUrl": "https://wx.233.com/center/study/tiku/chapter?domain=ccbp&subjectId=1200&chapterType=1",
+  "sourceQuestionCount": 1943,
+  "statusCounts": {
+    "可查看": 941,
+    "权限不足/收费题": 1002
+  },
+  "warnings": [],
+  "workbookSha256": "89511820536e0dc467b7162caf9ae3e1570c620a49c49a847e8e873db732cf88",
+  "acceptedQuestionCount": 938,
+  "reusedExplanationCount": 0,
+  "ocrAttemptedQuestionCount": 13,
+  "ocrSucceededQuestionCount": 10,
+  "ocrFailedQuestionCount": 3,
+  "ocrImageCount": 13
+}

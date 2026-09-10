@@ -1,0 +1,29 @@
+{
+  "schemaVersion": 1,
+  "subjectId": "junior-personal-loan",
+  "version": "2026-09-08-v2",
+  "questionCount": 454,
+  "files": [
+    {
+      "name": "questions.json",
+      "bytes": 483484,
+      "sha256": "3f57f90a09bc1cb4038199c8e523b7410b95a3f2f55c5199f4d22724de18d406"
+    },
+    {
+      "name": "catalog.json",
+      "bytes": 7455,
+      "sha256": "14f8576ca3d1331966dd5686a75f0f3faf4ee8bcb59eaf89f2c1cf31f0ed9a07"
+    },
+    {
+      "name": "rejected.json",
+      "bytes": 2350,
+      "sha256": "2b440685e9315cae326a4c3aca881994700f1152cc5e65e5f673f57d8f87b581"
+    },
+    {
+      "name": "validation-report.json",
+      "bytes": 2343,
+      "sha256": "8bcd92f29800a34818a69ebec8b9650a37fae2b38930586cc0d2a63a4b786dc3"
+    }
+  ],
+  "generatedAt": "2026-09-08T15:46:58.284563+00:00"
+}

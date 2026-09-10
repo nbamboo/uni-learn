@@ -1,0 +1,39 @@
+{
+  "schemaVersion": 1,
+  "subjectId": "middle-risk",
+  "version": "2026-09-10-v1",
+  "questionCount": 565,
+  "files": [
+    {
+      "name": "catalog.json",
+      "bytes": 18434,
+      "sha256": "7cf9c14922986512641f243533c808c7e907d7825f47d6fe6974d0350d2681ee"
+    },
+    {
+      "name": "questions.json",
+      "bytes": 618819,
+      "sha256": "df84f7e39d1a7f71feb6a7af1dd4a1a15bf955e2538a3660b21d9380a36ea2b2"
+    },
+    {
+      "name": "rejected.json",
+      "bytes": 30192,
+      "sha256": "96480ff30cd0ca9c8784afd6f15344abb1d2f75053c9581219f65df0aa30827e"
+    },
+    {
+      "name": "source-index.json",
+      "bytes": 302105,
+      "sha256": "310a99bdb3802e7138ebf07d5622929cde43d051fd095415b1e9cabaf8c21424"
+    },
+    {
+      "name": "sync-metadata.json",
+      "bytes": 684,
+      "sha256": "21450680e73f0992dbd11b2e4f61285d1b41b793e5f776e13e9a115585a0ef70"
+    },
+    {
+      "name": "validation-report.json",
+      "bytes": 2847,
+      "sha256": "3e8496a06014fdb960b3c97bb3660e93d248924c21fc4e1824c572a2e7cd35f5"
+    }
+  ],
+  "generatedAt": "2026-09-10T01:13:36.831332+00:00"
+}

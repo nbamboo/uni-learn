@@ -1,0 +1,39 @@
+{
+  "schemaVersion": 1,
+  "subjectId": "middle-law",
+  "version": "2026-09-10-v1",
+  "questionCount": 938,
+  "files": [
+    {
+      "name": "catalog.json",
+      "bytes": 34851,
+      "sha256": "e9cac3583d9d3f7163c1792c6e1b0c6b14e5a774a94f9a1083f0f6b79a2dbe72"
+    },
+    {
+      "name": "questions.json",
+      "bytes": 981214,
+      "sha256": "820b95abcdc60559e0045ac84a36e130f43f77e44a6a4102555dcdd14fa33b94"
+    },
+    {
+      "name": "rejected.json",
+      "bytes": 1597,
+      "sha256": "33ef2adf549aec35a6aea309bd2a8602013372cb2e35e68f5369c2a8f9dfcb3b"
+    },
+    {
+      "name": "source-index.json",
+      "bytes": 561541,
+      "sha256": "ad48d60ee613b23886e20e18a53e8aaf86608cddf2e1b4f1abfc381fc3ec3608"
+    },
+    {
+      "name": "sync-metadata.json",
+      "bytes": 685,
+      "sha256": "5fe601e613994e357ffef24ed8800dff4bd3beecf0362cdc4082d160c539329c"
+    },
+    {
+      "name": "validation-report.json",
+      "bytes": 5022,
+      "sha256": "7fcc8c1046601fdaadc43407a9296085aae0433352f88fbcbcd6eaa578e6b1da"
+    }
+  ],
+  "generatedAt": "2026-09-10T01:12:09.055559+00:00"
+}
