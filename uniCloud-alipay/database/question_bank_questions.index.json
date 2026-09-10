@@ -1,0 +1,186 @@
+[
+  {
+    "IndexName": "uq_subject_version_sort",
+    "MgoKeySchema": {
+      "MgoIndexKeys": [
+        {
+          "Name": "subjectId",
+          "Direction": "1",
+          "Type": "varchar"
+        },
+        {
+          "Name": "version",
+          "Direction": "1",
+          "Type": "varchar"
+        },
+        {
+          "Name": "sortOrder",
+          "Direction": "1",
+          "Type": "int"
+        }
+      ],
+      "MgoIsUnique": true,
+      "MgoIsSparse": false
+    }
+  },
+  {
+    "IndexName": "subject_version_status_sort",
+    "MgoKeySchema": {
+      "MgoIndexKeys": [
+        {
+          "Name": "subjectId",
+          "Direction": "1",
+          "Type": "varchar"
+        },
+        {
+          "Name": "version",
+          "Direction": "1",
+          "Type": "varchar"
+        },
+        {
+          "Name": "status",
+          "Direction": "1",
+          "Type": "int"
+        },
+        {
+          "Name": "sortOrder",
+          "Direction": "1",
+          "Type": "int"
+        }
+      ],
+      "MgoIsUnique": false,
+      "MgoIsSparse": false
+    }
+  },
+  {
+    "IndexName": "subject_version_chapter_status_sort",
+    "MgoKeySchema": {
+      "MgoIndexKeys": [
+        {
+          "Name": "subjectId",
+          "Direction": "1",
+          "Type": "varchar"
+        },
+        {
+          "Name": "version",
+          "Direction": "1",
+          "Type": "varchar"
+        },
+        {
+          "Name": "chapterId",
+          "Direction": "1",
+          "Type": "varchar"
+        },
+        {
+          "Name": "status",
+          "Direction": "1",
+          "Type": "int"
+        },
+        {
+          "Name": "sortOrder",
+          "Direction": "1",
+          "Type": "int"
+        }
+      ],
+      "MgoIsUnique": false,
+      "MgoIsSparse": false
+    }
+  },
+  {
+    "IndexName": "subject_version_knowledge_status_sort",
+    "MgoKeySchema": {
+      "MgoIndexKeys": [
+        {
+          "Name": "subjectId",
+          "Direction": "1",
+          "Type": "varchar"
+        },
+        {
+          "Name": "version",
+          "Direction": "1",
+          "Type": "varchar"
+        },
+        {
+          "Name": "knowledge",
+          "Direction": "1",
+          "Type": "varchar"
+        },
+        {
+          "Name": "status",
+          "Direction": "1",
+          "Type": "int"
+        },
+        {
+          "Name": "sortOrder",
+          "Direction": "1",
+          "Type": "int"
+        }
+      ],
+      "MgoIsUnique": false,
+      "MgoIsSparse": false
+    }
+  },
+  {
+    "IndexName": "subject_version_chapter_knowledge_status_sort",
+    "MgoKeySchema": {
+      "MgoIndexKeys": [
+        {
+          "Name": "subjectId",
+          "Direction": "1",
+          "Type": "varchar"
+        },
+        {
+          "Name": "version",
+          "Direction": "1",
+          "Type": "varchar"
+        },
+        {
+          "Name": "chapterId",
+          "Direction": "1",
+          "Type": "varchar"
+        },
+        {
+          "Name": "knowledge",
+          "Direction": "1",
+          "Type": "varchar"
+        },
+        {
+          "Name": "status",
+          "Direction": "1",
+          "Type": "int"
+        },
+        {
+          "Name": "sortOrder",
+          "Direction": "1",
+          "Type": "int"
+        }
+      ],
+      "MgoIsUnique": false,
+      "MgoIsSparse": false
+    }
+  },
+  {
+    "IndexName": "subject_version_question",
+    "MgoKeySchema": {
+      "MgoIndexKeys": [
+        {
+          "Name": "subjectId",
+          "Direction": "1",
+          "Type": "varchar"
+        },
+        {
+          "Name": "version",
+          "Direction": "1",
+          "Type": "varchar"
+        },
+        {
+          "Name": "questionId",
+          "Direction": "1",
+          "Type": "varchar"
+        }
+      ],
+      "MgoIsUnique": false,
+      "MgoIsSparse": false
+    }
+  }
+]
