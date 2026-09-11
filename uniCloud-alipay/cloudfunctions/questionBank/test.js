@@ -172,13 +172,27 @@ function createFakeDatabase(collections) {
 
 function loadDatabase() {
 	const databaseDir = path.resolve(__dirname, '../../database')
+	const catalogSeedPath = path.join(databaseDir, 'question_bank_catalogs.init_data.json')
+	const questionSeedPath = path.join(databaseDir, 'question_bank_questions.init_data.json')
+	if (!fs.existsSync(catalogSeedPath) || !fs.existsSync(questionSeedPath)) {
+		const outputRoot = path.resolve(__dirname, '../../../outputs/question-bank/junior-personal-finance')
+		const version = fs.readdirSync(outputRoot).filter(name => (
+			fs.statSync(path.join(outputRoot, name)).isDirectory()
+		)).sort().slice(-1)[0]
+		const readJsonLines = filePath => fs.readFileSync(filePath, 'utf8')
+			.split(/\r?\n/).filter(Boolean).map(line => JSON.parse(line))
+		return {
+			question_bank_catalogs: readJsonLines(path.join(outputRoot, version, 'catalog.json')),
+			question_bank_questions: readJsonLines(path.join(outputRoot, version, 'questions.json'))
+		}
+	}
 	return {
 		question_bank_catalogs: JSON.parse(fs.readFileSync(
-			path.join(databaseDir, 'question_bank_catalogs.init_data.json'),
+			catalogSeedPath,
 			'utf8'
 		)),
 		question_bank_questions: JSON.parse(fs.readFileSync(
-			path.join(databaseDir, 'question_bank_questions.init_data.json'),
+			questionSeedPath,
 			'utf8'
 		))
 	}
@@ -229,8 +243,23 @@ async function run() {
 	const chapterPage = await service.execute({
 		action: 'getPracticePage', subjectId, mode: 'chapter', chapterId: '1', pageSize: 50
 	})
-	assert.equal(chapterPage.total, 79)
+	assert.equal(chapterPage.total, catalog.chapters.find(item => item.id === '1').count)
 	assert.ok(chapterPage.items.every(item => item.chapterId === '1'))
+	const repeatedSection = questions[0]
+	const sectionExpected = questions.filter(question => (
+		question.chapterId === repeatedSection.chapterId && question.section === repeatedSection.section
+	))
+	const sectionPage = await service.execute({
+		action: 'getPracticePage',
+		subjectId,
+		mode: 'section',
+		chapterId: repeatedSection.chapterId,
+		section: repeatedSection.section,
+		pageSize: 50
+	})
+	assert.equal(sectionPage.total, sectionExpected.length)
+	assert.ok(sectionPage.items.every(item => item.chapterId === repeatedSection.chapterId))
+	assert.ok(sectionPage.items.every(item => item.section === repeatedSection.section))
 
 	const knowledgePage = await service.execute({
 		action: 'getPracticePage',
@@ -240,7 +269,9 @@ async function run() {
 		knowledge: '银行个人理财业务分类',
 		pageSize: 50
 	})
-	assert.equal(knowledgePage.total, 21)
+	assert.equal(knowledgePage.total, questions.filter(item => (
+		item.chapterId === '1' && item.knowledge === '银行个人理财业务分类'
+	)).length)
 	assert.ok(knowledgePage.items.every(item => item.chapterId === '1'))
 	assert.ok(knowledgePage.items.every(item => item.knowledge === '银行个人理财业务分类'))
 
@@ -290,9 +321,48 @@ async function run() {
 		error => error instanceof QuestionBankError && error.errCode === 'QUESTION_BANK_INVALID_ARGUMENT'
 	)
 	await assert.rejects(
+		service.execute({ action: 'getPracticePage', subjectId, mode: 'section', chapterId: '1' }),
+		error => error instanceof QuestionBankError && error.errCode === 'QUESTION_BANK_INVALID_ARGUMENT'
+	)
+	await assert.rejects(
 		service.execute({ action: 'unknownAction', subjectId }),
 		error => error instanceof QuestionBankError && error.errCode === 'QUESTION_BANK_UNSUPPORTED_ACTION'
 	)
+
+	const sameNameCatalog = Object.assign({}, collections.question_bank_catalogs[0], {
+		questionCount: 2,
+		chapters: [{ id: '1', count: 1 }, { id: '2', count: 1 }]
+	})
+	const sameNameQuestions = [
+		Object.assign({}, questions[0], {
+			_id: `${sameNameCatalog.activeVersion}:scope-1`,
+			questionId: 'scope-1',
+			chapterId: '1',
+			section: '同名小节',
+			sortOrder: 1
+		}),
+		Object.assign({}, questions[1], {
+			_id: `${sameNameCatalog.activeVersion}:scope-2`,
+			questionId: 'scope-2',
+			chapterId: '2',
+			section: '同名小节',
+			sortOrder: 2
+		})
+	]
+	const sameNameService = createQuestionBankService(createFakeDatabase({
+		question_bank_catalogs: [sameNameCatalog],
+		question_bank_questions: sameNameQuestions
+	}))
+	const sameNameSectionPage = await sameNameService.execute({
+		action: 'getPracticePage',
+		subjectId,
+		mode: 'section',
+		chapterId: '2',
+		section: '同名小节',
+		pageSize: 20
+	})
+	assert.equal(sameNameSectionPage.total, 1)
+	assert.equal(sameNameSectionPage.items[0].id, 'scope-2')
 
 	console.log('questionBank tests passed')
 }

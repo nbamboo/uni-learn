@@ -162,15 +162,26 @@ function createDatabase(seed, now) {
 
 function loadSeed() {
 	const databaseDir = path.resolve(__dirname, '../../database')
+	const catalogSeedPath = path.join(databaseDir, 'question_bank_catalogs.init_data.json')
+	const questionSeedPath = path.join(databaseDir, 'question_bank_questions.init_data.json')
+	let catalogRows
+	let questionRows
+	if (fs.existsSync(catalogSeedPath) && fs.existsSync(questionSeedPath)) {
+		catalogRows = JSON.parse(fs.readFileSync(catalogSeedPath, 'utf8'))
+		questionRows = JSON.parse(fs.readFileSync(questionSeedPath, 'utf8'))
+	} else {
+		const outputRoot = path.resolve(__dirname, '../../../outputs/question-bank/junior-personal-finance')
+		const version = fs.readdirSync(outputRoot).filter(name => (
+			fs.statSync(path.join(outputRoot, name)).isDirectory()
+		)).sort().slice(-1)[0]
+		const readJsonLines = filePath => fs.readFileSync(filePath, 'utf8')
+			.split(/\r?\n/).filter(Boolean).map(line => JSON.parse(line))
+		catalogRows = readJsonLines(path.join(outputRoot, version, 'catalog.json'))
+		questionRows = readJsonLines(path.join(outputRoot, version, 'questions.json'))
+	}
 	return {
-		question_bank_catalogs: JSON.parse(fs.readFileSync(
-			path.join(databaseDir, 'question_bank_catalogs.init_data.json'),
-			'utf8'
-		)),
-			question_bank_questions: JSON.parse(fs.readFileSync(
-			path.join(databaseDir, 'question_bank_questions.init_data.json'),
-			'utf8'
-			)),
+		question_bank_catalogs: catalogRows,
+		question_bank_questions: questionRows,
 			'uni-id-users': [{
 				_id: 'user-one',
 				nickname: '理财学员',
@@ -386,6 +397,7 @@ async function run() {
 			judgedLocally: true,
 			correct: false,
 			chapterId: question.chapterId,
+			section: question.section,
 			knowledge: question.knowledge,
 			occurredAt: currentTime.getTime()
 		}],
@@ -417,6 +429,7 @@ async function run() {
 			judgedLocally: true,
 			correct: false,
 			chapterId: question.chapterId,
+			section: question.section,
 			knowledge: question.knowledge,
 			occurredAt: currentTime.getTime()
 		}]
@@ -436,6 +449,7 @@ async function run() {
 				judgedLocally: true,
 				correct: true,
 				chapterId: question.chapterId,
+				section: question.section,
 				knowledge: question.knowledge,
 				occurredAt: currentTime.getTime() + 1000
 			},
@@ -477,6 +491,7 @@ async function run() {
 	assert.deepEqual(snapshot.wrongQuestionIds, [])
 	assert.deepEqual(snapshot.favoriteQuestionIds, [question.questionId])
 	assert.equal(snapshot.chapterAttempts[question.chapterId], 1)
+	assert.equal(snapshot.sectionAttempts[`${question.chapterId}|${question.section}`], 1)
 	assert.equal(snapshot.progressPositions.chapter[question.chapterId], question.questionId)
 	const aggregateOnlySnapshot = await service.execute({
 		action: 'getStateSnapshot',
@@ -510,6 +525,33 @@ async function run() {
 		knowledgeAggregateSnapshot.knowledgeAttempts[`${question.chapterId}|${question.knowledge}`],
 		1
 	)
+	await service.execute({
+		action: 'syncEvents',
+		events: [{
+			type: 'answer',
+			eventId: 'answer-section-one',
+			subjectId,
+			questionId: question.questionId,
+			selected: question.answer,
+			practiceMode: 'section',
+			judgedLocally: true,
+			correct: true,
+			chapterId: question.chapterId,
+			section: question.section,
+			knowledge: question.knowledge,
+			occurredAt: currentTime.getTime() + 2600
+		}]
+	}, userId)
+	const sectionAggregateSnapshot = await service.execute({
+		action: 'getStateSnapshot',
+		subjectId,
+		includeProgress: false
+	}, userId)
+	assert.equal(
+		sectionAggregateSnapshot.sectionAttempts[`${question.chapterId}|${question.section}`],
+		1
+	)
+	assert.equal(sectionAggregateSnapshot.chapterAttempts[question.chapterId], 1)
 
 	const smartPractice = await service.execute({
 		action: 'getSmartPractice',
@@ -531,6 +573,7 @@ async function run() {
 		subjectId,
 		mode: 'chapter',
 		chapterId: question.chapterId,
+		section: '',
 		knowledge: '',
 		questionId: question.questionId,
 		progressAt: currentTime.getTime()
@@ -585,10 +628,36 @@ async function run() {
 	}, userId)
 	assert.equal(knowledgeProgress.questionId, question.questionId)
 	assert.equal(environment.collections.question_bank_user_progress.size, 2)
+	await service.execute({
+		action: 'syncEvents',
+		events: [],
+		progress: {
+			progressId: 'progress-section-one',
+			subjectId,
+			mode: 'section',
+			chapterId: question.chapterId,
+			section: question.section,
+			questionId: question.questionId,
+			occurredAt: currentTime.getTime() + 4500
+		}
+	}, userId)
+	const sectionProgress = await service.execute({
+		action: 'getProgress',
+		subjectId,
+		mode: 'section',
+		chapterId: question.chapterId,
+		section: question.section
+	}, userId)
+	assert.equal(sectionProgress.questionId, question.questionId)
+	assert.equal(environment.collections.question_bank_user_progress.size, 3)
 	const scopedSnapshot = await service.execute({ action: 'getStateSnapshot', subjectId }, userId)
 	assert.equal(scopedSnapshot.progressPositions.chapter[question.chapterId], nextQuestion.questionId)
 	assert.equal(
 		scopedSnapshot.progressPositions.knowledge[`${question.chapterId}|${question.knowledge}`],
+		question.questionId
+	)
+	assert.equal(
+		scopedSnapshot.progressPositions.section[`${question.chapterId}|${question.section}`],
 		question.questionId
 	)
 
@@ -641,17 +710,26 @@ async function run() {
 			practiceModes: ['knowledge']
 		})
 	})
+	environment.collections.question_bank_user_states.set(`${migrationUserId}|${subjectId}|${question.questionId}`, {
+		_id: `${migrationUserId}|${subjectId}|${question.questionId}`,
+		userId: migrationUserId,
+		subjectId,
+		questionId: question.questionId,
+		chapterId: question.chapterId,
+		attempted: true,
+		practiceModes: ['chapter']
+	})
 	environment.collections.question_bank_user_stats.set(`${migrationUserId}|${subjectId}`, {
 		_id: `${migrationUserId}|${subjectId}`,
 		userId: migrationUserId,
 		subjectId,
-		attempted: 2,
-		correct: 2,
+		attempted: 3,
+		correct: 3,
 		wrong: 0,
 		favorite: 0,
-		totalAttempts: 2,
+		totalAttempts: 3,
 		todayKey: '2026-08-28',
-		todayAttempts: 2,
+		todayAttempts: 3,
 		chapterAttempts: [],
 		knowledgeAttempts: [{ key: '相关管理要求', count: 2 }],
 		stateAggregateVersion: 2,
@@ -666,9 +744,11 @@ async function run() {
 	assert.equal(migratedSnapshot.knowledgeAttempts['5|相关管理要求'], 1)
 	assert.equal(migratedSnapshot.knowledgeAttempts['6|相关管理要求'], 1)
 	assert.equal(migratedSnapshot.knowledgeAttempts['相关管理要求'], 2)
+	assert.equal(migratedSnapshot.chapterAttempts[question.chapterId], 1)
+	assert.equal(migratedSnapshot.sectionAttempts[`${question.chapterId}|${question.section}`], 1)
 	assert.equal(
 		environment.collections.question_bank_user_stats.get(`${migrationUserId}|${subjectId}`).stateAggregateVersion,
-		3
+		5
 	)
 	for (const collectionName of ['question_bank_user_states', 'question_bank_user_stats']) {
 		for (const [id, document] of environment.collections[collectionName]) {

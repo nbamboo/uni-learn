@@ -30,7 +30,7 @@ let source = fs.readFileSync(servicePath, 'utf8')
 source = source
 	.replace(/^\s*import[\s\S]*?from\s+['"][^'"]+['"]\s*$/gm, '')
 	.replace(/\bexport\s+(?=(?:class|async\s+function|function|const|let|var)\b)/g, '')
-source += '\n;globalThis.__practice = { clearSubjectPracticeState, getPracticeState, getChapterProgress }'
+source += '\n;globalThis.__practice = { clearSubjectPracticeState, getPracticeState, getChapterProgress, getSectionProgress }'
 
 vm.createContext(environment)
 vm.runInContext(source, environment, { filename: servicePath })
@@ -40,7 +40,8 @@ storage.set(stateKey, {
 	currentSubjectId: 'junior-personal-finance',
 	answers: {
 		'ipf-1': { subjectId: 'junior-personal-finance', chapterId: '1', practiceModes: ['smart'], selected: ['A'] },
-		'ipf-2': { subjectId: 'junior-personal-finance', chapterId: '1', practiceModes: ['chapter'], selected: ['A'] },
+		'ipf-2': { subjectId: 'junior-personal-finance', chapterId: '1', section: '第一节', practiceModes: ['chapter'], selected: ['A'] },
+		'ipf-3': { subjectId: 'junior-personal-finance', chapterId: '1', section: '第一节', practiceModes: ['section'], selected: ['B'] },
 		'law-1': { subjectId: 'junior-law', selected: ['B'] }
 	},
 	favorites: ['ipf-1', 'law-1', 'unscoped-1'],
@@ -62,10 +63,14 @@ storage.set(stateKey, {
 assert.equal(environment.__practice.getPracticeState().answers['ipf-1'].practiceModes[0], 'smart')
 currentUser.uid = 'another-user'
 assert.deepEqual(JSON.parse(JSON.stringify(environment.__practice.getPracticeState().answers)), {})
-currentUser.uid = 'clear-test-user'
+	currentUser.uid = 'clear-test-user'
 assert.equal(
 	environment.__practice.getChapterProgress('junior-personal-finance', '1', 10).attempted,
-	1
+	2
+)
+assert.equal(
+	environment.__practice.getSectionProgress('junior-personal-finance', '1', '第一节', 4).attempted,
+	2
 )
 
 environment.__practice.clearSubjectPracticeState('junior-personal-finance')
@@ -74,6 +79,7 @@ const saved = environment.__practice.getPracticeState()
 assert.equal(saved.currentSubjectId, 'junior-personal-finance')
 assert.equal(saved.answers['ipf-1'], undefined)
 assert.equal(saved.answers['ipf-2'], undefined)
+assert.equal(saved.answers['ipf-3'], undefined)
 assert.deepEqual(JSON.parse(JSON.stringify(saved.answers['law-1'].selected)), ['B'])
 assert.deepEqual(Array.from(saved.favorites), ['law-1', 'unscoped-1'])
 assert.equal(saved.favoriteSubjects['ipf-1'], undefined)

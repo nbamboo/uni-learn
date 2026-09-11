@@ -2,6 +2,7 @@ const CLOUD_FUNCTION_NAME = 'questionBankUser'
 const OUTBOX_STORAGE_KEY = 'uni-learn-practice-cloud-outbox-v1'
 const PROGRESS_STORAGE_KEY = 'uni-learn-practice-cloud-progress-v1'
 const CHAPTER_POSITION_STORAGE_KEY = 'uni-learn-practice-chapter-position-v1'
+const SECTION_POSITION_STORAGE_KEY = 'uni-learn-practice-section-position-v1'
 const KNOWLEDGE_POSITION_STORAGE_KEY = 'uni-learn-practice-knowledge-position-v1'
 const PREFERENCES_STORAGE_KEY = 'uni-learn-practice-preferences-v1'
 const PRACTICE_STATE_STORAGE_KEY = 'uni-learn-practice-state-v1'
@@ -22,7 +23,7 @@ const SYNC_BATCH_TRIGGER = 10
 const SYNC_DELAY = 15 * 1000
 const RETRY_DELAY = 180
 const ANSWER_MODES = ['exam', 'practice', 'review']
-const PRACTICE_ENTRY_MODES = ['smart', 'chapter', 'knowledge', 'wrong', 'favorite', 'search', 'sequence']
+const PRACTICE_ENTRY_MODES = ['smart', 'chapter', 'section', 'knowledge', 'wrong', 'favorite', 'search', 'sequence']
 const MAX_PERSISTED_SUMMARIES = 20
 
 const snapshotCache = new Map()
@@ -100,6 +101,11 @@ function summaryCacheKey(subjectId) {
 export function getKnowledgeScopeKey(chapterId, knowledge) {
 	if (chapterId === undefined || chapterId === null || !String(chapterId) || !knowledge) return ''
 	return `${String(chapterId)}|${String(knowledge)}`
+}
+
+export function getSectionScopeKey(chapterId, section) {
+	if (chapterId === undefined || chapterId === null || !String(chapterId) || !section) return ''
+	return `${String(chapterId)}|${String(section)}`
 }
 
 function readPersistedSummaries() {
@@ -310,10 +316,14 @@ function saveOutbox(events) {
 
 function progressScopeKey(progress) {
 	if (!progress || !progress.subjectId) return ''
-	const mode = progress.mode === 'knowledge' ? 'knowledge' : 'chapter'
+	const mode = ['chapter', 'section', 'knowledge'].indexOf(progress.mode) > -1
+		? progress.mode
+		: 'chapter'
 	const scope = mode === 'knowledge'
 		? getKnowledgeScopeKey(progress.chapterId, progress.knowledge)
-		: progress.chapterId
+		: (mode === 'section'
+			? getSectionScopeKey(progress.chapterId, progress.section)
+			: progress.chapterId)
 	return scope === undefined || scope === null || scope === ''
 		? ''
 		: `${progress.subjectId}|${mode}|${scope}`
@@ -391,6 +401,7 @@ function savePracticePosition(storageKey, positionKey, progress) {
 	positions[positionKey] = {
 		subjectId: progress.subjectId,
 		chapterId: progress.chapterId,
+		section: progress.section || '',
 		knowledge: progress.knowledge || '',
 		questionId: progress.questionId,
 		updatedAt: progress.occurredAt
@@ -454,6 +465,7 @@ export function queuePracticeAnswer(question, selected, options) {
 		event.judgedLocally = true
 		event.correct = localCorrect
 		event.chapterId = String(chapterId)
+		event.section = question.section || ''
 		event.knowledge = question.knowledge || ''
 	}
 	invalidateUserPracticeCache(event.subjectId)
@@ -478,21 +490,30 @@ export function savePracticeProgress(question, options) {
 	const config = options || {}
 	const subjectId = question && question.subjectId
 	const chapterId = question && (question.chapterId || config.chapterId)
+	const section = config.section || question && question.section || ''
 	const knowledge = config.knowledge || question && question.knowledge || ''
-	const mode = config.mode === 'knowledge' ? 'knowledge' : 'chapter'
+	const mode = ['section', 'knowledge'].indexOf(config.mode) > -1 ? config.mode : 'chapter'
 	const questionId = question && (question.questionId || question.id)
 	if (!subjectId || chapterId === undefined || chapterId === null || !questionId) return null
 	if (mode === 'knowledge' && !knowledge) return null
+	if (mode === 'section' && !section) return null
 	const progress = {
 		progressId: config.progressId || createPracticeEventId('progress'),
 		subjectId,
 		mode,
 		chapterId: String(chapterId),
+		section: mode === 'section' ? section : '',
 		knowledge: mode === 'knowledge' ? knowledge : '',
 		questionId,
 		occurredAt: Number(config.occurredAt) || Date.now()
 	}
-	if (mode === 'knowledge') {
+	if (mode === 'section') {
+		savePracticePosition(
+			SECTION_POSITION_STORAGE_KEY,
+			`${progress.subjectId}|${getSectionScopeKey(progress.chapterId, progress.section)}`,
+			progress
+		)
+	} else if (mode === 'knowledge') {
 		savePracticePosition(
 			KNOWLEDGE_POSITION_STORAGE_KEY,
 			`${progress.subjectId}|${getKnowledgeScopeKey(progress.chapterId, progress.knowledge)}`,
@@ -513,6 +534,14 @@ export function getChapterPracticePosition(subjectId, chapterId) {
 	if (!subjectId || chapterId === undefined || chapterId === null) return null
 	const positions = readPracticePositions(CHAPTER_POSITION_STORAGE_KEY)
 	const position = positions[`${subjectId}|${String(chapterId)}`]
+	return position && position.questionId ? cloneValue(position) : null
+}
+
+export function getSectionPracticePosition(subjectId, chapterId, section) {
+	if (!subjectId || chapterId === undefined || chapterId === null || !section) return null
+	const positions = readPracticePositions(SECTION_POSITION_STORAGE_KEY)
+	const scopeKey = getSectionScopeKey(chapterId, section)
+	const position = positions[`${subjectId}|${scopeKey}`]
 	return position && position.questionId ? cloneValue(position) : null
 }
 
@@ -966,12 +995,19 @@ function getLocalPracticeSnapshot(subjectId, options) {
 		}
 	})
 	const chapterAttempts = {}
+	const sectionAttempts = {}
 	const knowledgeAttempts = {}
 	if (config.includeAggregates !== false) {
 		answers.forEach(item => {
 			const modes = Array.isArray(item.answer.practiceModes) ? item.answer.practiceModes : []
-			if (modes.indexOf('chapter') > -1 && item.answer.chapterId) {
+			const isChapterScopePractice = modes.indexOf('chapter') > -1
+				|| modes.indexOf('section') > -1
+			if (isChapterScopePractice && item.answer.chapterId) {
 				chapterAttempts[item.answer.chapterId] = (chapterAttempts[item.answer.chapterId] || 0) + 1
+			}
+			if (isChapterScopePractice && item.answer.chapterId && item.answer.section) {
+				const scopeKey = getSectionScopeKey(item.answer.chapterId, item.answer.section)
+				sectionAttempts[scopeKey] = (sectionAttempts[scopeKey] || 0) + 1
 			}
 			if (modes.indexOf('knowledge') > -1 && item.answer.knowledge) {
 				const scopeKey = getKnowledgeScopeKey(item.answer.chapterId, item.answer.knowledge)
@@ -980,7 +1016,7 @@ function getLocalPracticeSnapshot(subjectId, options) {
 			}
 		})
 	}
-	const progressPositions = { chapter: {}, knowledge: {} }
+	const progressPositions = { chapter: {}, section: {}, knowledge: {} }
 	if (config.includeProgress !== false) {
 		const chapterPositions = readPracticePositions(CHAPTER_POSITION_STORAGE_KEY)
 		Object.keys(chapterPositions).forEach(key => {
@@ -997,6 +1033,14 @@ function getLocalPracticeSnapshot(subjectId, options) {
 				progressPositions.knowledge[scopeKey || position.knowledge] = position.questionId
 			}
 		})
+		const sectionPositions = readPracticePositions(SECTION_POSITION_STORAGE_KEY)
+		Object.keys(sectionPositions).forEach(key => {
+			const position = sectionPositions[key]
+			if (position && position.subjectId === subjectId && position.section && position.questionId) {
+				const scopeKey = getSectionScopeKey(position.chapterId, position.section)
+				if (scopeKey) progressPositions.section[scopeKey] = position.questionId
+			}
+		})
 	}
 	return {
 		subjectId,
@@ -1006,6 +1050,7 @@ function getLocalPracticeSnapshot(subjectId, options) {
 			.map(item => item.questionId),
 		favoriteQuestionIds: favoriteIds,
 		chapterAttempts,
+		sectionAttempts,
 		knowledgeAttempts,
 		progressPositions,
 		_localOnly: true
@@ -1222,15 +1267,19 @@ export async function getSmartPracticeQuestions(options) {
 export async function getPracticeProgress(options) {
 	const input = options || {}
 	if (!practiceCloudSyncEnabled()) {
-		const position = input.mode === 'knowledge'
-			? getKnowledgePracticePosition(input.subjectId, input.chapterId, input.knowledge)
-			: getChapterPracticePosition(input.subjectId, input.chapterId)
+		const mode = ['section', 'knowledge'].indexOf(input.mode) > -1 ? input.mode : 'chapter'
+		const position = mode === 'section'
+			? getSectionPracticePosition(input.subjectId, input.chapterId, input.section)
+			: (mode === 'knowledge'
+				? getKnowledgePracticePosition(input.subjectId, input.chapterId, input.knowledge)
+				: getChapterPracticePosition(input.subjectId, input.chapterId))
 		if (!position) return null
 		return {
 			subjectId: input.subjectId,
-			mode: input.mode === 'knowledge' ? 'knowledge' : 'chapter',
+			mode,
 			chapterId: String(input.chapterId || position.chapterId || ''),
-			knowledge: input.mode === 'knowledge' ? input.knowledge || position.knowledge || '' : '',
+			section: mode === 'section' ? input.section || position.section || '' : '',
+			knowledge: mode === 'knowledge' ? input.knowledge || position.knowledge || '' : '',
 			questionId: position.questionId,
 			progressAt: Number(position.updatedAt) || 0,
 			_localOnly: true
@@ -1241,6 +1290,7 @@ export async function getPracticeProgress(options) {
 		subjectId: input.subjectId,
 		mode: input.mode,
 		chapterId: input.chapterId,
+		section: input.section,
 		knowledge: input.knowledge
 	})
 }
@@ -1277,6 +1327,7 @@ function clearSubjectLocalSyncData(subjectId) {
 		readPendingProgresses().filter(item => item.subjectId !== subjectId)
 	)
 	removeSubjectPracticePositions(CHAPTER_POSITION_STORAGE_KEY, subjectId)
+	removeSubjectPracticePositions(SECTION_POSITION_STORAGE_KEY, subjectId)
 	removeSubjectPracticePositions(KNOWLEDGE_POSITION_STORAGE_KEY, subjectId)
 	removePersistedSummary(subjectId)
 	summaryRefreshRequiredKeys.delete(summaryCacheKey(subjectId))
@@ -1428,6 +1479,8 @@ export default {
 	getChapterPracticePosition,
 	getKnowledgeScopeKey,
 	getKnowledgePracticePosition,
+	getSectionScopeKey,
+	getSectionPracticePosition,
 	getCurrentPracticeUser,
 	getCachedPracticeSummary,
 	getPracticeProgress,

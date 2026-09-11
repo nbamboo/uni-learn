@@ -18,7 +18,7 @@ const MAX_QUESTION_IDS = 2000
 const MAX_PRACTICE_PAGES = 100
 const DEFAULT_RETRY_COUNT = 1
 const RETRY_DELAY = 120
-const PRACTICE_MODES = ['sequence', 'chapter', 'knowledge', 'search', 'smart']
+const PRACTICE_MODES = ['sequence', 'chapter', 'section', 'knowledge', 'search', 'smart']
 const ANSWER_ALIASES = ['A', 'B', 'C', 'D', 'E', 'F']
 const ID_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/
 
@@ -501,6 +501,30 @@ function getPersistedKnowledgeQuestions(catalog, chapterId, knowledge) {
 	return items.sort((left, right) => (Number(left.sortOrder) || 0) - (Number(right.sortOrder) || 0))
 }
 
+function getPersistedSectionQuestions(catalog, chapterId, section) {
+	if (!chapterId || !section) return null
+	const resolvedChapterId = String(chapterId)
+	const catalogChapter = getCatalogChapter(catalog, resolvedChapterId)
+	if (!catalogChapter) return null
+	const expectedChapterTotal = Number(catalogChapter.count)
+	const persisted = getPersistedChapter(
+		catalog.subjectId,
+		catalog.activeVersion,
+		resolvedChapterId,
+		Number.isInteger(expectedChapterTotal) ? expectedChapterTotal : undefined
+	)
+	if (!persisted) return null
+	const items = persisted.items.filter(question => (
+		String(question.chapterId) === resolvedChapterId && question.section === section
+	))
+	const catalogSection = Array.isArray(catalogChapter.sections)
+		? catalogChapter.sections.find(item => item.name === section)
+		: null
+	const expectedTotal = catalogSection && Number(catalogSection.count)
+	if (Number.isInteger(expectedTotal) && expectedTotal !== items.length) return null
+	return items.sort((left, right) => (Number(left.sortOrder) || 0) - (Number(right.sortOrder) || 0))
+}
+
 function getPersistedQuestionsByIds(catalog, questionIds) {
 	const requested = new Set(questionIds)
 	const found = new Map()
@@ -729,6 +753,24 @@ function buildLocalSmartPage(catalog, items, payload) {
 
 function buildLocalPracticePage(catalog, mode, payload) {
 	if (!catalog || !catalog.activeVersion) return null
+	if (mode === 'section') {
+		const sectionItems = getPersistedSectionQuestions(
+			catalog,
+			payload.chapterId,
+			payload.section
+		)
+		if (!sectionItems) return null
+		const page = paginateLocalQuestions(sectionItems, payload.cursor, payload.pageSize)
+		return Object.assign({
+			subjectId: catalog.subjectId,
+			version: catalog.activeVersion,
+			mode,
+			total: sectionItems.length,
+			pageSize: payload.pageSize,
+			cursor: payload.cursor,
+			_localOnly: true
+		}, page)
+	}
 	if (mode === 'knowledge') {
 		const knowledgeItems = getPersistedKnowledgeQuestions(
 			catalog,
@@ -866,6 +908,16 @@ function buildPracticePayload(input, subjectId, mode) {
 		payload.chapterId = normalizeString(input.chapterId, 'chapterId', {
 			required: true,
 			maxLength: 32
+		})
+	}
+	if (mode === 'section') {
+		payload.chapterId = normalizeString(input.chapterId, 'chapterId', {
+			required: true,
+			maxLength: 32
+		})
+		payload.section = normalizeString(input.section, 'section', {
+			required: true,
+			maxLength: 128
 		})
 	}
 	if (mode === 'knowledge') {
@@ -1023,13 +1075,16 @@ export async function getAllPracticeQuestions(params, options) {
 		maximum: MAX_PAGE_SIZE
 	})
 	const firstCursor = mode === 'smart' ? 0 : normalizeCursor(input.cursor)
-	const chapterId = mode === 'chapter'
+	const chapterId = mode === 'chapter' || mode === 'section'
 		? normalizeString(input.chapterId, 'chapterId', { required: true, maxLength: 32 })
 		: (mode === 'knowledge'
 			? normalizeString(input.chapterId, 'chapterId', { maxLength: 32 })
 			: '')
+	const section = mode === 'section'
+		? normalizeString(input.section, 'section', { required: true, maxLength: 128 })
+		: ''
 	const config = options || {}
-	if ((mode === 'chapter' || mode === 'knowledge' || mode === 'sequence')
+	if ((mode === 'chapter' || mode === 'section' || mode === 'knowledge' || mode === 'sequence')
 		&& firstCursor === 0
 		&& !config.forceRefresh) {
 		const catalog = await getQuestionCatalog(subjectId)
@@ -1044,6 +1099,8 @@ export async function getAllPracticeQuestions(params, options) {
 				Number.isInteger(expectedTotal) ? expectedTotal : undefined
 			)
 			persistedItems = persisted && persisted.items
+		} else if (mode === 'section') {
+			persistedItems = getPersistedSectionQuestions(catalog, chapterId, section)
 		} else if (mode === 'knowledge') {
 			persistedItems = getPersistedKnowledgeQuestions(catalog, chapterId, input.knowledge)
 		} else {

@@ -1,8 +1,8 @@
 # 用户题库云端功能部署
 
-代码已经按会员状态拆分用户数据：非会员的答题、统计、章节/知识点进度和偏好仅保存在本机；会员继续使用离线待同步队列和云端跨设备同步，并从云端读取错题/收藏夹。系统不在云端保存历史答题流水。
+代码已经按会员状态拆分用户数据：非会员的答题、统计、章节/小节/知识点进度和偏好仅保存在本机；会员继续使用离线待同步队列和云端跨设备同步，并从云端读取错题/收藏夹。系统不在云端保存历史答题流水。
 
-当前版本把知识点范围升级为 `chapterId + knowledge`，并允许客户端从完整章节缓存中直接生成知识点练习、非会员智能练习和本地搜索结果。升级时需要同时更新 `question_bank_questions` 索引、`question_bank_user_stats`/`question_bank_user_progress` Schema，并重新部署 `questionBank` 和 `questionBankUser`；会员旧汇总会在首次读取时自动迁移，不需要手工改数据。
+当前版本增加 `chapterId + section` 小节范围，并继续使用 `chapterId + knowledge` 知识点范围。客户端可从完整章节缓存直接生成小节/知识点练习、非会员智能练习和本地搜索结果。升级时需要同时更新 `question_bank_catalogs`、`question_bank_questions` 索引、`question_bank_user_states`、`question_bank_user_stats`、`question_bank_user_progress` Schema，并重新部署 `questionBank` 和 `questionBankUser`；会员旧汇总会在首次读取时自动迁移到 v4，不需要手工改数据。
 
 会员的单科做题汇总在客户端内存和本地各缓存 10 分钟；冷启动先展示上次云端汇总，小程序重新回到前台后按实际查看科目刷新。本机答题会立即使内存汇总失效，待同步事件存在时不会用旧云端汇总覆盖本机即时统计，`syncEvents` 返回的最新汇总会直接更新缓存。
 
@@ -71,10 +71,14 @@ node scripts/check-user-cloud-readiness.js
 - `question_bank_user_stats`
 - `question_bank_user_progress`
 - `question_bank_user_preferences`
+- `question_bank_catalogs`
+
+同时按 `question_bank_questions.index.json` 新增
+`subject_version_chapter_section_status_sort` 复合索引。
 
 然后上传 `questionBankUser` 云函数。该云函数必须能解析 `uni-id-common` 依赖。
 
-推荐顺序是：先上传三个 Schema，再配置三个集合的索引，最后上传 `questionBankUser`。如果 HBuilderX 当前版本没有对单个 `.index.json` 提供上传菜单，可在 uniCloud Web 控制台按文件内容创建同名索引，不要改用整库初始化。
+推荐顺序是：先上传本节列出的 Schema，再配置集合索引，最后上传 `questionBank` 和 `questionBankUser`。如果 HBuilderX 当前版本没有对单个 `.index.json` 提供上传菜单，可在 uniCloud Web 控制台按文件内容创建同名索引，不要改用整库初始化。
 
 ## 5. 联调检查
 
@@ -83,7 +87,7 @@ node scripts/check-user-cloud-readiness.js
 1. 进入“刷题”页，应在 `uni-id-users` 自动创建或复用当前微信用户。
 2. 使用非会员账号答题并切换章节/知识点，确认本机重启后状态仍存在，同时 `question_bank_user_states`、`question_bank_user_stats`、`question_bank_user_progress` 和 `question_bank_user_preferences` 均不产生该用户的数据。
 3. 非会员进入“关于”页，应显示“做题数据仅保存在本机”。
-4. 开通会员后继续答题，确认本地待同步事件被上传，`question_bank_user_progress` 在同一章节或知识点内始终覆盖原记录。
+4. 开通会员后继续答题，确认本地待同步事件被上传，`question_bank_user_progress` 在同一章节、小节或知识点内始终覆盖原记录。
 5. 同一道题作答两次，确认云端不产生历史流水；“错题集”只反映最后一次作答结果。
 6. 点击“做题记录”，确认跳回上次科目、章节和题目；会员的错题集、收藏夹从云端读取。
 7. 关闭并重新打开小程序，确认会员进度仍存在，并可在另一台设备使用同一微信账号恢复。

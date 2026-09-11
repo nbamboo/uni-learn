@@ -8,7 +8,7 @@ import {
 export const DEFAULT_SUBJECT_ID = 'junior-personal-finance'
 export const PRACTICE_STATE_KEY = 'uni-learn-practice-state-v1'
 export const DAILY_GOAL = 20
-const PRACTICE_ENTRY_MODES = ['smart', 'chapter', 'knowledge', 'wrong', 'favorite', 'search', 'sequence']
+const PRACTICE_ENTRY_MODES = ['smart', 'chapter', 'section', 'knowledge', 'wrong', 'favorite', 'search', 'sequence']
 export const PRACTICE_PROGRESS_UPDATED_EVENT = 'uni-learn-practice-progress-updated'
 
 export const subjectGroups = [
@@ -250,6 +250,7 @@ export function recordAnswer(question, selected, options) {
 	state.answers[question.id] = {
 		subjectId: question.subjectId,
 		chapterId: question.chapterId,
+		section: question.section,
 		knowledge: question.knowledge,
 		selected: selected.slice(),
 		correct,
@@ -264,13 +265,14 @@ export function recordAnswer(question, selected, options) {
 		attempts: daily && daily.dayKey === todayKey ? (Number(daily.attempts) || 0) + 1 : 1
 	}
 	savePracticeState(state)
-	if ((practiceMode === 'chapter' || practiceMode === 'knowledge')
+	if ((practiceMode === 'chapter' || practiceMode === 'section' || practiceMode === 'knowledge')
 		&& typeof uni !== 'undefined'
 		&& typeof uni.$emit === 'function') {
 		uni.$emit(PRACTICE_PROGRESS_UPDATED_EVENT, {
 			subjectId: question.subjectId,
 			mode: practiceMode,
 			chapterId: question.chapterId,
+			section: question.section || '',
 			knowledge: question.knowledge || '',
 			questionId: question.id
 		})
@@ -292,10 +294,28 @@ export function getChapterProgress(subjectId, chapterId, questionCount) {
 		: (chapter ? chapter.count : 0)
 	const attempted = Object.keys(state.answers).filter(questionId => {
 		const answer = state.answers[questionId]
+		const practiceModes = Array.isArray(answer.practiceModes) ? answer.practiceModes : []
 		return answer.subjectId === subjectId
 			&& answer.chapterId === String(chapterId)
-			&& Array.isArray(answer.practiceModes)
-			&& answer.practiceModes.indexOf('chapter') > -1
+			&& (practiceModes.indexOf('chapter') > -1 || practiceModes.indexOf('section') > -1)
+	}).length
+	return {
+		attempted,
+		total,
+		percent: total ? Math.min(100, Math.round(attempted / total * 100)) : 0
+	}
+}
+
+export function getSectionProgress(subjectId, chapterId, section, questionCount) {
+	const state = getPracticeState()
+	const total = Number.isInteger(questionCount) && questionCount >= 0 ? questionCount : 0
+	const attempted = Object.keys(state.answers).filter(questionId => {
+		const answer = state.answers[questionId]
+		const practiceModes = Array.isArray(answer.practiceModes) ? answer.practiceModes : []
+		return answer.subjectId === subjectId
+			&& answer.chapterId === String(chapterId)
+			&& answer.section === section
+			&& (practiceModes.indexOf('chapter') > -1 || practiceModes.indexOf('section') > -1)
 	}).length
 	return {
 		attempted,

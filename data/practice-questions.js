@@ -108,6 +108,10 @@ export async function buildPracticeQuestions(options) {
 			pageSize: 50
 		}
 		if (mode === 'chapter') query.chapterId = config.chapterId
+		if (mode === 'section') {
+			query.chapterId = config.chapterId
+			query.section = config.section
+		}
 		if (mode === 'knowledge') {
 			query.chapterId = config.chapterId
 			query.knowledge = config.knowledge

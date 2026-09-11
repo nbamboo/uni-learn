@@ -22,6 +22,9 @@ IMAGE_PATTERN = re.compile(r"\[图片:\s*(https?://[^\]]+)\]")
 SUBJECT_ID_PATTERN = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
 QUESTION_ID_PATTERN = SUBJECT_ID_PATTERN
 EMPTY_QUESTION_PATTERN = re.compile(r"\[题目\]\s*$")
+SECTION_ORDINAL_PATTERN = re.compile(
+    r"^第\s*([0-9一二三四五六七八九十百零〇两]+)\s*(?:节|部分)"
+)
 
 SUBJECT_CONFIGS = {
     "银行从业初级个人理财": {
@@ -305,6 +308,89 @@ def question_document(candidate, sort_order, updated_at):
     }
 
 
+def chinese_ordinal_value(value):
+    if value.isdigit():
+        return int(value)
+    digits = {"零": 0, "〇": 0, "一": 1, "二": 2, "两": 2, "三": 3, "四": 4,
+              "五": 5, "六": 6, "七": 7, "八": 8, "九": 9}
+    units = {"十": 10, "百": 100}
+    total = 0
+    current = 0
+    for char in value:
+        if char in digits:
+            current = digits[char]
+        elif char in units:
+            unit = units[char]
+            total += (current or 1) * unit
+            current = 0
+        else:
+            return None
+    return total + current
+
+
+def section_sort_key(item):
+    name, metadata = item
+    match = SECTION_ORDINAL_PATTERN.match(name)
+    ordinal = chinese_ordinal_value(match.group(1)) if match else None
+    if ordinal is None:
+        return (1, metadata["firstSeen"])
+    return (0, ordinal, metadata["firstSeen"])
+
+
+def chapter_sort_key(item):
+    (chapter_id, _chapter_name), metadata = item
+    if chapter_id.isdigit():
+        return (0, int(chapter_id), metadata["firstSeen"])
+    return (1, metadata["firstSeen"])
+
+
+def order_candidates_by_scope(candidates):
+    """Keep source order within a section while grouping chapters and sections naturally."""
+    chapters = OrderedDict()
+    for candidate in candidates:
+        fields = candidate["fields"]
+        chapter_key = (fields["chapterId"], fields["chapter"])
+        if chapter_key not in chapters:
+            chapters[chapter_key] = {
+                "firstSeen": len(chapters),
+                "sections": OrderedDict(),
+            }
+        sections = chapters[chapter_key]["sections"]
+        if fields["section"] not in sections:
+            sections[fields["section"]] = {"firstSeen": len(sections)}
+
+    chapter_ranks = {
+        chapter_key: rank
+        for rank, (chapter_key, _metadata) in enumerate(
+            sorted(chapters.items(), key=chapter_sort_key)
+        )
+    }
+    section_ranks = {
+        chapter_key: {
+            section_name: rank
+            for rank, (section_name, _metadata) in enumerate(
+                sorted(metadata["sections"].items(), key=section_sort_key)
+            )
+        }
+        for chapter_key, metadata in chapters.items()
+    }
+
+    def candidate_sort_key(indexed_candidate):
+        original_index, candidate = indexed_candidate
+        fields = candidate["fields"]
+        chapter_key = (fields["chapterId"], fields["chapter"])
+        return (
+            chapter_ranks[chapter_key],
+            section_ranks[chapter_key][fields["section"]],
+            original_index,
+        )
+
+    return [
+        candidate
+        for _index, candidate in sorted(enumerate(candidates), key=candidate_sort_key)
+    ]
+
+
 def catalog_document(questions, config, version, updated_at):
     chapters = OrderedDict()
     knowledge_groups = OrderedDict()
@@ -316,8 +402,17 @@ def catalog_document(questions, config, version, updated_at):
                 "subjectId": config["subjectId"],
                 "name": question["chapter"],
                 "count": 0,
+                "_sections": OrderedDict(),
             }
-        chapters[chapter_key]["count"] += 1
+        chapter = chapters[chapter_key]
+        chapter["count"] += 1
+        section_name = question["section"]
+        if section_name not in chapter["_sections"]:
+            chapter["_sections"][section_name] = {
+                "count": 0,
+                "firstSeen": len(chapter["_sections"]),
+            }
+        chapter["_sections"][section_name]["count"] += 1
 
         knowledge_key = (question["chapterId"], question["chapter"], question["knowledge"])
         if knowledge_key not in knowledge_groups:
@@ -329,6 +424,15 @@ def catalog_document(questions, config, version, updated_at):
             }
         knowledge_groups[knowledge_key]["count"] += 1
 
+    catalog_chapters = []
+    for chapter in chapters.values():
+        sections = [
+            {"name": name, "count": metadata["count"]}
+            for name, metadata in sorted(chapter.pop("_sections").items(), key=section_sort_key)
+        ]
+        chapter["sections"] = sections
+        catalog_chapters.append(chapter)
+
     return {
         "_id": config["subjectId"],
         "subjectId": config["subjectId"],
@@ -337,7 +441,7 @@ def catalog_document(questions, config, version, updated_at):
         "status": 1,
         "activeVersion": version,
         "questionCount": len(questions),
-        "chapters": list(chapters.values()),
+        "chapters": catalog_chapters,
         "knowledgeGroups": list(knowledge_groups.values()),
         "updatedAt": updated_at,
     }
@@ -366,12 +470,42 @@ def validate_outputs(questions, catalog):
     ids = [question["questionId"] for question in questions]
     document_ids = [question["_id"] for question in questions]
     expected_orders = list(range(1, len(questions) + 1))
+    expected_scopes = [
+        (chapter["id"], section["name"])
+        for chapter in catalog["chapters"]
+        for section in chapter.get("sections", [])
+    ]
+    actual_scopes = []
+    for question in questions:
+        scope = (question["chapterId"], question["section"])
+        if not actual_scopes or actual_scopes[-1] != scope:
+            actual_scopes.append(scope)
+    natural_section_order = all(
+        [section["name"] for section in chapter.get("sections", [])]
+        == [
+            name
+            for name, _metadata in sorted(
+                [
+                    (section["name"], {"firstSeen": index})
+                    for index, section in enumerate(chapter.get("sections", []))
+                ],
+                key=section_sort_key,
+            )
+        ]
+        for chapter in catalog["chapters"]
+    )
     checks = {
         "uniqueQuestionIds": len(ids) == len(set(ids)),
         "uniqueDocumentIds": len(document_ids) == len(set(document_ids)),
         "denseSortOrder": [question["sortOrder"] for question in questions] == expected_orders,
         "catalogCountMatches": catalog["questionCount"] == len(questions),
         "chapterCountsMatch": sum(chapter["count"] for chapter in catalog["chapters"]) == len(questions),
+        "sectionCountsMatch": all(
+            sum(section["count"] for section in chapter.get("sections", [])) == chapter["count"]
+            for chapter in catalog["chapters"]
+        ),
+        "naturalSectionOrder": natural_section_order,
+        "questionsFollowSectionOrder": actual_scopes == expected_scopes,
         "knowledgeCountsMatch": sum(group["count"] for group in catalog["knowledgeGroups"]) == len(questions),
         "answersMatchOptions": all(
             set(question["answer"]).issubset({option["alias"] for option in question["options"]})
@@ -434,7 +568,9 @@ def main():
             candidate["reasons"].append("duplicate_source_question_id")
             candidate["reasons"] = list(dict.fromkeys(candidate["reasons"]))
 
-    accepted_candidates = [candidate for candidate in candidates if not candidate["reasons"]]
+    accepted_candidates = order_candidates_by_scope(
+        [candidate for candidate in candidates if not candidate["reasons"]]
+    )
     rejected_candidates = [candidate for candidate in candidates if candidate["reasons"]]
     updated_at = date_value(version)
     questions = [
@@ -487,6 +623,7 @@ def main():
             "acceptedQuestions": len(questions),
             "rejectedQuestions": len(rejected_candidates),
             "chapters": len(catalog["chapters"]),
+            "sections": sum(len(chapter.get("sections", [])) for chapter in catalog["chapters"]),
             "knowledgeGroups": len(catalog["knowledgeGroups"]),
         },
         "statusCounts": dict(status_counts),

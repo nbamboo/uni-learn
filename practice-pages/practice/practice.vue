@@ -375,6 +375,7 @@
 				subjectId: options.subjectId,
 				mode: this.mode,
 				chapterId: options.chapterId,
+				section: options.section ? decodeURIComponent(options.section) : '',
 				knowledge: options.knowledge ? decodeURIComponent(options.knowledge) : '',
 				keyword: options.keyword ? decodeURIComponent(options.keyword) : '',
 				startId: options.startId,
@@ -514,7 +515,7 @@
 			},
 			canResumePracticeProgress() {
 				return this.answerMode !== 'exam'
-					|| ['chapter', 'knowledge'].indexOf(this.mode) === -1
+					|| ['chapter', 'section', 'knowledge'].indexOf(this.mode) === -1
 			},
 			resolveInitialQuestionIndex() {
 				if (!this.canResumePracticeProgress()) return 0
@@ -569,7 +570,7 @@
 				this.resetSwiperPosition()
 				try {
 					await this.loadAnswerPreferences()
-					if (this.mode === 'chapter') {
+					if (this.mode === 'chapter' || this.mode === 'section') {
 						const result = await getAllPracticeQuestions(Object.assign({}, this.practiceConfig, {
 							pageSize: 50
 						}), {
@@ -613,6 +614,7 @@
 					wrong: '错题强化',
 					favorite: '收藏练习',
 					chapter: '章节练习',
+					section: '小节练习',
 					knowledge: '知识点练习',
 					search: '题目练习'
 				}
@@ -644,10 +646,11 @@
 			saveCurrentQuestionProgress(question) {
 				if (this.answerMode === 'exam'
 					|| !question
-					|| ['chapter', 'knowledge'].indexOf(this.mode) === -1) return null
+					|| ['chapter', 'section', 'knowledge'].indexOf(this.mode) === -1) return null
 				return savePracticeProgress(question, {
 					mode: this.mode,
 					chapterId: this.practiceConfig.chapterId,
+					section: this.practiceConfig.section,
 					knowledge: this.practiceConfig.knowledge
 				})
 			},
@@ -837,6 +840,9 @@
 					&& selected.every(alias => question.answer.indexOf(alias) > -1)
 			},
 			resolveExamChapterName() {
+				if (this.mode === 'section' && this.practiceConfig && this.practiceConfig.section) {
+					return this.practiceConfig.section
+				}
 				const chapterNames = []
 				this.questionList.forEach(question => {
 					if (question.chapter && chapterNames.indexOf(question.chapter) === -1) {

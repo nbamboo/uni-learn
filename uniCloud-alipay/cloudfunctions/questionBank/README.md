@@ -34,7 +34,8 @@ console.log(result.data)
 
 ### getCatalog
 
-获取科目、章节、知识点和当前题库版本。
+获取科目、章节、小节、知识点和当前题库版本。新目录在每个 `chapters[]` 下提供可选的
+`sections: [{ name, count }]`；字段保持可选以兼容尚未升级的旧目录。
 
 ```js
 {
@@ -71,6 +72,7 @@ console.log(result.data)
 
 - `sequence`：整科顺序练习。
 - `chapter`：必须传 `chapterId`。
+- `section`：必须同时传 `chapterId` 和 `section`，避免不同章节的同名小节混题。
 - `knowledge`：必须传 `chapterId` 和 `knowledge`，避免不同章节的同名知识点混题。
 - `search`：必须传 `keyword`，返回完整题目。
 - `smart`：非会员智能练习入口；客户端传入本机的已答和错题 ID，仅用于本次候选排序且不写入云数据库。服务端最多抽取 100 个随机候选题号。会员使用 `questionBankUser.getSmartPractice` 读取云端状态。

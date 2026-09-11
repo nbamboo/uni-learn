@@ -11,7 +11,7 @@ const MAX_CATALOG_SUMMARIES = 50
 const SUBJECT_ID_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/
 const QUESTION_ID_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/
 const ANSWER_ALIASES = ['A', 'B', 'C', 'D', 'E', 'F']
-const PRACTICE_MODES = ['sequence', 'chapter', 'knowledge', 'search', 'smart']
+const PRACTICE_MODES = ['sequence', 'chapter', 'section', 'knowledge', 'search', 'smart']
 
 const QUESTION_INTERNAL_FIELDS = {
 	_id: false,
@@ -259,6 +259,17 @@ function buildModeCondition(db, catalog, mode, event) {
 			maxLength: 32
 		})
 		return Object.assign({}, base, { chapterId })
+	}
+	if (mode === 'section') {
+		const chapterId = readString(event.chapterId, 'chapterId', {
+			required: true,
+			maxLength: 32
+		})
+		const section = readString(event.section, 'section', {
+			required: true,
+			maxLength: 128
+		})
+		return Object.assign({}, base, { chapterId, section })
 	}
 	if (mode === 'knowledge') {
 		const knowledge = readString(event.knowledge, 'knowledge', {

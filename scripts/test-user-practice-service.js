@@ -20,6 +20,8 @@ function loadService(environment) {
 		getCachedPracticeSummary,
 		getKnowledgeScopeKey,
 		getKnowledgePracticePosition,
+		getSectionScopeKey,
+		getSectionPracticePosition,
 		getLocalPracticePreferences,
 		getPracticeProgress,
 		getPracticePreferences,
@@ -432,6 +434,7 @@ async function testNonMemberLocalOnly() {
 		id: 'local-question',
 		subjectId,
 		chapterId: '1',
+		section: '第一节 本地存储',
 		knowledge: '本地存储',
 		answer: ['A']
 	}
@@ -440,6 +443,7 @@ async function testNonMemberLocalOnly() {
 			[question.id]: {
 				subjectId,
 				chapterId: question.chapterId,
+				section: question.section,
 				knowledge: question.knowledge,
 				selected: ['B'],
 				correct: false,
@@ -478,6 +482,8 @@ async function testNonMemberLocalOnly() {
 	})
 	assert.deepEqual(Array.from(snapshot.wrongQuestionIds), [question.id])
 	assert.equal(snapshot.chapterAttempts['1'], 1)
+	const sectionScope = service.getSectionScopeKey(question.chapterId, question.section)
+	assert.equal(snapshot.sectionAttempts[sectionScope], 1)
 	assert.equal(snapshot.progressPositions.chapter['1'], question.id)
 	const progress = await service.getPracticeProgress({
 		subjectId,
@@ -511,6 +517,12 @@ async function testNonMemberLocalOnly() {
 	const flush = await service.flushPracticeEvents()
 	assert.equal(flush.localOnly, true)
 	service.savePracticeProgress(question, {
+		mode: 'section',
+		section: question.section,
+		progressId: 'local-section-progress',
+		occurredAt: Date.now()
+	})
+	service.savePracticeProgress(question, {
 		mode: 'knowledge',
 		knowledge: question.knowledge,
 		progressId: 'local-knowledge-progress',
@@ -520,6 +532,12 @@ async function testNonMemberLocalOnly() {
 	const restartedService = loadService(Object.assign({}, environment))
 	const restoredSnapshot = await restartedService.getPracticeStateSnapshot(subjectId)
 	const knowledgeScope = restartedService.getKnowledgeScopeKey(question.chapterId, question.knowledge)
+	assert.equal(restoredSnapshot.sectionAttempts[sectionScope], 1)
+	assert.equal(restoredSnapshot.progressPositions.section[sectionScope], question.id)
+	assert.equal(
+		restartedService.getSectionPracticePosition(subjectId, question.chapterId, question.section).questionId,
+		question.id
+	)
 	assert.equal(restoredSnapshot.knowledgeAttempts[knowledgeScope], 1)
 	assert.equal(restoredSnapshot.progressPositions.knowledge[knowledgeScope], question.id)
 	assert.equal(

@@ -49,6 +49,7 @@ async function run() {
 	let progressSaveCalls = 0
 	let snapshotCalls = 0
 	let chapterPositionCalls = 0
+	let sectionPositionCalls = 0
 	let knowledgePositionCalls = 0
 	let catalogCalls = 0
 	let catalogSummaryCalls = 0
@@ -60,6 +61,7 @@ async function run() {
 	let practiceAnswers = {}
 	const practiceProgressEvent = 'uni-learn-practice-progress-updated'
 	const eventListeners = new Map()
+	const localStorage = new Map()
 	const emitEvent = (name, payload) => {
 		const listeners = eventListeners.get(name) || []
 		listeners.slice().forEach(listener => listener(payload))
@@ -99,7 +101,11 @@ async function run() {
 			currentSubjectId: 'junior-personal-finance',
 			answers: practiceAnswers
 		}),
+		savePracticeState: state => {
+			practiceAnswers = state.answers
+		},
 		getChapterProgress: (subjectId, chapterId, total) => ({ attempted: 2, total, percent: 20 }),
+		getSectionProgress: (subjectId, chapterId, section, total) => ({ attempted: 1, total, percent: 25 }),
 		getSubjectById: subjectId => ({ id: subjectId, name: '测试科目' }),
 		getSubjectStats: () => ({ attempted: 0, correct: 0, wrong: 0, favorite: 0, accuracy: 0 }),
 		getTodayProgress: () => ({ attempts: 0, goal: 20, percent: 0 }),
@@ -127,16 +133,18 @@ async function run() {
 			practiceAnswers[question.id] = {
 				subjectId: question.subjectId,
 				chapterId: question.chapterId,
+				section: question.section,
 				knowledge: question.knowledge,
 				practiceModes,
 				selected: selected.slice(),
 				attempts: previous ? previous.attempts + 1 : 1
 			}
-			if (practiceMode === 'chapter' || practiceMode === 'knowledge') {
+			if (practiceMode === 'chapter' || practiceMode === 'section' || practiceMode === 'knowledge') {
 				emitEvent(practiceProgressEvent, {
 					subjectId: question.subjectId,
 					mode: practiceMode,
 					chapterId: question.chapterId,
+					section: question.section,
 					knowledge: question.knowledge,
 					questionId: question.id
 				})
@@ -171,13 +179,22 @@ async function run() {
 			knowledgePositionCalls += 1
 			return { questionId: 'saved-knowledge-question' }
 		},
+		getSectionScopeKey: (chapterId, section) => chapterId && section
+			? `${chapterId}|${section}`
+			: '',
+		getSectionPracticePosition: () => {
+			sectionPositionCalls += 1
+			return { questionId: 'saved-section-question' }
+		},
 		getPracticeStateSnapshot: async () => {
 			snapshotCalls += 1
 			return {
 				chapterAttempts: { '1': 4 },
+				sectionAttempts: { '1|第一节': 1 },
 				knowledgeAttempts: { '1|测试知识点': 3 },
 				progressPositions: {
 					chapter: { '1': 'cloud-chapter-question' },
+					section: { '1|第一节': 'cloud-section-question' },
 					knowledge: { '1|测试知识点': 'cloud-knowledge-question' }
 				}
 			}
@@ -201,6 +218,9 @@ async function run() {
 		getQuestionsByIds: async () => ({
 			items: [{
 				id: 'local-record',
+				subjectId: 'junior-personal-finance',
+				chapterId: '1',
+				section: '第一节',
 				title: '本地错题',
 				knowledge: '本地记录'
 			}]
@@ -210,7 +230,12 @@ async function run() {
 			return {
 				name: '测试科目',
 				questionCount: 10,
-				chapters: [{ id: '1', name: '第一章', count: 10 }],
+				chapters: [{
+					id: '1',
+					name: '第一章',
+					count: 10,
+					sections: [{ name: '第一节', count: 4 }, { name: '第二节', count: 6 }]
+				}],
 				knowledgeGroups: [{ chapterId: '1', chapter: '第一章', name: '测试知识点', count: 5 }]
 			}
 		},
@@ -231,6 +256,9 @@ async function run() {
 			return null
 		},
 		uni: {
+			getStorageSync: key => localStorage.get(key),
+			setStorageSync: (key, value) => localStorage.set(key, value),
+			removeStorageSync: key => localStorage.delete(key),
 			$on: (name, listener) => {
 				const listeners = eventListeners.get(name) || []
 				listeners.push(listener)
@@ -522,6 +550,20 @@ async function run() {
 	assert.equal(answerSheetExam.showExamResult, true)
 
 	const chapterComponent = loadComponent(environment, '../practice-pages/chapter/chapter.vue')
+	practiceAnswers = {
+		'local-record': {
+			subjectId: 'junior-personal-finance',
+			chapterId: '1',
+			practiceModes: ['chapter'],
+			selected: ['A']
+		}
+	}
+	const historicalChapterList = Object.assign(chapterComponent.data(), chapterComponent.methods, {
+		subjectId: 'junior-personal-finance'
+	})
+	assert.equal(await historicalChapterList.backfillLocalSectionMetadata(), true)
+	assert.equal(practiceAnswers['local-record'].section, '第一节')
+	practiceAnswers = {}
 	const memberChapterList = Object.assign(chapterComponent.data(), chapterComponent.methods, {
 		view: 'chapter',
 		pageActive: true
@@ -599,10 +641,18 @@ async function run() {
 	assert.equal(snapshotCalls, snapshotsBeforeExamCatalog)
 	assert.equal(chapterExam.items[0].progress.attempted, 0)
 	assert.equal(chapterExam.items[0].progress.positionQuestionId, '')
+	assert.equal(chapterExam.items[0].sections[0].progress.attempted, 0)
 	const chapterCallsBeforeExam = chapterPositionCalls
 	chapterExam.startItem(catalogItem)
 	assert.equal(chapterPositionCalls, chapterCallsBeforeExam)
 	assert.equal(navigationUrls.slice(-1)[0], '/practice-pages/practice/practice?subjectId=junior-personal-finance&mode=chapter&chapterId=1')
+	const sectionCallsBeforeExam = sectionPositionCalls
+	chapterExam.startSection(chapterExam.items[0], chapterExam.items[0].sections[0])
+	assert.equal(sectionPositionCalls, sectionCallsBeforeExam)
+	assert.equal(
+		navigationUrls.slice(-1)[0],
+		'/practice-pages/practice/practice?subjectId=junior-personal-finance&mode=section&chapterId=1&section=%E7%AC%AC%E4%B8%80%E8%8A%82'
+	)
 
 	const knowledgeExam = Object.assign(chapterComponent.data(), chapterComponent.methods, {
 		subjectId: 'junior-personal-finance',
@@ -623,6 +673,20 @@ async function run() {
 	})
 	chapterPractice.startItem(catalogItem)
 	assert.match(navigationUrls.slice(-1)[0], /startId=saved-chapter-question/)
+	chapterPractice.toggleChapter({ id: '1', sections: [{ name: '第一节' }] })
+	assert.equal(chapterPractice.expandedChapterId, '1')
+	chapterPractice.toggleChapter({ id: '2', sections: [{ name: '第一节' }] })
+	assert.equal(chapterPractice.expandedChapterId, '2')
+	assert.equal(
+		localStorage.get('uni-learn-expanded-chapter-v1:junior-personal-finance'),
+		'2'
+	)
+	chapterPractice.startSection({ id: '1' }, {
+		name: '第一节',
+		progress: { attempted: 1, total: 4, positionQuestionId: 'cloud-section-question' }
+	})
+	assert.match(navigationUrls.slice(-1)[0], /mode=section/)
+	assert.match(navigationUrls.slice(-1)[0], /startId=saved-section-question/)
 
 	const knowledgeReview = Object.assign(chapterComponent.data(), chapterComponent.methods, {
 		subjectId: 'junior-personal-finance',

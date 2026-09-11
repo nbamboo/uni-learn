@@ -87,6 +87,15 @@ async function run() {
 	assert.equal(lastAllParams.mode, 'knowledge')
 	assert.equal(lastAllParams.chapterId, '1')
 	assert.equal(lastAllParams.knowledge, '测试知识点')
+	await module.buildPracticeQuestions({
+		subjectId: 'junior-personal-finance',
+		mode: 'section',
+		chapterId: '2',
+		section: '第二节 测试小节'
+	})
+	assert.equal(lastAllParams.mode, 'section')
+	assert.equal(lastAllParams.chapterId, '2')
+	assert.equal(lastAllParams.section, '第二节 测试小节')
 
 	member = true
 	const memberItems = await module.buildPracticeQuestions({
@@ -96,7 +105,7 @@ async function run() {
 	})
 	assert.equal(memberItems[0].id, 'member-smart')
 	assert.equal(questionBankPageCalls, 1)
-	assert.equal(questionBankAllCalls, 1)
+	assert.equal(questionBankAllCalls, 2)
 	assert.equal(cloudSmartCalls, 1)
 
 	console.log('practice question routing tests passed')

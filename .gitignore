@@ -1,6 +1,8 @@
 unpackage/
 .hbuilderx/
 .DS_Store
+outputs/
+resources/
 
 # Codex 临时工作文件
 .codex-tmp/

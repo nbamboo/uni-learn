@@ -114,7 +114,11 @@ function createEnvironment() {
 							subjectId: data.subjectId,
 							activeVersion: catalogVersion,
 							questionCount: 3,
-							chapters: [{ id: '1', count: 3 }],
+							chapters: [{
+								id: '1',
+								count: 3,
+								sections: [{ name: '第一节', count: 2 }, { name: '第二节', count: 1 }]
+							}],
 							knowledgeGroups: [{
 								chapterId: '1', name: '共同知识点', count: 2
 							}, {
@@ -279,6 +283,14 @@ async function testPersistentChapterCache() {
 	})
 	assert.deepEqual(Array.from(localKnowledge.items, item => item.id), ['ipf-1', 'ipf-2'])
 	assert.equal(localKnowledge._localOnly, true)
+	const localSection = await reuseService.getAllPracticeQuestions({
+		subjectId,
+		mode: 'section',
+		chapterId: '1',
+		section: '第二节'
+	})
+	assert.deepEqual(Array.from(localSection.items, item => item.id), ['ipf-3'])
+	assert.equal(localSection._localOnly, true)
 	const localSequence = await reuseService.getAllPracticeQuestions({ subjectId, mode: 'sequence' })
 	assert.equal(localSequence.items.length, 3)
 	assert.equal(localSequence._localOnly, true)
@@ -474,6 +486,10 @@ async function run() {
 	)
 	await assert.rejects(
 		service.getPracticePage({ subjectId, pageSize: 51 }),
+		error => error.errCode === 'QUESTION_BANK_INVALID_ARGUMENT'
+	)
+	await assert.rejects(
+		service.getPracticePage({ subjectId, mode: 'section', chapterId: '1' }),
 		error => error.errCode === 'QUESTION_BANK_INVALID_ARGUMENT'
 	)
 
