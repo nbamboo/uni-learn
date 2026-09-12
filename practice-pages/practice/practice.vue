@@ -259,6 +259,7 @@
 		flushPracticeEvents,
 		getLocalPracticePreferences,
 		getPracticePreferences,
+		getPracticeRound,
 		getPracticeStateSnapshot,
 		savePracticeProgress
 	} from '@/services/user-practice.js'
@@ -517,17 +518,47 @@
 				return this.answerMode !== 'exam'
 					|| ['chapter', 'section', 'knowledge'].indexOf(this.mode) === -1
 			},
-			resolveInitialQuestionIndex() {
+			resolveInitialQuestionIndex(practiceRound) {
 				if (!this.canResumePracticeProgress()) return 0
 				const savedStartIndex = this.practiceConfig.startId
 					? this.questionList.findIndex(item => item.id === this.practiceConfig.startId)
+					: -1
+				const hasRoundProgress = practiceRound
+					&& Array.isArray(practiceRound.answeredQuestionIds)
+					&& practiceRound.answeredQuestionIds.length > 0
+				const roundPositionIndex = hasRoundProgress && practiceRound.positionQuestionId
+					? this.questionList.findIndex(item => item.id === practiceRound.positionQuestionId)
+					: -1
+				const answeredQuestionIds = hasRoundProgress
+					? new Set(practiceRound.answeredQuestionIds)
+					: null
+				const firstUnansweredIndex = answeredQuestionIds
+					? this.questionList.findIndex(item => !answeredQuestionIds.has(item.id))
 					: -1
 				const numberedStartIndex = this.practiceConfig.startNumber > 0
 					? Math.min(this.practiceConfig.startNumber - 1, this.questionList.length - 1)
 					: -1
 				return savedStartIndex > -1
 					? savedStartIndex
-					: (numberedStartIndex > -1 ? numberedStartIndex : 0)
+					: (roundPositionIndex > -1
+						? roundPositionIndex
+						: (firstUnansweredIndex > -1
+							? firstUnansweredIndex
+							: (numberedStartIndex > -1 ? numberedStartIndex : 0)))
+			},
+			hydratePracticeRound(practiceRound) {
+				this.resetSessionAnswers()
+				if (!practiceRound || !Array.isArray(practiceRound.answers)) return
+				const availableIds = new Set(this.questionList.map(question => question.id))
+				practiceRound.answers.forEach(answer => {
+					if (!answer || !availableIds.has(answer.questionId) || !Array.isArray(answer.selected)) return
+					this.$set(this.sessionAnswers, answer.questionId, {
+						selected: answer.selected.slice(),
+						correct: Boolean(answer.correct)
+					})
+					if (answer.correct) this.correctCount += 1
+					else this.wrongCount += 1
+				})
 			},
 			getSessionSnapshotQuestionIds(initialIndex) {
 				const maximum = 100
@@ -560,8 +591,8 @@
 				this.loadError = ''
 				this.questionList = []
 				this.currentIndex = 0
-						this.draftAnswers = {}
-						this.sessionAnswers = {}
+				this.draftAnswers = {}
+				this.sessionAnswers = {}
 				this.visitedQuestionIds = []
 				this.examSubmitted = false
 				this.showExamResult = false
@@ -580,7 +611,19 @@
 					} else {
 						this.questionList = await buildPracticeQuestions(this.practiceConfig)
 					}
-					const initialQuestionIndex = this.resolveInitialQuestionIndex()
+					let practiceRound = null
+					if (this.answerMode === 'practice'
+						&& ['chapter', 'section'].indexOf(this.mode) > -1) {
+						practiceRound = await getPracticeRound({
+							subjectId: this.practiceConfig.subjectId,
+							chapterId: this.practiceConfig.chapterId,
+							section: this.mode === 'section' ? this.practiceConfig.section : ''
+						})
+						this.hydratePracticeRound(practiceRound)
+					} else {
+						this.resetSessionAnswers()
+					}
+					const initialQuestionIndex = this.resolveInitialQuestionIndex(practiceRound)
 					let snapshot = null
 					try {
 						snapshot = await getPracticeStateSnapshot(this.practiceConfig.subjectId, {
@@ -593,7 +636,6 @@
 					} catch (syncError) {
 						this.favoriteQuestionIds = []
 					}
-					this.resetSessionAnswers()
 					if (this.questionList.length) {
 						this.loadQuestion(initialQuestionIndex)
 					}

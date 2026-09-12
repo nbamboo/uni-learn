@@ -22,9 +22,12 @@ function loadService(environment) {
 		getKnowledgePracticePosition,
 		getSectionScopeKey,
 		getSectionPracticePosition,
+		getLocalPracticeRound,
+		getLocalPracticeRoundSnapshot,
 		getLocalPracticePreferences,
 		getPracticeProgress,
 		getPracticePreferences,
+		getPracticeRound,
 		getPracticeRecords,
 		getSmartPracticeQuestions,
 		getPracticeStateSnapshot,
@@ -37,6 +40,7 @@ function loadService(environment) {
 		practiceCloudSyncEnabled,
 		queuePracticeAnswer,
 		queuePracticeFavorite,
+		resetPracticeRound,
 		savePracticeProgress,
 		updatePracticePreferences
 	}`
@@ -485,13 +489,50 @@ async function testNonMemberLocalOnly() {
 	const sectionScope = service.getSectionScopeKey(question.chapterId, question.section)
 	assert.equal(snapshot.sectionAttempts[sectionScope], 1)
 	assert.equal(snapshot.progressPositions.chapter['1'], question.id)
+	for (let index = 0; index < 110; index += 1) {
+		service.queuePracticeAnswer({
+			id: `round-extra-${index + 1}`,
+			subjectId,
+			chapterId: '1',
+			section: '第二节 超过一百题',
+			knowledge: '',
+			answer: ['A']
+		}, ['A'], {
+			eventId: `round-extra-answer-${index + 1}`,
+			correct: true,
+			practiceMode: 'section',
+			occurredAt: Date.now() + index + 1
+		})
+	}
+	const largeRound = await service.getPracticeRound({ subjectId, chapterId: '1' })
+	assert.equal(largeRound.answers.length, 111)
+	assert.equal(service.getLocalPracticeRoundSnapshot(subjectId).chapterAttempts['1'], 111)
+	await service.resetPracticeRound({
+		subjectId,
+		chapterId: '1',
+		section: question.section,
+		eventId: 'round-reset-section-one',
+		occurredAt: Date.now() + 1000
+	})
+	assert.equal((await service.getPracticeRound({ subjectId, chapterId: '1' })).answers.length, 110)
+	const lifetimeAfterSectionReset = await service.getPracticeStateSnapshot(subjectId, {
+		questionIds: [question.id]
+	})
+	assert.deepEqual(Array.from(lifetimeAfterSectionReset.wrongQuestionIds), [question.id])
+	await service.resetPracticeRound({
+		subjectId,
+		chapterId: '1',
+		eventId: 'round-reset-chapter-one',
+		occurredAt: Date.now() + 2000
+	})
+	assert.equal((await service.getPracticeRound({ subjectId, chapterId: '1' })).answers.length, 0)
+	assert.equal(service.getLocalPracticeRoundSnapshot(subjectId).chapterAttempts['1'], 0)
 	const progress = await service.getPracticeProgress({
 		subjectId,
 		mode: 'chapter',
 		chapterId: '1'
 	})
-	assert.equal(progress.questionId, question.id)
-	assert.equal(progress._localOnly, true)
+	assert.equal(progress, null)
 	const localWrongRecords = await service.getPracticeRecords({
 		subjectId,
 		type: 'wrong',
@@ -520,7 +561,7 @@ async function testNonMemberLocalOnly() {
 		mode: 'section',
 		section: question.section,
 		progressId: 'local-section-progress',
-		occurredAt: Date.now()
+		occurredAt: Date.now() + 3000
 	})
 	service.savePracticeProgress(question, {
 		mode: 'knowledge',
@@ -532,7 +573,7 @@ async function testNonMemberLocalOnly() {
 	const restartedService = loadService(Object.assign({}, environment))
 	const restoredSnapshot = await restartedService.getPracticeStateSnapshot(subjectId)
 	const knowledgeScope = restartedService.getKnowledgeScopeKey(question.chapterId, question.knowledge)
-	assert.equal(restoredSnapshot.sectionAttempts[sectionScope], 1)
+	assert.equal(restoredSnapshot.sectionAttempts[sectionScope] || 0, 0)
 	assert.equal(restoredSnapshot.progressPositions.section[sectionScope], question.id)
 	assert.equal(
 		restartedService.getSectionPracticePosition(subjectId, question.chapterId, question.section).questionId,
@@ -567,6 +608,7 @@ async function testNonMemberLocalOnly() {
 	user.uid = 'member-expired-user'
 	const cleared = await service.clearCurrentSubjectPracticeData(subjectId)
 	assert.equal(cleared.localOnly, true)
+	assert.equal(storage.has(`uni-learn-practice-rounds-v1:${user.uid}`), false)
 	assert.equal(cloudCalls, 0)
 }
 

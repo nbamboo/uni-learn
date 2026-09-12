@@ -8,11 +8,13 @@ const USER_COLLECTION = 'uni-id-users'
 const STATE_COLLECTION = 'question_bank_user_states'
 const STATS_COLLECTION = 'question_bank_user_stats'
 const PROGRESS_COLLECTION = 'question_bank_user_progress'
+const PRACTICE_ROUND_COLLECTION = 'question_bank_user_rounds'
 const PREFERENCES_COLLECTION = 'question_bank_user_preferences'
 const MEMBERSHIP_COLLECTION = 'question_bank_memberships'
 const MAX_SYNC_EVENTS = 50
 const MAX_STATE_ROWS = 2000
 const MAX_PROGRESS_ROWS = 500
+const MAX_PRACTICE_ROUND_ROWS = 500
 const MAX_SNAPSHOT_QUESTION_IDS = 100
 const MAX_SMART_CANDIDATES = 100
 const DEFAULT_PAGE_SIZE = 20
@@ -30,6 +32,7 @@ const MEMBER_SYNC_ACTIONS = new Set([
 	'getSummary',
 	'getStateSnapshot',
 	'getProgress',
+	'getPracticeRound',
 	'getSmartPractice',
 	'getRecords',
 	'getPreferences',
@@ -223,6 +226,11 @@ function progressDocumentId(userId, subjectId, mode, scopeKey) {
 	return `${userId}|${subjectId}|${mode}|${scopeHash}`
 }
 
+function practiceRoundDocumentId(userId, subjectId, chapterId) {
+	const chapterHash = crypto.createHash('sha256').update(String(chapterId)).digest('hex').slice(0, 24)
+	return `${userId}|${subjectId}|round|${chapterHash}`
+}
+
 function knowledgeScopeKey(chapterId, knowledge) {
 	if (!chapterId || !knowledge) return ''
 	return `${String(chapterId)}|${String(knowledge)}`
@@ -231,6 +239,173 @@ function knowledgeScopeKey(chapterId, knowledge) {
 function sectionScopeKey(chapterId, section) {
 	if (!chapterId || !section) return ''
 	return `${String(chapterId)}|${String(section)}`
+}
+
+function emptyPracticeRound(userId, subjectId, chapterId, timestamp) {
+	return {
+		_id: practiceRoundDocumentId(userId, subjectId, chapterId),
+		userId,
+		subjectId,
+		chapterId: String(chapterId),
+		answers: [],
+		chapterPosition: {},
+		sectionPositions: [],
+		chapterResetAt: new Date(0),
+		sectionResets: [],
+		createdAt: timestamp,
+		updatedAt: timestamp
+	}
+}
+
+function normalizePracticeRound(saved, userId, subjectId, chapterId, timestamp) {
+	const round = saved || emptyPracticeRound(userId, subjectId, chapterId, timestamp)
+	round.answers = Array.isArray(round.answers)
+		? round.answers.filter(item => item && item.questionId && Array.isArray(item.selected))
+		: []
+	round.sectionPositions = Array.isArray(round.sectionPositions)
+		? round.sectionPositions.filter(item => item && item.section && item.questionId)
+		: []
+	round.sectionResets = Array.isArray(round.sectionResets)
+		? round.sectionResets.filter(item => item && item.section)
+		: []
+	round.chapterPosition = isPlainObject(round.chapterPosition) && round.chapterPosition.questionId
+		? round.chapterPosition
+		: {}
+	return round
+}
+
+function practiceRoundResetAt(round, section) {
+	const sectionReset = section
+		? round.sectionResets.find(item => item.section === section)
+		: null
+	return Math.max(
+		getDateValue(round.chapterResetAt),
+		getDateValue(sectionReset && sectionReset.resetAt)
+	)
+}
+
+function applyPracticeRoundAnswer(round, item, correct, chapterId, section) {
+	const eventTime = item.occurredAt.getTime()
+	if (eventTime <= practiceRoundResetAt(round, section)) return false
+	const savedIndex = round.answers.findIndex(answer => answer.questionId === item.questionId)
+	const saved = savedIndex > -1 ? round.answers[savedIndex] : null
+	if (saved && getDateValue(saved.answeredAt) > eventTime) return false
+	const answer = {
+		questionId: item.questionId,
+		section: section || '',
+		selected: item.selected.slice(),
+		correct: Boolean(correct),
+		answeredAt: item.occurredAt,
+		answerEventId: item.eventId
+	}
+	if (savedIndex > -1) round.answers.splice(savedIndex, 1, answer)
+	else round.answers.push(answer)
+	round.chapterId = String(chapterId)
+	return true
+}
+
+function applyPracticeRoundProgress(round, progress) {
+	const progressTime = progress.occurredAt.getTime()
+	const section = progress.section || ''
+	if (progressTime <= practiceRoundResetAt(round, section)) return false
+	if (!round.chapterPosition || getDateValue(round.chapterPosition.progressAt) <= progressTime) {
+		round.chapterPosition = {
+			questionId: progress.questionId,
+			section,
+			progressId: progress.progressId,
+			progressAt: progress.occurredAt
+		}
+	}
+	if (section) {
+		const savedIndex = round.sectionPositions.findIndex(item => item.section === section)
+		const saved = savedIndex > -1 ? round.sectionPositions[savedIndex] : null
+		if (!saved || getDateValue(saved.progressAt) <= progressTime) {
+			const position = {
+				section,
+				questionId: progress.questionId,
+				progressId: progress.progressId,
+				progressAt: progress.occurredAt
+			}
+			if (savedIndex > -1) round.sectionPositions.splice(savedIndex, 1, position)
+			else round.sectionPositions.push(position)
+		}
+	}
+	return true
+}
+
+function applyPracticeRoundReset(round, item) {
+	const resetTime = item.occurredAt.getTime()
+	if (!item.section) {
+		if (resetTime < getDateValue(round.chapterResetAt)) return false
+		round.answers = round.answers.filter(answer => getDateValue(answer.answeredAt) > resetTime)
+		if (round.chapterPosition && getDateValue(round.chapterPosition.progressAt) <= resetTime) {
+			round.chapterPosition = {}
+		}
+		round.sectionPositions = round.sectionPositions.filter(position => {
+			return getDateValue(position.progressAt) > resetTime
+		})
+		round.chapterResetAt = item.occurredAt
+		round.chapterResetEventId = item.eventId
+		return true
+	}
+	const savedIndex = round.sectionResets.findIndex(reset => reset.section === item.section)
+	const saved = savedIndex > -1 ? round.sectionResets[savedIndex] : null
+	if (saved && resetTime < getDateValue(saved.resetAt)) return false
+	round.answers = round.answers.filter(answer => (
+		answer.section !== item.section || getDateValue(answer.answeredAt) > resetTime
+	))
+	round.sectionPositions = round.sectionPositions.filter(position => (
+		position.section !== item.section || getDateValue(position.progressAt) > resetTime
+	))
+	if (round.chapterPosition
+		&& round.chapterPosition.section === item.section
+		&& getDateValue(round.chapterPosition.progressAt) <= resetTime) {
+		round.chapterPosition = {}
+	}
+	const reset = { section: item.section, resetAt: item.occurredAt, resetEventId: item.eventId }
+	if (savedIndex > -1) round.sectionResets.splice(savedIndex, 1, reset)
+	else round.sectionResets.push(reset)
+	return true
+}
+
+function practiceRoundResponse(round, section) {
+	const allAnswers = round.answers
+		.sort((left, right) => getDateValue(left.answeredAt) - getDateValue(right.answeredAt))
+		.map(answer => ({
+			questionId: answer.questionId,
+			section: answer.section || '',
+			selected: answer.selected.slice(),
+			correct: Boolean(answer.correct),
+			answeredAt: getDateValue(answer.answeredAt)
+		}))
+	const answers = section
+		? allAnswers.filter(answer => answer.section === section)
+		: allAnswers
+	const position = section
+		? round.sectionPositions.find(item => item.section === section) || null
+		: round.chapterPosition
+	const sectionReset = section
+		? round.sectionResets.find(item => item.section === section) || null
+		: null
+	const result = {
+		subjectId: round.subjectId,
+		chapterId: round.chapterId,
+		section: section || '',
+		answers,
+		answeredQuestionIds: answers.map(answer => answer.questionId),
+		positionQuestionId: position && position.questionId || '',
+		positionSection: position && position.section || '',
+		positionAt: getDateValue(position && position.progressAt),
+		chapterResetAt: getDateValue(round.chapterResetAt),
+		sectionResetAt: getDateValue(sectionReset && sectionReset.resetAt)
+	}
+	if (section) {
+		result.chapterAnswers = allAnswers
+		result.chapterPositionQuestionId = round.chapterPosition && round.chapterPosition.questionId || ''
+		result.chapterPositionSection = round.chapterPosition && round.chapterPosition.section || ''
+		result.chapterPositionAt = getDateValue(round.chapterPosition && round.chapterPosition.progressAt)
+	}
+	return result
 }
 
 function defaultPreferences() {
@@ -414,16 +589,26 @@ function readSyncEvent(rawEvent, currentTime, index) {
 	const event = requireObject(rawEvent, `events[${index}]`)
 	const type = readString(event.type, `events[${index}].type`, {
 		required: true,
-		values: ['answer', 'favorite']
+		values: ['answer', 'favorite', 'roundReset']
 	})
 	const result = {
 		type,
 		eventId: readEventId(event.eventId),
 		subjectId: readSubjectId(event.subjectId),
-		questionId: readQuestionId(event.questionId),
 		occurredAt: readOccurredAt(event.occurredAt, currentTime),
 		originalIndex: index
 	}
+	if (type === 'roundReset') {
+		result.chapterId = readString(event.chapterId, `events[${index}].chapterId`, {
+			required: true,
+			maxLength: 32
+		})
+		result.section = readString(event.section, `events[${index}].section`, {
+			maxLength: 128
+		})
+		return result
+	}
+	result.questionId = readQuestionId(event.questionId)
 	if (type === 'answer') {
 		result.selected = readSelected(event.selected)
 		result.practiceMode = readString(event.practiceMode, `events[${index}].practiceMode`, {
@@ -662,6 +847,8 @@ function createQuestionBankUserService(db, options) {
 		return withTransaction(db, async store => {
 			const stateCache = new Map()
 			const statsCache = new Map()
+			const roundCache = new Map()
+			const dirtyRoundIds = new Set()
 			const acceptedEventIds = []
 			const duplicateEventIds = []
 			const answerResults = []
@@ -686,7 +873,31 @@ function createQuestionBankUserService(db, options) {
 				return statsCache.get(id)
 			}
 
+			async function getRound(subjectId, chapterId) {
+				const id = practiceRoundDocumentId(userId, subjectId, chapterId)
+				if (!roundCache.has(id)) {
+					const saved = await getDocument(store, PRACTICE_ROUND_COLLECTION, id)
+					roundCache.set(id, normalizePracticeRound(
+						saved,
+						userId,
+						subjectId,
+						chapterId,
+						currentTime
+					))
+				}
+				return roundCache.get(id)
+			}
+
 			for (const item of events) {
+				if (item.type === 'roundReset') {
+					const round = await getRound(item.subjectId, item.chapterId)
+					if (applyPracticeRoundReset(round, item)) {
+						round.updatedAt = serverDate()
+						dirtyRoundIds.add(round._id)
+					}
+					acceptedEventIds.push(item.eventId)
+					continue
+				}
 				if (item.type === 'answer') {
 					const question = item.judgedLocally
 						? null
@@ -697,8 +908,6 @@ function createQuestionBankUserService(db, options) {
 					const state = await getState(item.subjectId, item.questionId)
 					const wasAttempted = Boolean(state.attempted)
 					const wasCorrect = Boolean(state.lastCorrect)
-					const wasChapterScopePractice = state.practiceModes.indexOf('chapter') > -1
-						|| state.practiceModes.indexOf('section') > -1
 					const wasKnowledgePractice = state.practiceModes.indexOf('knowledge') > -1
 					const latestTime = getDateValue(state.lastAnsweredAt)
 					const eventTime = item.occurredAt.getTime()
@@ -739,15 +948,6 @@ function createQuestionBankUserService(db, options) {
 							stats.correct = Math.max(0, stats.correct - 1)
 						}
 					}
-					const isChapterScopePractice = state.practiceModes.indexOf('chapter') > -1
-						|| state.practiceModes.indexOf('section') > -1
-					if (!wasChapterScopePractice && isChapterScopePractice) {
-						incrementAggregate(stats.chapterAttempts, state.chapterId)
-						incrementAggregate(
-							stats.sectionAttempts,
-							sectionScopeKey(state.chapterId, state.section)
-						)
-					}
 					if (!wasKnowledgePractice && state.practiceModes.indexOf('knowledge') > -1) {
 						incrementAggregate(
 							stats.knowledgeAttempts,
@@ -757,6 +957,19 @@ function createQuestionBankUserService(db, options) {
 					stats.totalAttempts += 1
 					if (chinaDayKey(item.occurredAt) === todayKey) stats.todayAttempts += 1
 					stats.updatedAt = serverDate()
+					if (['chapter', 'section'].indexOf(item.practiceMode) > -1) {
+						const round = await getRound(item.subjectId, state.chapterId)
+						if (applyPracticeRoundAnswer(
+							round,
+							item,
+							correct,
+							state.chapterId,
+							state.section
+						)) {
+							round.updatedAt = serverDate()
+							dirtyRoundIds.add(round._id)
+						}
+					}
 
 					acceptedEventIds.push(item.eventId)
 					answerResults.push({ eventId: item.eventId, correct })
@@ -780,7 +993,17 @@ function createQuestionBankUserService(db, options) {
 			}
 
 			let progressResult = null
-			if (progress) {
+			if (progress && ['chapter', 'section'].indexOf(progress.mode) > -1) {
+				const round = await getRound(progress.subjectId, progress.chapterId)
+				if (applyPracticeRoundProgress(round, progress)) {
+					round.updatedAt = serverDate()
+					dirtyRoundIds.add(round._id)
+				}
+				progressResult = {
+					progressId: progress.progressId,
+					saved: true
+				}
+			} else if (progress) {
 				const id = progressDocumentId(
 					userId,
 					progress.subjectId,
@@ -821,6 +1044,12 @@ function createQuestionBankUserService(db, options) {
 			}
 			for (const stats of statsCache.values()) {
 				await setDocument(store, STATS_COLLECTION, stats._id, stats)
+			}
+			for (const roundId of dirtyRoundIds) {
+				const round = roundCache.get(roundId)
+				const document = Object.assign({}, round)
+				if (!document.chapterPosition) delete document.chapterPosition
+				await setDocument(store, PRACTICE_ROUND_COLLECTION, round._id, document)
 			}
 			const summaries = {}
 			statsCache.forEach(stats => {
@@ -911,7 +1140,8 @@ function createQuestionBankUserService(db, options) {
 			const targets = [
 				STATE_COLLECTION,
 				STATS_COLLECTION,
-				PROGRESS_COLLECTION
+				PROGRESS_COLLECTION,
+				PRACTICE_ROUND_COLLECTION
 			]
 			const deletedByCollection = {}
 			for (const collectionName of targets) {
@@ -1025,7 +1255,7 @@ function createQuestionBankUserService(db, options) {
 			: Promise.resolve({ data: [] })
 		const progressPromise = includeProgress
 			? db.collection(PROGRESS_COLLECTION)
-				.where({ userId, subjectId })
+				.where({ userId, subjectId, mode: 'knowledge' })
 				.field({
 					mode: true,
 					scopeKey: true,
@@ -1041,25 +1271,81 @@ function createQuestionBankUserService(db, options) {
 		const aggregatePromise = includeAggregates
 			? loadStateAggregates(userId, subjectId, currentTime)
 			: Promise.resolve(null)
-		const responses = await Promise.all([statePromise, progressPromise, aggregatePromise])
+		const roundPromise = includeAggregates || includeProgress
+			? db.collection(PRACTICE_ROUND_COLLECTION)
+				.where({ userId, subjectId })
+				.field({
+					chapterId: true,
+					answers: true,
+					chapterPosition: true,
+					sectionPositions: true,
+					chapterResetAt: true,
+					sectionResets: true
+				})
+				.limit(MAX_PRACTICE_ROUND_ROWS + 1)
+				.get()
+			: Promise.resolve({ data: [] })
+		const responses = await Promise.all([
+			statePromise,
+			progressPromise,
+			aggregatePromise,
+			roundPromise
+		])
 		const rows = getRows(responses[0])
 		const progressRows = getRows(responses[1])
 		const stats = responses[2]
+		const roundRows = getRows(responses[3])
 		if (progressRows.length > MAX_PROGRESS_ROWS) {
 			throw new QuestionBankUserError('QUESTION_BANK_USER_PROGRESS_LIMIT', '用户练习进度超过处理上限')
+		}
+		if (roundRows.length > MAX_PRACTICE_ROUND_ROWS) {
+			throw new QuestionBankUserError('QUESTION_BANK_USER_ROUND_LIMIT', '用户章节练习轮次超过处理上限')
 		}
 		const answeredRows = rows.filter(item => item.attempted)
 			.sort((left, right) => getDateValue(right.lastAnsweredAt) - getDateValue(left.lastAnsweredAt))
 		const wrongRows = answeredRows.filter(item => item.lastCorrect === false)
 		const favoriteRows = rows.filter(item => item.favorite)
 			.sort((left, right) => getDateValue(right.favoriteUpdatedAt) - getDateValue(left.favoriteUpdatedAt))
-		const chapterAttempts = stats ? aggregateEntriesToObject(stats.chapterAttempts) : {}
-		const sectionAttempts = stats ? aggregateEntriesToObject(stats.sectionAttempts) : {}
+		const chapterAttempts = {}
+		const sectionAttempts = {}
 		const knowledgeAttempts = stats
 			? addLegacyKnowledgeAliases(aggregateEntriesToObject(stats.knowledgeAttempts))
 			: {}
 		const answerSelections = {}
 		const progressPositions = { chapter: {}, section: {}, knowledge: {} }
+		roundRows.forEach(savedRound => {
+			const round = normalizePracticeRound(
+				savedRound,
+				userId,
+				subjectId,
+				savedRound.chapterId,
+				currentTime
+			)
+			const chapterId = String(round.chapterId)
+			if (includeAggregates) {
+				const seenQuestions = new Set()
+				round.answers.forEach(answer => {
+					if (seenQuestions.has(answer.questionId)) return
+					seenQuestions.add(answer.questionId)
+					chapterAttempts[chapterId] = (chapterAttempts[chapterId] || 0) + 1
+					if (answer.section) {
+						const scopeKey = sectionScopeKey(chapterId, answer.section)
+						sectionAttempts[scopeKey] = (sectionAttempts[scopeKey] || 0) + 1
+					}
+				})
+			}
+			if (includeProgress && round.chapterPosition && round.chapterPosition.questionId) {
+				progressPositions.chapter[chapterId] = round.chapterPosition.questionId
+			}
+			if (includeProgress) {
+				round.sectionPositions.forEach(position => {
+					const scopeKey = sectionScopeKey(chapterId, position.section)
+					if (scopeKey && position.questionId) {
+						progressPositions.section[scopeKey] = position.questionId
+					}
+				})
+			}
+		})
 		answeredRows.forEach(item => {
 			if (Array.isArray(item.lastSelected) && item.lastSelected.length) {
 				answerSelections[item.questionId] = item.lastSelected
@@ -1116,6 +1402,42 @@ function createQuestionBankUserService(db, options) {
 			: (mode === 'section'
 				? sectionScopeKey(chapterId, section)
 				: knowledgeScopeKey(chapterId, knowledge))
+		if (mode === 'chapter' || mode === 'section') {
+			const savedRound = await getDocument(
+				db,
+				PRACTICE_ROUND_COLLECTION,
+				practiceRoundDocumentId(userId, subjectId, chapterId)
+			)
+			if (!savedRound) return null
+			const round = normalizePracticeRound(savedRound, userId, subjectId, chapterId, now())
+			const position = mode === 'section'
+				? round.sectionPositions.find(item => item.section === section) || null
+				: round.chapterPosition
+			if (!position || !position.questionId) return null
+			const catalog = await loadCatalog(db, subjectId)
+			const response = await db.collection(QUESTION_COLLECTION)
+				.where({
+					subjectId,
+					version: catalog.activeVersion,
+					status: 1,
+					questionId: position.questionId,
+					chapterId,
+					...(mode === 'section' ? { section } : {})
+				})
+				.field({ questionId: true })
+				.limit(1)
+				.get()
+			if (!getRows(response).length) return null
+			return {
+				subjectId,
+				mode,
+				chapterId,
+				section: mode === 'section' ? section : '',
+				knowledge: '',
+				questionId: position.questionId,
+				progressAt: getDateValue(position.progressAt)
+			}
+		}
 		let saved = await getDocument(
 			db,
 			PROGRESS_COLLECTION,
@@ -1153,6 +1475,22 @@ function createQuestionBankUserService(db, options) {
 			questionId: saved.questionId,
 			progressAt: getDateValue(saved.progressAt)
 		}
+	}
+
+	async function getPracticeRound(event, userId) {
+		const subjectId = readSubjectId(event.subjectId)
+		const chapterId = readString(event.chapterId, 'chapterId', {
+			required: true,
+			maxLength: 32
+		})
+		const section = readString(event.section, 'section', { maxLength: 128 })
+		const saved = await getDocument(
+			db,
+			PRACTICE_ROUND_COLLECTION,
+			practiceRoundDocumentId(userId, subjectId, chapterId)
+		)
+		const round = normalizePracticeRound(saved, userId, subjectId, chapterId, now())
+		return practiceRoundResponse(round, section)
 	}
 
 	async function getSmartPractice(event, userId) {
@@ -1305,6 +1643,7 @@ function createQuestionBankUserService(db, options) {
 		getSummary,
 		getStateSnapshot,
 		getProgress,
+		getPracticeRound,
 		getSmartPractice,
 		getRecords,
 		getUserProfile,
@@ -1336,5 +1675,6 @@ module.exports = {
 	chinaDayKey,
 	stateDocumentId,
 	progressDocumentId,
+	practiceRoundDocumentId,
 	statsDocumentId
 }

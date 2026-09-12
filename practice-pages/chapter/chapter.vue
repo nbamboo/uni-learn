@@ -112,22 +112,21 @@
 
 <script>
 	import {
-		getChapterProgress,
-		getSectionProgress,
 		PRACTICE_PROGRESS_UPDATED_EVENT,
 		getPracticeState,
-		savePracticeState,
 		getSubjectById
 	} from '@/data/practice.js'
-	import { getCatalog, getQuestionsByIds } from '@/services/question-bank.js'
+	import { getCatalog } from '@/services/question-bank.js'
 	import {
 		getChapterPracticePosition,
 		getKnowledgeScopeKey,
+		getLocalPracticeRoundSnapshot,
 		getLocalPracticePreferences,
 		getKnowledgePracticePosition,
 		getSectionPracticePosition,
 		getSectionScopeKey,
-		getPracticeStateSnapshot
+		getPracticeStateSnapshot,
+		resetPracticeRound
 	} from '@/services/user-practice.js'
 	import { getCachedMembership, getMembership } from '@/services/membership.js'
 
@@ -154,6 +153,8 @@
 				nightMode: Boolean(localPreferences.nightMode),
 				pageActive: false,
 				hiddenKnowledgeAdPositions: {},
+				entryActionPending: false,
+				chapterProgressCloudLoadedAt: 0,
 				practiceProgressUpdatedHandler: null
 			}
 		},
@@ -208,46 +209,6 @@
 			this.destroyChapterInterstitialAd()
 		},
 		methods: {
-			async backfillLocalSectionMetadata() {
-				try {
-					const state = getPracticeState()
-					const answers = state && state.answers && typeof state.answers === 'object'
-						? state.answers
-						: {}
-					const questionIds = Object.keys(answers).filter(questionId => {
-						const answer = answers[questionId] || {}
-						const modes = Array.isArray(answer.practiceModes) ? answer.practiceModes : []
-						const isLegacyDefault = !answer.subjectId
-							&& this.subjectId === 'junior-personal-finance'
-							&& questionId.indexOf('ipf-') === 0
-						return (answer.subjectId === this.subjectId || isLegacyDefault)
-							&& !answer.section
-							&& (modes.indexOf('chapter') > -1 || modes.indexOf('section') > -1)
-					}).slice(0, 2000)
-					if (!questionIds.length) return false
-					const result = await getQuestionsByIds({
-						subjectId: this.subjectId,
-						questionIds
-					})
-					let changed = false
-					;(result.items || []).forEach(question => {
-						const questionId = question.questionId || question.id
-						const answer = answers[questionId]
-						if (!answer || !question.section) return
-						if (!answer.subjectId) answer.subjectId = this.subjectId
-						if (!answer.chapterId && question.chapterId) {
-							answer.chapterId = String(question.chapterId)
-						}
-						answer.section = question.section
-						changed = true
-					})
-					if (changed) savePracticeState(state)
-					return changed
-				} catch (error) {
-					// 历史数据补全失败不阻塞目录，云端聚合或后续刷新仍可恢复进度。
-					return false
-				}
-			},
 			async refreshMembership() {
 				try {
 					this.membership = await getMembership()
@@ -337,28 +298,30 @@
 			},
 			refreshChapterProgress() {
 				if (this.answerMode === 'exam') return
+				const localState = getLocalPracticeRoundSnapshot(this.subjectId)
 				this.items = this.items.map(item => {
-					const localProgress = getChapterProgress(this.subjectId, item.id, item.count)
-					const attempted = Math.max(item.progress.attempted, localProgress.attempted)
+					const hasLocalRound = (localState.chapterIds || []).indexOf(String(item.id)) > -1
+					const localUpdatedAt = (localState.updatedAtByChapter || {})[item.id] || 0
+					if (!hasLocalRound
+						|| (this.chapterProgressCloudLoadedAt
+							&& localUpdatedAt < this.chapterProgressCloudLoadedAt)) return item
+					const attempted = (localState.chapterAttempts || {})[item.id] || 0
 					return Object.assign({}, item, {
 						progress: Object.assign({}, item.progress, {
 							attempted,
-							percent: item.count ? Math.min(100, Math.round(attempted / item.count * 100)) : 0
+							percent: item.count ? Math.min(100, Math.round(attempted / item.count * 100)) : 0,
+							positionQuestionId: (localState.progressPositions.chapter || {})[item.id] || ''
 						}),
 						sections: item.sections.map(section => {
-							const sectionProgress = getSectionProgress(
-								this.subjectId,
-								item.id,
-								section.name,
-								section.count
-							)
-							const sectionAttempted = Math.max(section.progress.attempted, sectionProgress.attempted)
+							const scopeKey = getSectionScopeKey(item.id, section.name)
+							const sectionAttempted = (localState.sectionAttempts || {})[scopeKey] || 0
 							return Object.assign({}, section, {
 								progress: Object.assign({}, section.progress, {
 									attempted: sectionAttempted,
 									percent: section.count
 										? Math.min(100, Math.round(sectionAttempted / section.count * 100))
-										: 0
+										: 0,
+									positionQuestionId: (localState.progressPositions.section || {})[scopeKey] || ''
 								})
 							})
 						})
@@ -439,7 +402,6 @@
 					const shouldLoadProgress = this.answerMode !== 'exam'
 					let cloudState = null
 					if (shouldLoadProgress) {
-						await this.backfillLocalSectionMetadata()
 						try {
 							cloudState = await getPracticeStateSnapshot(this.subjectId, {
 								localState: getPracticeState(),
@@ -451,30 +413,25 @@
 					}
 
 					if (this.view === 'chapter') {
+						this.chapterProgressCloudLoadedAt = cloudState && !cloudState._localOnly
+							? Date.now()
+							: 0
+						const roundState = cloudState || getLocalPracticeRoundSnapshot(this.subjectId)
 						const chapters = Array.isArray(catalog.chapters) ? catalog.chapters : []
-						const chapterPositions = cloudState && cloudState.progressPositions
-							? cloudState.progressPositions.chapter || {}
+						const chapterPositions = roundState && roundState.progressPositions
+							? roundState.progressPositions.chapter || {}
 							: {}
-						const sectionPositions = cloudState && cloudState.progressPositions
-							? cloudState.progressPositions.section || {}
+						const sectionPositions = roundState && roundState.progressPositions
+							? roundState.progressPositions.section || {}
 							: {}
 						this.items = chapters.map(item => {
 							const sections = Array.isArray(item.sections) ? item.sections : []
 							const mappedSections = sections.map(section => {
 								const total = Number.isInteger(section.count) && section.count >= 0 ? section.count : 0
 								const scopeKey = getSectionScopeKey(item.id, section.name)
-								const localProgress = getSectionProgress(
-									this.subjectId,
-									item.id,
-									section.name,
-									total
-								)
 								const attempted = !shouldLoadProgress
 									? 0
-									: Math.max(
-										localProgress.attempted,
-										cloudState ? ((cloudState.sectionAttempts || {})[scopeKey] || 0) : 0
-									)
+									: ((roundState.sectionAttempts || {})[scopeKey] || 0)
 								return Object.assign({}, section, {
 									progress: {
 										attempted,
@@ -496,19 +453,16 @@
 									}
 								}
 							}
-							const localProgress = getChapterProgress(this.subjectId, item.id, item.count)
-							const attempted = Math.max(
-								localProgress.attempted,
-								cloudState ? ((cloudState.chapterAttempts || {})[item.id] || 0) : 0
-							)
+							const attempted = (roundState.chapterAttempts || {})[item.id] || 0
 							return {
 								...item,
 								sections: mappedSections,
-								progress: Object.assign({}, localProgress, {
+								progress: {
 									attempted,
+									total: item.count,
 									percent: item.count ? Math.min(100, Math.round(attempted / item.count * 100)) : 0,
 									positionQuestionId: chapterPositions[item.id] || ''
-								})
+								}
 							}
 						})
 						this.restoreExpandedChapter(this.items)
@@ -579,37 +533,80 @@
 				uni.navigateTo({ url })
 			},
 			startChapter(item) {
-				let url = `/practice-pages/practice/practice?subjectId=${this.subjectId}`
-				url += `&mode=chapter&chapterId=${encodeURIComponent(item.id)}`
-				if (this.answerMode !== 'exam') {
-					const savedPosition = getChapterPracticePosition(this.subjectId, item.id)
-					const startId = savedPosition && savedPosition.questionId
-						|| item.progress.positionQuestionId
-					if (startId) url += `&startId=${encodeURIComponent(startId)}`
-					else if (item.progress.attempted > 0) {
-						url += `&startNumber=${Math.min(item.progress.attempted, item.progress.total)}`
-					}
-				}
-				uni.navigateTo({ url })
+				this.openRoundEntry('chapter', item)
 			},
 			startSection(chapter, section) {
+				this.openRoundEntry('section', chapter, section)
+			},
+			buildRoundPracticeUrl(mode, chapter, section, startId) {
 				let url = `/practice-pages/practice/practice?subjectId=${this.subjectId}`
-				url += `&mode=section&chapterId=${encodeURIComponent(chapter.id)}`
-				url += `&section=${encodeURIComponent(section.name)}`
-				if (this.answerMode !== 'exam') {
-					const savedPosition = getSectionPracticePosition(
-						this.subjectId,
-						chapter.id,
-						section.name
-					)
-					const startId = savedPosition && savedPosition.questionId
-						|| section.progress.positionQuestionId
-					if (startId) url += `&startId=${encodeURIComponent(startId)}`
-					else if (section.progress.attempted > 0) {
-						url += `&startNumber=${Math.min(section.progress.attempted, section.progress.total)}`
-					}
+				url += `&mode=${mode}&chapterId=${encodeURIComponent(chapter.id)}`
+				if (mode === 'section' && section) {
+					url += `&section=${encodeURIComponent(section.name)}`
 				}
+				if (startId) url += `&startId=${encodeURIComponent(startId)}`
+				return url
+			},
+			getRoundPosition(mode, chapter, section) {
+				const savedPosition = mode === 'section'
+					? getSectionPracticePosition(this.subjectId, chapter.id, section.name)
+					: getChapterPracticePosition(this.subjectId, chapter.id)
+				return (section ? section.progress.positionQuestionId : chapter.progress.positionQuestionId)
+					|| savedPosition && savedPosition.questionId
+					|| ''
+			},
+			navigateToRoundPractice(mode, chapter, section, startId) {
+				const url = this.buildRoundPracticeUrl(mode, chapter, section, startId)
 				uni.navigateTo({ url })
+			},
+			openRoundEntry(mode, chapter, section) {
+				if (this.entryActionPending) return
+				const progress = section ? section.progress : chapter.progress
+				const hasProgress = progress && Number(progress.attempted) > 0
+				if (this.answerMode !== 'practice' || !hasProgress) {
+					const startId = this.answerMode === 'exam'
+						|| (this.answerMode === 'practice' && !hasProgress)
+						? ''
+						: this.getRoundPosition(mode, chapter, section)
+					this.navigateToRoundPractice(mode, chapter, section, startId)
+					return
+				}
+				this.entryActionPending = true
+				uni.showActionSheet({
+					itemList: ['重新做题', '继续做题'],
+					success: async result => {
+						try {
+							if (result.tapIndex === 0) {
+								await resetPracticeRound({
+									subjectId: this.subjectId,
+									chapterId: chapter.id,
+									section: section ? section.name : ''
+								})
+								this.refreshChapterProgress()
+								this.navigateToRoundPractice(mode, chapter, section, '')
+								return
+							}
+							if (result.tapIndex === 1) {
+								this.navigateToRoundPractice(
+									mode,
+									chapter,
+									section,
+									this.getRoundPosition(mode, chapter, section)
+								)
+							}
+						} catch (error) {
+							uni.showToast({
+								title: error && (error.errMsg || error.message) || '重置失败，请重试',
+								icon: 'none'
+							})
+						} finally {
+							this.entryActionPending = false
+						}
+					},
+					fail: () => {
+						this.entryActionPending = false
+					}
+				})
 			}
 		}
 	}

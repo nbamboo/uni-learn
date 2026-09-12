@@ -204,6 +204,7 @@ function loadSeed() {
 		question_bank_user_states: [],
 		question_bank_user_stats: [],
 		question_bank_user_progress: [],
+		question_bank_user_rounds: [],
 		question_bank_user_preferences: [],
 		question_bank_memberships: [{
 			_id: 'user-one',
@@ -287,6 +288,7 @@ async function run() {
 		'getSummary',
 		'getStateSnapshot',
 		'getProgress',
+		'getPracticeRound',
 		'getSmartPractice',
 		'getPreferences',
 		'updatePreferences',
@@ -406,6 +408,7 @@ async function run() {
 			subjectId,
 			mode: 'chapter',
 			chapterId: question.chapterId,
+			section: question.section,
 			questionId: question.questionId,
 			occurredAt: currentTime.getTime()
 		}
@@ -578,7 +581,8 @@ async function run() {
 		questionId: question.questionId,
 		progressAt: currentTime.getTime()
 	})
-	assert.equal(environment.collections.question_bank_user_progress.size, 1)
+	assert.equal(environment.collections.question_bank_user_progress.size, 0)
+	assert.equal(environment.collections.question_bank_user_rounds.size, 1)
 	assert.equal(environment.collections.question_bank_user_attempts, undefined)
 
 	const nextQuestion = Array.from(environment.collections.question_bank_questions.values())
@@ -593,6 +597,7 @@ async function run() {
 			subjectId,
 			mode: 'chapter',
 			chapterId: nextQuestion.chapterId,
+			section: nextQuestion.section,
 			questionId: nextQuestion.questionId,
 			occurredAt: currentTime.getTime() + 3000
 		}
@@ -604,7 +609,7 @@ async function run() {
 		chapterId: nextQuestion.chapterId
 	}, userId)
 	assert.equal(replacedProgress.questionId, nextQuestion.questionId)
-	assert.equal(environment.collections.question_bank_user_progress.size, 1)
+	assert.equal(environment.collections.question_bank_user_progress.size, 0)
 
 	await service.execute({
 		action: 'syncEvents',
@@ -627,7 +632,7 @@ async function run() {
 		knowledge: question.knowledge
 	}, userId)
 	assert.equal(knowledgeProgress.questionId, question.questionId)
-	assert.equal(environment.collections.question_bank_user_progress.size, 2)
+	assert.equal(environment.collections.question_bank_user_progress.size, 1)
 	await service.execute({
 		action: 'syncEvents',
 		events: [],
@@ -649,9 +654,9 @@ async function run() {
 		section: question.section
 	}, userId)
 	assert.equal(sectionProgress.questionId, question.questionId)
-	assert.equal(environment.collections.question_bank_user_progress.size, 3)
+	assert.equal(environment.collections.question_bank_user_progress.size, 1)
 	const scopedSnapshot = await service.execute({ action: 'getStateSnapshot', subjectId }, userId)
-	assert.equal(scopedSnapshot.progressPositions.chapter[question.chapterId], nextQuestion.questionId)
+	assert.equal(scopedSnapshot.progressPositions.chapter[question.chapterId], question.questionId)
 	assert.equal(
 		scopedSnapshot.progressPositions.knowledge[`${question.chapterId}|${question.knowledge}`],
 		question.questionId
@@ -660,6 +665,121 @@ async function run() {
 		scopedSnapshot.progressPositions.section[`${question.chapterId}|${question.section}`],
 		question.questionId
 	)
+	const initialRound = await service.execute({
+		action: 'getPracticeRound',
+		subjectId,
+		chapterId: question.chapterId
+	}, userId)
+	assert.equal(initialRound.answers.length, 1)
+	assert.equal(initialRound.answers[0].questionId, question.questionId)
+	assert.equal(initialRound.positionQuestionId, question.questionId)
+
+	const otherSection = '第二节 轮次隔离测试'
+	await service.execute({
+		action: 'syncEvents',
+		events: [{
+			type: 'answer',
+			eventId: 'answer-other-section',
+			subjectId,
+			questionId: nextQuestion.questionId,
+			selected: nextQuestion.answer,
+			practiceMode: 'section',
+			judgedLocally: true,
+			correct: true,
+			chapterId: nextQuestion.chapterId,
+			section: otherSection,
+			knowledge: nextQuestion.knowledge,
+			occurredAt: currentTime.getTime() + 4700
+		}],
+		progress: {
+			progressId: 'progress-other-section',
+			subjectId,
+			mode: 'section',
+			chapterId: nextQuestion.chapterId,
+			section: otherSection,
+			questionId: nextQuestion.questionId,
+			occurredAt: currentTime.getTime() + 4700
+		}
+	}, userId)
+	assert.equal((await service.execute({
+		action: 'getPracticeRound', subjectId, chapterId: question.chapterId
+	}, userId)).answers.length, 2)
+
+	await service.execute({
+		action: 'syncEvents',
+		events: [{
+			type: 'roundReset',
+			eventId: 'round-reset-section',
+			subjectId,
+			chapterId: question.chapterId,
+			section: question.section,
+			occurredAt: currentTime.getTime() + 5000
+		}]
+	}, userId)
+	const sectionResetRound = await service.execute({
+		action: 'getPracticeRound', subjectId, chapterId: question.chapterId
+	}, userId)
+	assert.equal(sectionResetRound.answers.length, 1)
+	assert.equal(sectionResetRound.answers[0].section, otherSection)
+	assert.equal(sectionResetRound.positionQuestionId, nextQuestion.questionId)
+
+	// 重置后晚到的旧答题事件仍更新长期状态，但不能把本轮答案写回来。
+	await service.execute({
+		action: 'syncEvents',
+		events: [{
+			type: 'answer',
+			eventId: 'answer-delayed-before-reset',
+			subjectId,
+			questionId: question.questionId,
+			selected: question.answer,
+			practiceMode: 'chapter',
+			judgedLocally: true,
+			correct: true,
+			chapterId: question.chapterId,
+			section: question.section,
+			knowledge: question.knowledge,
+			occurredAt: currentTime.getTime() + 4900
+		}]
+	}, userId)
+	assert.equal((await service.execute({
+		action: 'getPracticeRound',
+		subjectId,
+		chapterId: question.chapterId,
+		section: question.section
+	}, userId)).answers.length, 0)
+
+	await service.execute({
+		action: 'syncEvents',
+		events: [{
+			type: 'roundReset',
+			eventId: 'round-reset-chapter',
+			subjectId,
+			chapterId: question.chapterId,
+			occurredAt: currentTime.getTime() + 6000
+		}],
+		progress: {
+			progressId: 'progress-delayed-reset',
+			subjectId,
+			mode: 'section',
+			chapterId: question.chapterId,
+			section: otherSection,
+			questionId: nextQuestion.questionId,
+			occurredAt: currentTime.getTime() + 5900
+		}
+	}, userId)
+	assert.equal((await service.execute({
+		action: 'getPracticeRound', subjectId, chapterId: question.chapterId
+	}, userId)).answers.length, 0)
+	assert.equal(await service.execute({
+		action: 'getProgress',
+		subjectId,
+		mode: 'section',
+		chapterId: question.chapterId,
+		section: otherSection
+	}, userId), null)
+	const resetSnapshot = await service.execute({ action: 'getStateSnapshot', subjectId }, userId)
+	assert.equal(resetSnapshot.chapterAttempts[question.chapterId] || 0, 0)
+	assert.equal(resetSnapshot.sectionAttempts[`${question.chapterId}|${question.section}`] || 0, 0)
 
 	const stateReadsBeforeWrongRecords = environment.reads.question_bank_user_states || 0
 	const statsReadsBeforeWrongRecords = environment.reads.question_bank_user_stats || 0
@@ -744,8 +864,8 @@ async function run() {
 	assert.equal(migratedSnapshot.knowledgeAttempts['5|相关管理要求'], 1)
 	assert.equal(migratedSnapshot.knowledgeAttempts['6|相关管理要求'], 1)
 	assert.equal(migratedSnapshot.knowledgeAttempts['相关管理要求'], 2)
-	assert.equal(migratedSnapshot.chapterAttempts[question.chapterId], 1)
-	assert.equal(migratedSnapshot.sectionAttempts[`${question.chapterId}|${question.section}`], 1)
+	assert.equal(migratedSnapshot.chapterAttempts[question.chapterId] || 0, 0)
+	assert.equal(migratedSnapshot.sectionAttempts[`${question.chapterId}|${question.section}`] || 0, 0)
 	assert.equal(
 		environment.collections.question_bank_user_stats.get(`${migrationUserId}|${subjectId}`).stateAggregateVersion,
 		5
@@ -765,6 +885,18 @@ async function run() {
 	})
 	environment.collections.question_bank_user_progress.set('other-subject-progress', {
 		_id: 'other-subject-progress', userId, subjectId: otherSubjectId, mode: 'chapter'
+	})
+	environment.collections.question_bank_user_rounds.set('other-subject-round', {
+		_id: 'other-subject-round',
+		userId,
+		subjectId: otherSubjectId,
+		chapterId: '1',
+		answers: [],
+		sectionPositions: [],
+		sectionResets: [],
+		chapterResetAt: new Date(0),
+		createdAt: currentTime,
+		updatedAt: currentTime
 	})
 
 	await assert.rejects(
@@ -793,6 +925,10 @@ async function run() {
 	)
 	assert.deepEqual(
 		Array.from(environment.collections.question_bank_user_progress.values()).map(item => item.subjectId),
+		[otherSubjectId]
+	)
+	assert.deepEqual(
+		Array.from(environment.collections.question_bank_user_rounds.values()).map(item => item.subjectId),
 		[otherSubjectId]
 	)
 	assert.equal(environment.collections.question_bank_user_preferences.size, 1)

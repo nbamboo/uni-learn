@@ -1,0 +1,165 @@
+{
+  "bsonType": "object",
+  "description": "用户按科目和章节保存的当前练习轮次；重做仅重置本集合，不影响长期错题、收藏和统计",
+  "required": ["_id", "userId", "subjectId", "chapterId", "answers", "sectionPositions", "chapterResetAt", "sectionResets", "createdAt", "updatedAt"],
+  "permission": {
+    "read": false,
+    "create": false,
+    "update": false,
+    "delete": false,
+    "count": false
+  },
+  "properties": {
+    "_id": {
+      "bsonType": "string",
+      "description": "userId、subjectId 和 chapterId 哈希组成的稳定 ID",
+      "minLength": 8,
+      "maxLength": 192
+    },
+    "userId": {
+      "bsonType": "string",
+      "minLength": 1,
+      "maxLength": 64
+    },
+    "subjectId": {
+      "bsonType": "string",
+      "minLength": 1,
+      "maxLength": 64,
+      "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+    },
+    "chapterId": {
+      "bsonType": "string",
+      "minLength": 1,
+      "maxLength": 32
+    },
+    "answers": {
+      "bsonType": "array",
+      "arrayType": "object",
+      "maxLength": 5000,
+      "items": {
+        "bsonType": "object",
+        "required": ["questionId", "section", "selected", "correct", "answeredAt", "answerEventId"],
+        "properties": {
+          "questionId": {
+            "bsonType": "string",
+            "minLength": 1,
+            "maxLength": 64,
+            "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+          },
+          "section": {
+            "bsonType": "string",
+            "maxLength": 128
+          },
+          "selected": {
+            "bsonType": "array",
+            "arrayType": "string",
+            "minLength": 1,
+            "maxLength": 6,
+            "items": {
+              "bsonType": "string",
+              "enum": ["A", "B", "C", "D", "E", "F"]
+            }
+          },
+          "correct": {
+            "bsonType": "bool"
+          },
+          "answeredAt": {
+            "bsonType": "date"
+          },
+          "answerEventId": {
+            "bsonType": "string",
+            "minLength": 8,
+            "maxLength": 96
+          }
+        }
+      }
+    },
+    "chapterPosition": {
+      "bsonType": "object",
+      "properties": {
+        "questionId": {
+          "bsonType": "string",
+          "maxLength": 64
+        },
+        "section": {
+          "bsonType": "string",
+          "maxLength": 128
+        },
+        "progressId": {
+          "bsonType": "string",
+          "maxLength": 96
+        },
+        "progressAt": {
+          "bsonType": "date"
+        }
+      }
+    },
+    "sectionPositions": {
+      "bsonType": "array",
+      "arrayType": "object",
+      "maxLength": 500,
+      "items": {
+        "bsonType": "object",
+        "required": ["section", "questionId", "progressId", "progressAt"],
+        "properties": {
+          "section": {
+            "bsonType": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "questionId": {
+            "bsonType": "string",
+            "minLength": 1,
+            "maxLength": 64
+          },
+          "progressId": {
+            "bsonType": "string",
+            "minLength": 8,
+            "maxLength": 96
+          },
+          "progressAt": {
+            "bsonType": "date"
+          }
+        }
+      }
+    },
+    "chapterResetAt": {
+      "bsonType": "date"
+    },
+    "chapterResetEventId": {
+      "bsonType": "string",
+      "minLength": 8,
+      "maxLength": 96
+    },
+    "sectionResets": {
+      "bsonType": "array",
+      "arrayType": "object",
+      "maxLength": 500,
+      "items": {
+        "bsonType": "object",
+        "required": ["section", "resetAt", "resetEventId"],
+        "properties": {
+          "section": {
+            "bsonType": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "resetAt": {
+            "bsonType": "date"
+          },
+          "resetEventId": {
+            "bsonType": "string",
+            "minLength": 8,
+            "maxLength": 96
+          }
+        }
+      }
+    },
+    "createdAt": {
+      "bsonType": "date"
+    },
+    "updatedAt": {
+      "bsonType": "date"
+    }
+  }
+}

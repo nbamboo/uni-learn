@@ -1,7 +1,10 @@
 <template>
 	<view class="records-page" :class="{ 'night-mode': nightMode }">
 		<view class="records-header">
-			<text class="subject-name">{{ subject.name }}</text>
+			<view class="subject-info">
+				<text class="subject-label">当前科目</text>
+				<text class="subject-name">{{ subject.name }}</text>
+			</view>
 			<view class="record-tabs">
 				<view class="record-tab" :class="{ active: activeView === tab.key }" v-for="tab in tabs" :key="tab.key" @tap="switchView(tab.key)">
 					{{ tab.label }}
@@ -10,7 +13,7 @@
 		</view>
 
 		<view class="records-summary">
-			<view>
+			<view class="summary-count">
 				<text class="summary-value">{{ total }}</text>
 				<text class="summary-label">{{ activeTab.unit }}</text>
 			</view>
@@ -43,7 +46,9 @@
 				<view class="record-status" :class="item.correct ? 'correct' : 'wrong'" v-if="activeView !== 'favorite'">
 					<uni-icons :type="item.correct ? 'checkmarkempty' : 'closeempty'" size="18" :color="item.correct ? '#28a665' : '#e45151'"></uni-icons>
 				</view>
-				<uni-icons v-else type="star-filled" size="20" color="#e7a721"></uni-icons>
+				<view class="record-status favorite" v-else>
+					<uni-icons type="star-filled" size="19" color="#e7a721"></uni-icons>
+				</view>
 			</view>
 			<uni-load-more
 				v-if="hasMore"
@@ -95,8 +100,8 @@
 				requestId: 0,
 				nightMode: Boolean(localPreferences.nightMode),
 				tabs: [
-					{ key: 'wrong', label: '错题集', unit: '道待巩固', icon: 'refresh', emptyTitle: '暂时没有错题', emptyCaption: '继续保持，答错的题目会自动加入这里。' },
-					{ key: 'favorite', label: '收藏夹', unit: '道已收藏', icon: 'star', emptyTitle: '还没有收藏题目', emptyCaption: '刷题时点亮星标，重点题目会出现在这里。' }
+					{ key: 'wrong', label: '错题集', unit: '道题待巩固', icon: 'refresh', emptyTitle: '暂时没有错题', emptyCaption: '继续保持，答错的题目会自动加入这里。' },
+					{ key: 'favorite', label: '收藏夹', unit: '道题已收藏', icon: 'star', emptyTitle: '还没有收藏题目', emptyCaption: '刷题时点亮星标，重点题目会出现在这里。' }
 				]
 			}
 		},
@@ -205,28 +210,30 @@
 <style lang="scss">
 	page { background: #f5f6f8; color: #292d32; }
 	.records-page { min-height: 100vh; padding-bottom: 40rpx; }
-	.records-header { padding: 26rpx 24rpx 0; background: #ffffff; }
-	.subject-name { display: block; margin-bottom: 22rpx; padding-left: 8rpx; font-size: 25rpx; color: #7c828a; }
-	.record-tabs { display: grid; grid-template-columns: repeat(2, 1fr); height: 76rpx; }
-	.record-tab { position: relative; display: flex; align-items: center; justify-content: center; color: #626871; font-size: 27rpx; }
-	.record-tab.active { color: #008cff; font-weight: 600; }
-	.record-tab.active::after { position: absolute; bottom: 0; left: 25%; width: 50%; height: 4rpx; border-radius: 2rpx; background: #008cff; content: ''; }
-	.records-summary { display: flex; align-items: center; justify-content: space-between; margin: 22rpx 24rpx 0; padding: 24rpx; border-radius: 8rpx; background: #eaf5ff; }
-	.records-summary > view { display: flex; align-items: baseline; }
-	.summary-value { color: #008cff; font-size: 40rpx; font-weight: 600; }
-	.summary-label { margin-left: 10rpx; color: #68717c; font-size: 24rpx; }
-	.records-summary button { height: 64rpx; margin: 0; padding: 0 24rpx; border-radius: 34rpx; background: #008cff; color: #ffffff; font-size: 25rpx; line-height: 64rpx; }
+	.records-header { padding: 28rpx 24rpx 22rpx; background: #ffffff; }
+	.subject-info { display: flex; flex-direction: column; padding: 0 6rpx; }
+	.subject-label { color: #9aa1aa; font-size: 21rpx; line-height: 1.2; }
+	.subject-name { margin-top: 8rpx; color: #292d32; font-size: 30rpx; font-weight: 600; line-height: 1.35; }
+	.record-tabs { display: flex; height: 72rpx; margin-top: 24rpx; padding: 6rpx; border-radius: 14rpx; box-sizing: border-box; background: #f1f3f6; }
+	.record-tab { display: flex; align-items: center; justify-content: center; flex: 1; border-radius: 10rpx; color: #68707a; font-size: 26rpx; transition: color 0.16s ease, background-color 0.16s ease; }
+	.record-tab.active { background: #ffffff; color: #008cff; font-weight: 600; box-shadow: 0 2rpx 8rpx rgba(35, 54, 72, 0.08); }
+	.records-summary { display: flex; align-items: center; justify-content: space-between; min-height: 112rpx; margin: 18rpx 24rpx 0; padding: 22rpx 24rpx; border: 1rpx solid #e0edf7; border-radius: 14rpx; box-sizing: border-box; background: #ffffff; box-shadow: 0 4rpx 14rpx rgba(29, 47, 63, 0.035); }
+	.summary-count { display: flex; align-items: baseline; min-width: 0; }
+	.summary-value { color: #008cff; font-size: 42rpx; font-weight: 700; line-height: 1; }
+	.summary-label { margin-left: 10rpx; color: #68717c; font-size: 23rpx; }
+	.records-summary button { display: flex; align-items: center; justify-content: center; height: 62rpx; margin: 0 0 0 24rpx; padding: 0 26rpx; border: 0; border-radius: 31rpx; box-sizing: border-box; background: #008cff; color: #ffffff; font-size: 24rpx; font-weight: 500; line-height: 1; }
 	.records-summary button::after, .empty-state button::after { border: 0; }
-	.record-list { padding: 18rpx 24rpx 0; }
-	.record-item { display: flex; align-items: center; min-height: 126rpx; margin-bottom: 14rpx; padding: 20rpx; border-radius: 8rpx; box-sizing: border-box; background: #ffffff; }
-	.record-index { display: flex; align-items: center; justify-content: center; width: 48rpx; height: 48rpx; flex: 0 0 48rpx; margin-right: 18rpx; border-radius: 8rpx; background: #f0f2f5; color: #707680; font-size: 23rpx; }
+	.record-list { padding: 16rpx 24rpx 0; }
+	.record-item { display: flex; align-items: flex-start; min-height: 126rpx; margin-bottom: 14rpx; padding: 22rpx 20rpx; border: 1rpx solid #edf1f5; border-radius: 14rpx; box-sizing: border-box; background: #ffffff; }
+	.record-index { display: flex; align-items: center; justify-content: center; width: 48rpx; height: 48rpx; flex: 0 0 48rpx; margin: 2rpx 18rpx 0 0; border-radius: 10rpx; background: #f0f2f5; color: #707680; font-size: 23rpx; }
 	.record-content { display: flex; flex: 1; flex-direction: column; min-width: 0; }
 	.record-title { display: -webkit-box; overflow: hidden; font-size: 27rpx; line-height: 1.5; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
 	.record-meta { display: flex; align-items: center; justify-content: space-between; margin-top: 11rpx; color: #92979f; font-size: 21rpx; }
 	.record-meta text:first-child { max-width: 70%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-	.record-status { display: flex; align-items: center; justify-content: center; width: 46rpx; height: 46rpx; margin-left: 16rpx; border-radius: 50%; }
+	.record-status { display: flex; align-items: center; justify-content: center; width: 46rpx; height: 46rpx; flex: 0 0 46rpx; margin: 2rpx 0 0 16rpx; border-radius: 50%; }
 	.record-status.correct { background: #eff9f4; }
 	.record-status.wrong { background: #fff2f2; }
+	.record-status.favorite { background: #fff8e6; }
 	.empty-state { display: flex; align-items: center; flex-direction: column; padding: 150rpx 52rpx; text-align: center; }
 	.loading-state { display: flex; align-items: center; justify-content: center; min-height: 45vh; }
 	.empty-icon { display: flex; align-items: center; justify-content: center; width: 100rpx; height: 100rpx; border-radius: 8rpx; background: #eceff2; }
@@ -236,21 +243,24 @@
 	.error-state { color: #bd3f3f; }
 	.records-page.night-mode { background: #12171d; color: #e6e9ed; }
 	.night-mode .records-header { background: #171c22; }
-	.night-mode .subject-name,
+	.night-mode .subject-label,
 	.night-mode .record-tab,
 	.night-mode .summary-label,
 	.night-mode .record-meta,
 	.night-mode .empty-caption { color: #8f99a5; }
+	.night-mode .subject-name { color: #e6e9ed; }
+	.night-mode .record-tabs { background: #11161b; }
+	.night-mode .record-tab.active { background: #25303a; box-shadow: none; }
 	.night-mode .record-tab.active,
 	.night-mode .summary-value { color: #63b9f6; }
-	.night-mode .record-tab.active::after { background: #269df0; }
-	.night-mode .records-summary { background: #17364d; }
+	.night-mode .records-summary { border-color: #2b3c49; background: #1b222a; box-shadow: none; }
 	.night-mode .records-summary button,
 	.night-mode .empty-state button { background: #168ee5; }
-	.night-mode .record-item { background: #1b222a; }
+	.night-mode .record-item { border-color: #29333d; background: #1b222a; }
 	.night-mode .record-index,
 	.night-mode .empty-icon { background: #242c35; color: #aeb7c1; }
 	.night-mode .record-status.correct { background: #1e372e; }
 	.night-mode .record-status.wrong { background: #3b2327; }
+	.night-mode .record-status.favorite { background: #3a321e; }
 	.night-mode .error-state { color: #ef9a9a; }
 </style>

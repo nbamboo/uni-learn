@@ -4,6 +4,7 @@ const PROGRESS_STORAGE_KEY = 'uni-learn-practice-cloud-progress-v1'
 const CHAPTER_POSITION_STORAGE_KEY = 'uni-learn-practice-chapter-position-v1'
 const SECTION_POSITION_STORAGE_KEY = 'uni-learn-practice-section-position-v1'
 const KNOWLEDGE_POSITION_STORAGE_KEY = 'uni-learn-practice-knowledge-position-v1'
+const PRACTICE_ROUNDS_STORAGE_KEY = 'uni-learn-practice-rounds-v1'
 const PREFERENCES_STORAGE_KEY = 'uni-learn-practice-preferences-v1'
 const PRACTICE_STATE_STORAGE_KEY = 'uni-learn-practice-state-v1'
 const SUMMARY_STORAGE_KEY = 'uni-learn-practice-summary-v1'
@@ -396,6 +397,307 @@ function readPracticePositions(storageKey) {
 	return cloneValue(saved.positions)
 }
 
+function normalizePracticeRound(round, subjectId, chapterId) {
+	const source = isObject(round) ? round : {}
+	const answers = {}
+	const sourceAnswers = isObject(source.answers) ? source.answers : {}
+	Object.keys(sourceAnswers).forEach(questionId => {
+		const answer = sourceAnswers[questionId]
+		if (!isObject(answer) || !Array.isArray(answer.selected) || !answer.selected.length) return
+		answers[questionId] = {
+			questionId,
+			section: typeof answer.section === 'string' ? answer.section : '',
+			selected: answer.selected.slice(),
+			correct: Boolean(answer.correct),
+			answeredAt: Number(answer.answeredAt) || 0
+		}
+	})
+	const sectionPositions = {}
+	const sourcePositions = isObject(source.sectionPositions) ? source.sectionPositions : {}
+	Object.keys(sourcePositions).forEach(section => {
+		const position = sourcePositions[section]
+		if (!isObject(position) || !position.questionId) return
+		sectionPositions[section] = {
+			questionId: position.questionId,
+			section,
+			updatedAt: Number(position.updatedAt) || 0
+		}
+	})
+	const sectionResetAt = {}
+	const sourceResets = isObject(source.sectionResetAt) ? source.sectionResetAt : {}
+	Object.keys(sourceResets).forEach(section => {
+		const timestamp = Number(sourceResets[section]) || 0
+		if (timestamp > 0) sectionResetAt[section] = timestamp
+	})
+	const chapterPosition = isObject(source.chapterPosition) && source.chapterPosition.questionId
+		? {
+			questionId: source.chapterPosition.questionId,
+			section: source.chapterPosition.section || '',
+			updatedAt: Number(source.chapterPosition.updatedAt) || 0
+		}
+		: null
+	return {
+		subjectId: subjectId || source.subjectId || '',
+		chapterId: String(chapterId === undefined ? source.chapterId || '' : chapterId),
+		answers,
+		chapterPosition,
+		sectionPositions,
+		chapterResetAt: Number(source.chapterResetAt) || 0,
+		sectionResetAt,
+		updatedAt: Number(source.updatedAt) || 0
+	}
+}
+
+function readPracticeRounds() {
+	const saved = getStorage(userScopedStorageKey(PRACTICE_ROUNDS_STORAGE_KEY))
+	if (!saved || saved.version !== 1 || !isObject(saved.rounds)) return {}
+	const result = {}
+	Object.keys(saved.rounds).forEach(key => {
+		const source = saved.rounds[key]
+		if (!isObject(source) || !source.subjectId || source.chapterId === undefined) return
+		result[key] = normalizePracticeRound(source, source.subjectId, source.chapterId)
+	})
+	return result
+}
+
+function writePracticeRounds(rounds) {
+	const storageKey = userScopedStorageKey(PRACTICE_ROUNDS_STORAGE_KEY)
+	if (!Object.keys(rounds).length) {
+		if (removeStorage(storageKey)) return true
+		return setStorage(storageKey, null)
+	}
+	return setStorage(storageKey, { version: 1, rounds })
+}
+
+function practiceRoundKey(subjectId, chapterId) {
+	return `${subjectId}|${String(chapterId)}`
+}
+
+function getStoredPracticeRound(subjectId, chapterId, create) {
+	const rounds = readPracticeRounds()
+	const key = practiceRoundKey(subjectId, chapterId)
+	const saved = rounds[key]
+	return {
+		rounds,
+		key,
+		round: saved || (create ? normalizePracticeRound(null, subjectId, chapterId) : null)
+	}
+}
+
+function effectiveRoundResetAt(round, section) {
+	return Math.max(
+		Number(round && round.chapterResetAt) || 0,
+		section ? (Number(round && round.sectionResetAt && round.sectionResetAt[section]) || 0) : 0
+	)
+}
+
+function saveStoredPracticeRound(container) {
+	container.rounds[container.key] = container.round
+	container.round.updatedAt = Date.now()
+	writePracticeRounds(container.rounds)
+	return container.round
+}
+
+function updateLocalPracticeRoundAnswer(event) {
+	if (!event
+		|| event.type !== 'answer'
+		|| ['chapter', 'section'].indexOf(event.practiceMode) === -1
+		|| !event.chapterId) return
+	const container = getStoredPracticeRound(event.subjectId, event.chapterId, true)
+	const round = container.round
+	const eventTime = Number(event.occurredAt) || 0
+	if (eventTime <= effectiveRoundResetAt(round, event.section)) return
+	const saved = round.answers[event.questionId]
+	if (saved && Number(saved.answeredAt) > eventTime) return
+	round.answers[event.questionId] = {
+		questionId: event.questionId,
+		section: event.section || '',
+		selected: event.selected.slice(),
+		correct: Boolean(event.correct),
+		answeredAt: eventTime
+	}
+	saveStoredPracticeRound(container)
+}
+
+function updateLocalPracticeRoundPosition(progress, questionSection) {
+	if (!progress || ['chapter', 'section'].indexOf(progress.mode) === -1) return
+	const section = questionSection || progress.section || ''
+	const container = getStoredPracticeRound(progress.subjectId, progress.chapterId, true)
+	const round = container.round
+	const progressTime = Number(progress.occurredAt) || 0
+	if (progressTime <= effectiveRoundResetAt(round, section)) return
+	if (!round.chapterPosition || Number(round.chapterPosition.updatedAt) <= progressTime) {
+		round.chapterPosition = {
+			questionId: progress.questionId,
+			section,
+			updatedAt: progressTime
+		}
+	}
+	if (section) {
+		const saved = round.sectionPositions[section]
+		if (!saved || Number(saved.updatedAt) <= progressTime) {
+			round.sectionPositions[section] = {
+				questionId: progress.questionId,
+				section,
+				updatedAt: progressTime
+			}
+		}
+	}
+	saveStoredPracticeRound(container)
+}
+
+function resetLocalPracticeRound(subjectId, chapterId, section, resetAt) {
+	const container = getStoredPracticeRound(subjectId, chapterId, true)
+	const round = container.round
+	const timestamp = Number(resetAt) || Date.now()
+	if (!section) {
+		round.answers = {}
+		round.chapterPosition = null
+		round.sectionPositions = {}
+		round.chapterResetAt = Math.max(round.chapterResetAt, timestamp)
+	} else {
+		Object.keys(round.answers).forEach(questionId => {
+			if (round.answers[questionId].section === section) delete round.answers[questionId]
+		})
+		delete round.sectionPositions[section]
+		if (round.chapterPosition && round.chapterPosition.section === section) {
+			round.chapterPosition = null
+		}
+		round.sectionResetAt[section] = Math.max(
+			Number(round.sectionResetAt[section]) || 0,
+			timestamp
+		)
+	}
+	saveStoredPracticeRound(container)
+	return round
+}
+
+function toPracticeRoundResult(round, section) {
+	const source = round || normalizePracticeRound(null, '', '')
+	const answers = Object.keys(source.answers)
+		.map(questionId => source.answers[questionId])
+		.filter(answer => !section || answer.section === section)
+		.sort((left, right) => Number(left.answeredAt) - Number(right.answeredAt))
+		.map(cloneValue)
+	const position = section
+		? source.sectionPositions[section] || null
+		: source.chapterPosition
+	return {
+		subjectId: source.subjectId,
+		chapterId: source.chapterId,
+		section: section || '',
+		answers,
+		answeredQuestionIds: answers.map(answer => answer.questionId),
+		positionQuestionId: position && position.questionId || '',
+		positionSection: position && position.section || '',
+		positionAt: position && Number(position.updatedAt) || 0,
+		chapterResetAt: Number(source.chapterResetAt) || 0,
+		sectionResetAt: section ? (Number(source.sectionResetAt[section]) || 0) : 0
+	}
+}
+
+export function getLocalPracticeRound(subjectId, chapterId, section) {
+	if (!subjectId || chapterId === undefined || chapterId === null) {
+		return toPracticeRoundResult(null, section)
+	}
+	const container = getStoredPracticeRound(subjectId, chapterId, false)
+	return toPracticeRoundResult(
+		container.round || normalizePracticeRound(null, subjectId, chapterId),
+		section || ''
+	)
+}
+
+function cacheCloudPracticeRound(result, requestedSection) {
+	if (!isObject(result) || !result.subjectId || result.chapterId === undefined) return result
+	const section = requestedSection || ''
+	const container = getStoredPracticeRound(result.subjectId, result.chapterId, true)
+	const round = container.round
+	const hasChapterAnswers = Array.isArray(result.chapterAnswers)
+	const answers = hasChapterAnswers
+		? result.chapterAnswers
+		: (Array.isArray(result.answers) ? result.answers : [])
+	if (section && !hasChapterAnswers) {
+		Object.keys(round.answers).forEach(questionId => {
+			if (round.answers[questionId].section === section) delete round.answers[questionId]
+		})
+	} else {
+		round.answers = {}
+	}
+	answers.forEach(answer => {
+		if (!isObject(answer) || !answer.questionId || !Array.isArray(answer.selected)) return
+		round.answers[answer.questionId] = {
+			questionId: answer.questionId,
+			section: answer.section || '',
+			selected: answer.selected.slice(),
+			correct: Boolean(answer.correct),
+			answeredAt: Number(answer.answeredAt) || 0
+		}
+	})
+	const position = result.positionQuestionId ? {
+		questionId: result.positionQuestionId,
+		section: section || result.positionSection || '',
+		updatedAt: Number(result.positionAt) || 0
+	} : null
+	if (section) {
+		if (position) round.sectionPositions[section] = position
+		else delete round.sectionPositions[section]
+		round.sectionResetAt[section] = Number(result.sectionResetAt) || 0
+		if (hasChapterAnswers) {
+			round.chapterPosition = result.chapterPositionQuestionId ? {
+				questionId: result.chapterPositionQuestionId,
+				section: result.chapterPositionSection || '',
+				updatedAt: Number(result.chapterPositionAt) || 0
+			} : null
+			round.chapterResetAt = Number(result.chapterResetAt) || 0
+		}
+	} else {
+		round.chapterPosition = position
+		round.chapterResetAt = Number(result.chapterResetAt) || 0
+	}
+	saveStoredPracticeRound(container)
+	return result
+}
+
+export function getLocalPracticeRoundSnapshot(subjectId) {
+	const chapterIds = []
+	const updatedAtByChapter = {}
+	const chapterAttempts = {}
+	const sectionAttempts = {}
+	const progressPositions = { chapter: {}, section: {} }
+	const rounds = readPracticeRounds()
+	Object.keys(rounds).forEach(key => {
+		const round = rounds[key]
+		if (!round || round.subjectId !== subjectId) return
+		const chapterId = String(round.chapterId)
+		chapterIds.push(chapterId)
+		updatedAtByChapter[chapterId] = Number(round.updatedAt) || 0
+		const answers = Object.keys(round.answers).map(questionId => round.answers[questionId])
+		chapterAttempts[chapterId] = answers.length
+		answers.forEach(answer => {
+			if (!answer.section) return
+			const scopeKey = getSectionScopeKey(chapterId, answer.section)
+			sectionAttempts[scopeKey] = (sectionAttempts[scopeKey] || 0) + 1
+		})
+		if (round.chapterPosition && round.chapterPosition.questionId) {
+			progressPositions.chapter[chapterId] = round.chapterPosition.questionId
+		}
+		Object.keys(round.sectionPositions).forEach(section => {
+			const position = round.sectionPositions[section]
+			const scopeKey = getSectionScopeKey(chapterId, section)
+			if (scopeKey && position.questionId) progressPositions.section[scopeKey] = position.questionId
+		})
+	})
+	return {
+		subjectId,
+		chapterIds,
+		updatedAtByChapter,
+		chapterAttempts,
+		sectionAttempts,
+		progressPositions,
+		_localOnly: true
+	}
+}
+
 function savePracticePosition(storageKey, positionKey, progress) {
 	const positions = readPracticePositions(storageKey)
 	positions[positionKey] = {
@@ -468,6 +770,7 @@ export function queuePracticeAnswer(question, selected, options) {
 		event.section = question.section || ''
 		event.knowledge = question.knowledge || ''
 	}
+	updateLocalPracticeRoundAnswer(event)
 	invalidateUserPracticeCache(event.subjectId)
 	return enqueueEvent(event)
 }
@@ -502,29 +805,19 @@ export function savePracticeProgress(question, options) {
 		subjectId,
 		mode,
 		chapterId: String(chapterId),
-		section: mode === 'section' ? section : '',
+		section: mode === 'knowledge' ? '' : section,
 		knowledge: mode === 'knowledge' ? knowledge : '',
 		questionId,
 		occurredAt: Number(config.occurredAt) || Date.now()
 	}
-	if (mode === 'section') {
-		savePracticePosition(
-			SECTION_POSITION_STORAGE_KEY,
-			`${progress.subjectId}|${getSectionScopeKey(progress.chapterId, progress.section)}`,
-			progress
-		)
-	} else if (mode === 'knowledge') {
+	if (mode === 'knowledge') {
 		savePracticePosition(
 			KNOWLEDGE_POSITION_STORAGE_KEY,
 			`${progress.subjectId}|${getKnowledgeScopeKey(progress.chapterId, progress.knowledge)}`,
 			progress
 		)
 	} else {
-		savePracticePosition(
-			CHAPTER_POSITION_STORAGE_KEY,
-			`${progress.subjectId}|${progress.chapterId}`,
-			progress
-		)
+		updateLocalPracticeRoundPosition(progress, section)
 	}
 	savePendingProgress(progress)
 	return progress.progressId
@@ -532,17 +825,25 @@ export function savePracticeProgress(question, options) {
 
 export function getChapterPracticePosition(subjectId, chapterId) {
 	if (!subjectId || chapterId === undefined || chapterId === null) return null
-	const positions = readPracticePositions(CHAPTER_POSITION_STORAGE_KEY)
-	const position = positions[`${subjectId}|${String(chapterId)}`]
-	return position && position.questionId ? cloneValue(position) : null
+	const round = getLocalPracticeRound(subjectId, chapterId)
+	return round.positionQuestionId ? {
+		subjectId,
+		chapterId: String(chapterId),
+		questionId: round.positionQuestionId,
+		updatedAt: round.positionAt
+	} : null
 }
 
 export function getSectionPracticePosition(subjectId, chapterId, section) {
 	if (!subjectId || chapterId === undefined || chapterId === null || !section) return null
-	const positions = readPracticePositions(SECTION_POSITION_STORAGE_KEY)
-	const scopeKey = getSectionScopeKey(chapterId, section)
-	const position = positions[`${subjectId}|${scopeKey}`]
-	return position && position.questionId ? cloneValue(position) : null
+	const round = getLocalPracticeRound(subjectId, chapterId, section)
+	return round.positionQuestionId ? {
+		subjectId,
+		chapterId: String(chapterId),
+		section,
+		questionId: round.positionQuestionId,
+		updatedAt: round.positionAt
+	} : null
 }
 
 export function getKnowledgePracticePosition(subjectId, chapterId, knowledge) {
@@ -994,21 +1295,17 @@ function getLocalPracticeSnapshot(subjectId, options) {
 			answerSelections[item.questionId] = item.answer.selected.slice()
 		}
 	})
-	const chapterAttempts = {}
-	const sectionAttempts = {}
+	const roundSnapshot = getLocalPracticeRoundSnapshot(subjectId)
+	const chapterAttempts = config.includeAggregates === false
+		? {}
+		: roundSnapshot.chapterAttempts
+	const sectionAttempts = config.includeAggregates === false
+		? {}
+		: roundSnapshot.sectionAttempts
 	const knowledgeAttempts = {}
 	if (config.includeAggregates !== false) {
 		answers.forEach(item => {
 			const modes = Array.isArray(item.answer.practiceModes) ? item.answer.practiceModes : []
-			const isChapterScopePractice = modes.indexOf('chapter') > -1
-				|| modes.indexOf('section') > -1
-			if (isChapterScopePractice && item.answer.chapterId) {
-				chapterAttempts[item.answer.chapterId] = (chapterAttempts[item.answer.chapterId] || 0) + 1
-			}
-			if (isChapterScopePractice && item.answer.chapterId && item.answer.section) {
-				const scopeKey = getSectionScopeKey(item.answer.chapterId, item.answer.section)
-				sectionAttempts[scopeKey] = (sectionAttempts[scopeKey] || 0) + 1
-			}
 			if (modes.indexOf('knowledge') > -1 && item.answer.knowledge) {
 				const scopeKey = getKnowledgeScopeKey(item.answer.chapterId, item.answer.knowledge)
 				const key = scopeKey || item.answer.knowledge
@@ -1018,27 +1315,14 @@ function getLocalPracticeSnapshot(subjectId, options) {
 	}
 	const progressPositions = { chapter: {}, section: {}, knowledge: {} }
 	if (config.includeProgress !== false) {
-		const chapterPositions = readPracticePositions(CHAPTER_POSITION_STORAGE_KEY)
-		Object.keys(chapterPositions).forEach(key => {
-			const position = chapterPositions[key]
-			if (position && position.subjectId === subjectId && position.chapterId && position.questionId) {
-				progressPositions.chapter[position.chapterId] = position.questionId
-			}
-		})
+		progressPositions.chapter = cloneValue(roundSnapshot.progressPositions.chapter)
+		progressPositions.section = cloneValue(roundSnapshot.progressPositions.section)
 		const knowledgePositions = readPracticePositions(KNOWLEDGE_POSITION_STORAGE_KEY)
 		Object.keys(knowledgePositions).forEach(key => {
 			const position = knowledgePositions[key]
 			if (position && position.subjectId === subjectId && position.knowledge && position.questionId) {
 				const scopeKey = getKnowledgeScopeKey(position.chapterId, position.knowledge)
 				progressPositions.knowledge[scopeKey || position.knowledge] = position.questionId
-			}
-		})
-		const sectionPositions = readPracticePositions(SECTION_POSITION_STORAGE_KEY)
-		Object.keys(sectionPositions).forEach(key => {
-			const position = sectionPositions[key]
-			if (position && position.subjectId === subjectId && position.section && position.questionId) {
-				const scopeKey = getSectionScopeKey(position.chapterId, position.section)
-				if (scopeKey) progressPositions.section[scopeKey] = position.questionId
 			}
 		})
 	}
@@ -1211,6 +1495,68 @@ export async function getPracticeStateSnapshot(subjectId, options) {
 	return setCached(snapshotCache, cacheKey, result, SNAPSHOT_CACHE_TTL)
 }
 
+export async function getPracticeRound(options) {
+	const input = options || {}
+	const subjectId = typeof input.subjectId === 'string' ? input.subjectId.trim() : ''
+	const chapterId = input.chapterId === undefined || input.chapterId === null
+		? ''
+		: String(input.chapterId)
+	const section = typeof input.section === 'string' ? input.section.trim() : ''
+	if (!subjectId || !chapterId) {
+		throw new UserPracticeServiceError(
+			'QUESTION_BANK_USER_CLIENT_ERROR',
+			'章节练习轮次参数无效'
+		)
+	}
+	if (!practiceCloudSyncEnabled()) {
+		return Object.assign(getLocalPracticeRound(subjectId, chapterId, section), {
+			_localOnly: true
+		})
+	}
+	try {
+		await flushPracticeEvents()
+		const result = await executeCloudCall('getPracticeRound', { subjectId, chapterId, section })
+		return cacheCloudPracticeRound(result, section)
+	} catch (error) {
+		return Object.assign(getLocalPracticeRound(subjectId, chapterId, section), {
+			_localFallback: true,
+			_syncError: error && (error.errMsg || error.message) || '练习轮次同步失败'
+		})
+	}
+}
+
+export async function resetPracticeRound(options) {
+	const input = options || {}
+	const subjectId = typeof input.subjectId === 'string' ? input.subjectId.trim() : ''
+	const chapterId = input.chapterId === undefined || input.chapterId === null
+		? ''
+		: String(input.chapterId)
+	const section = typeof input.section === 'string' ? input.section.trim() : ''
+	if (!subjectId || !chapterId) {
+		throw new UserPracticeServiceError(
+			'QUESTION_BANK_USER_CLIENT_ERROR',
+			'章节练习轮次参数无效'
+		)
+	}
+	const occurredAt = Number(input.occurredAt) || Date.now()
+	const round = resetLocalPracticeRound(subjectId, chapterId, section, occurredAt)
+	const event = {
+		type: 'roundReset',
+		eventId: input.eventId || createPracticeEventId('round-reset'),
+		subjectId,
+		chapterId,
+		section,
+		occurredAt
+	}
+	invalidateUserPracticeCache(subjectId)
+	enqueueEvent(event)
+	return Object.assign(toPracticeRoundResult(round, section), {
+		reset: true,
+		localOnly: !practiceCloudSyncEnabled(),
+		syncPending: practiceCloudSyncEnabled()
+	})
+}
+
 export async function getPracticeRecords(params) {
 	const input = params || {}
 	if (!practiceCloudSyncEnabled()) {
@@ -1329,6 +1675,11 @@ function clearSubjectLocalSyncData(subjectId) {
 	removeSubjectPracticePositions(CHAPTER_POSITION_STORAGE_KEY, subjectId)
 	removeSubjectPracticePositions(SECTION_POSITION_STORAGE_KEY, subjectId)
 	removeSubjectPracticePositions(KNOWLEDGE_POSITION_STORAGE_KEY, subjectId)
+	const rounds = readPracticeRounds()
+	Object.keys(rounds).forEach(key => {
+		if (rounds[key] && rounds[key].subjectId === subjectId) delete rounds[key]
+	})
+	writePracticeRounds(rounds)
 	removePersistedSummary(subjectId)
 	summaryRefreshRequiredKeys.delete(summaryCacheKey(subjectId))
 	invalidateUserPracticeCache(subjectId)
@@ -1485,9 +1836,12 @@ export default {
 	getCachedPracticeSummary,
 	getPracticeProgress,
 	getPracticePreferences,
+	getPracticeRound,
 	getPracticeRecords,
 	getSmartPracticeQuestions,
 	getPracticeStateSnapshot,
+	getLocalPracticeRound,
+	getLocalPracticeRoundSnapshot,
 	getPracticeSummary,
 	getPracticeUserProfile,
 	getLocalPracticePreferences,
@@ -1499,6 +1853,7 @@ export default {
 	practiceUserLoggedIn,
 	queuePracticeAnswer,
 	queuePracticeFavorite,
+	resetPracticeRound,
 	savePracticeProgress,
 	updatePracticePreferences
 }

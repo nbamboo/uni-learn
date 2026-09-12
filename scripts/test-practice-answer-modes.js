@@ -45,6 +45,7 @@ async function run() {
 	const switchTabUrls = []
 	const tabBarStyles = []
 	const modalOptions = []
+	const actionSheetOptions = []
 	let flushCalls = 0
 	let progressSaveCalls = 0
 	let snapshotCalls = 0
@@ -57,6 +58,18 @@ async function run() {
 	let interstitialCreateCalls = 0
 	let interstitialShowCalls = 0
 	let interstitialDestroyCalls = 0
+	let resetRoundCalls = 0
+	let localRoundSnapshot = {
+		chapterIds: [],
+		chapterAttempts: {},
+		sectionAttempts: {},
+		progressPositions: { chapter: {}, section: {} }
+	}
+	let practiceRoundResponse = {
+		answers: [],
+		positionQuestionId: ''
+	}
+	let allPracticeQuestions = []
 	let preferenceResponse = { answerMode: 'practice', nightMode: false }
 	let practiceAnswers = {}
 	const practiceProgressEvent = 'uni-learn-practice-progress-updated'
@@ -96,7 +109,7 @@ async function run() {
 		},
 		PRACTICE_PROGRESS_UPDATED_EVENT: practiceProgressEvent,
 		buildPracticeQuestions: async () => [],
-		getAllPracticeQuestions: async () => ({ items: [] }),
+		getAllPracticeQuestions: async () => ({ items: allPracticeQuestions }),
 		getPracticeState: () => ({
 			currentSubjectId: 'junior-personal-finance',
 			answers: practiceAnswers
@@ -185,6 +198,27 @@ async function run() {
 		getSectionPracticePosition: () => {
 			sectionPositionCalls += 1
 			return { questionId: 'saved-section-question' }
+		},
+		getLocalPracticeRoundSnapshot: () => localRoundSnapshot,
+		getPracticeRound: async () => practiceRoundResponse,
+		resetPracticeRound: async input => {
+			resetRoundCalls += 1
+			if (input.section) {
+				localRoundSnapshot.sectionAttempts[`${input.chapterId}|${input.section}`] = 0
+				delete localRoundSnapshot.progressPositions.section[`${input.chapterId}|${input.section}`]
+			} else {
+				localRoundSnapshot.chapterAttempts[input.chapterId] = 0
+				delete localRoundSnapshot.progressPositions.chapter[input.chapterId]
+				Object.keys(localRoundSnapshot.sectionAttempts).forEach(key => {
+					if (key.indexOf(`${input.chapterId}|`) === 0) localRoundSnapshot.sectionAttempts[key] = 0
+				})
+				Object.keys(localRoundSnapshot.progressPositions.section).forEach(key => {
+					if (key.indexOf(`${input.chapterId}|`) === 0) {
+						delete localRoundSnapshot.progressPositions.section[key]
+					}
+				})
+			}
+			return { reset: true }
 		},
 		getPracticeStateSnapshot: async () => {
 			snapshotCalls += 1
@@ -277,6 +311,7 @@ async function run() {
 			switchTab: options => switchTabUrls.push(options.url),
 			navigateBack: () => {},
 			showModal: options => modalOptions.push(options),
+			showActionSheet: options => actionSheetOptions.push(options),
 			showToast: () => {}
 		},
 		console,
@@ -411,6 +446,47 @@ async function run() {
 		startNumber: 2
 	}
 	assert.equal(practiceChapterResume.resolveInitialQuestionIndex(), 2)
+	practiceChapterResume.practiceConfig.startId = 'missing-question'
+	assert.equal(practiceChapterResume.resolveInitialQuestionIndex({
+		positionQuestionId: 'missing-position',
+		answeredQuestionIds: [single.id]
+	}), 1)
+
+	// 章节轮次独立恢复全部答案，不受状态快照最多 100 道题的限制。
+	allPracticeQuestions = Array.from({ length: 120 }, (_, index) => {
+		const question = createQuestion(`round-${index + 1}`, 'single', ['A'])
+		question.section = index < 60 ? '第一节' : '第二节'
+		return question
+	})
+	practiceRoundResponse = {
+		answers: allPracticeQuestions.map((question, index) => ({
+			questionId: question.id,
+			section: question.section,
+			selected: ['A'],
+			correct: index % 3 !== 0,
+			answeredAt: Date.now() + index
+		})),
+		answeredQuestionIds: allPracticeQuestions.map(question => question.id),
+		positionQuestionId: 'round-111'
+	}
+	const longRoundPage = createContext('practice', [])
+	longRoundPage.mode = 'chapter'
+	longRoundPage.practiceConfig = {
+		subjectId: 'junior-personal-finance',
+		chapterId: '1',
+		section: '',
+		knowledge: '',
+		startId: '',
+		startNumber: 0
+	}
+	await longRoundPage.loadQuestions()
+	assert.equal(Object.keys(longRoundPage.sessionAnswers).length, 120)
+	assert.equal(longRoundPage.currentQuestion.id, 'round-111')
+	assert.equal(longRoundPage.correctCount, 80)
+	assert.equal(longRoundPage.wrongCount, 40)
+	assert.equal(longRoundPage.getSessionSnapshotQuestionIds(longRoundPage.currentIndex).length, 100)
+	allPracticeQuestions = []
+	practiceRoundResponse = { answers: [], answeredQuestionIds: [], positionQuestionId: '' }
 
 	const reviewKnowledgeResume = createContext('review', [single, multiple, following])
 	reviewKnowledgeResume.mode = 'knowledge'
@@ -550,19 +626,6 @@ async function run() {
 	assert.equal(answerSheetExam.showExamResult, true)
 
 	const chapterComponent = loadComponent(environment, '../practice-pages/chapter/chapter.vue')
-	practiceAnswers = {
-		'local-record': {
-			subjectId: 'junior-personal-finance',
-			chapterId: '1',
-			practiceModes: ['chapter'],
-			selected: ['A']
-		}
-	}
-	const historicalChapterList = Object.assign(chapterComponent.data(), chapterComponent.methods, {
-		subjectId: 'junior-personal-finance'
-	})
-	assert.equal(await historicalChapterList.backfillLocalSectionMetadata(), true)
-	assert.equal(practiceAnswers['local-record'].section, '第一节')
 	practiceAnswers = {}
 	const memberChapterList = Object.assign(chapterComponent.data(), chapterComponent.methods, {
 		view: 'chapter',
@@ -671,8 +734,17 @@ async function run() {
 		view: 'chapter',
 		answerMode: 'practice'
 	})
+	const actionSheetsBeforeFreshEntry = actionSheetOptions.length
+	chapterPractice.startItem({
+		...catalogItem,
+		progress: { attempted: 0, total: 10, percent: 0, positionQuestionId: 'stale-position' }
+	})
+	assert.equal(actionSheetOptions.length, actionSheetsBeforeFreshEntry)
+	assert.doesNotMatch(navigationUrls.slice(-1)[0], /startId=/)
 	chapterPractice.startItem(catalogItem)
-	assert.match(navigationUrls.slice(-1)[0], /startId=saved-chapter-question/)
+	assert.deepEqual(Array.from(actionSheetOptions.slice(-1)[0].itemList), ['重新做题', '继续做题'])
+	await actionSheetOptions.slice(-1)[0].success({ tapIndex: 1 })
+	assert.match(navigationUrls.slice(-1)[0], /startId=cloud-chapter-question/)
 	chapterPractice.toggleChapter({ id: '1', sections: [{ name: '第一节' }] })
 	assert.equal(chapterPractice.expandedChapterId, '1')
 	chapterPractice.toggleChapter({ id: '2', sections: [{ name: '第一节' }] })
@@ -685,8 +757,35 @@ async function run() {
 		name: '第一节',
 		progress: { attempted: 1, total: 4, positionQuestionId: 'cloud-section-question' }
 	})
+	await actionSheetOptions.slice(-1)[0].success({ tapIndex: 1 })
 	assert.match(navigationUrls.slice(-1)[0], /mode=section/)
-	assert.match(navigationUrls.slice(-1)[0], /startId=saved-section-question/)
+	assert.match(navigationUrls.slice(-1)[0], /startId=cloud-section-question/)
+	const urlsBeforeCancelledEntry = navigationUrls.length
+	chapterPractice.startItem(catalogItem)
+	actionSheetOptions.slice(-1)[0].fail({ errMsg: 'showActionSheet:fail cancel' })
+	assert.equal(navigationUrls.length, urlsBeforeCancelledEntry)
+	localRoundSnapshot = {
+		chapterIds: ['1'],
+		chapterAttempts: { '1': 4 },
+		sectionAttempts: { '1|第一节': 1, '1|第二节': 3 },
+		progressPositions: {
+			chapter: { '1': 'saved-chapter-question' },
+			section: { '1|第一节': 'saved-section-question' }
+		}
+	}
+	chapterPractice.items = [{
+		...catalogItem,
+		sections: [{
+			name: '第一节',
+			count: 4,
+			progress: { attempted: 1, total: 4, percent: 25, positionQuestionId: 'saved-section-question' }
+		}]
+	}]
+	chapterPractice.startItem(chapterPractice.items[0])
+	await actionSheetOptions.slice(-1)[0].success({ tapIndex: 0 })
+	assert.equal(resetRoundCalls, 1)
+	assert.doesNotMatch(navigationUrls.slice(-1)[0], /startId=/)
+	assert.equal(chapterPractice.items[0].progress.attempted, 0)
 
 	const knowledgeReview = Object.assign(chapterComponent.data(), chapterComponent.methods, {
 		subjectId: 'junior-personal-finance',
