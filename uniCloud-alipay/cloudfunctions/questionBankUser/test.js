@@ -205,6 +205,7 @@ function loadSeed() {
 		question_bank_user_stats: [],
 		question_bank_user_progress: [],
 		question_bank_user_rounds: [],
+		question_bank_exam_drafts: [],
 		question_bank_user_preferences: [],
 		question_bank_memberships: [{
 			_id: 'user-one',
@@ -232,6 +233,7 @@ async function run() {
 	assert.deepEqual(defaultPreferences, {
 		answerMode: 'practice',
 		nightMode: false,
+		smartPractice: require('./smart-practice.js').defaultSmartPractice(),
 		updatedAt: 0
 	})
 	environment.collections.question_bank_memberships.set('user-grace', {
@@ -254,6 +256,213 @@ async function run() {
 		() => service.execute({ action: 'getPreferences' }, 'user-revoked'),
 		error => error && error.errCode === 'QUESTION_BANK_MEMBERSHIP_REQUIRED'
 	)
+
+	const examQuestions = Array.from(environment.collections.question_bank_questions.values())
+		.filter(item => item.subjectId === subjectId)
+		.slice(0, 2)
+	const examScope = {
+		mode: 'chapter',
+		chapterId: String(examQuestions[0].chapterId),
+		section: '',
+		knowledge: '',
+		keyword: ''
+	}
+	examScope.scopeKey = `chapter|${encodeURIComponent(examScope.chapterId)}`
+	const examRoundId = 'exam-round-cloud-one'
+	const examBaseTime = currentTime.getTime() - 4 * 60 * 1000
+	const officialStateCountBeforeExam = environment.collections.question_bank_user_states.size
+	const officialStatsCountBeforeExam = environment.collections.question_bank_user_stats.size
+	await service.execute({
+		action: 'syncEvents',
+		events: [{
+			type: 'examStart',
+			eventId: 'exam-start-cloud-one',
+			subjectId,
+			...examScope,
+			roundId: examRoundId,
+			questionVersion: examQuestions[0].version,
+			questionIds: examQuestions.map(item => item.questionId),
+			initialQuestionId: examQuestions[0].questionId,
+			positionQuestionId: examQuestions[0].questionId,
+			occurredAt: examBaseTime
+		}, {
+			type: 'examAnswer',
+			eventId: 'exam-answer-cloud-one',
+			subjectId,
+			...examScope,
+			roundId: examRoundId,
+			questionId: examQuestions[0].questionId,
+			selected: ['A'],
+			positionQuestionId: examQuestions[0].questionId,
+			occurredAt: examBaseTime + 1000
+		}, {
+			type: 'examPosition',
+			eventId: 'exam-position-cloud-one',
+			subjectId,
+			...examScope,
+			roundId: examRoundId,
+			questionId: examQuestions[1].questionId,
+			occurredAt: examBaseTime + 2000
+		}]
+	}, userId)
+	const savedExamDraft = await service.execute({
+		action: 'getExamDraft',
+		subjectId,
+		...examScope
+	}, userId)
+	assert.equal(savedExamDraft.active, true)
+	assert.equal(savedExamDraft.roundId, examRoundId)
+	assert.deepEqual(savedExamDraft.questionIds, examQuestions.map(item => item.questionId))
+	assert.deepEqual(savedExamDraft.answers[0].selected, ['A'])
+	assert.equal(savedExamDraft.positionQuestionId, examQuestions[1].questionId)
+	await service.execute({
+		action: 'syncEvents',
+		events: [{
+			type: 'examStart',
+			eventId: 'exam-start-cloud-one',
+			subjectId,
+			...examScope,
+			roundId: examRoundId,
+			questionVersion: examQuestions[0].version,
+			questionIds: examQuestions.map(item => item.questionId),
+			initialQuestionId: examQuestions[0].questionId,
+			positionQuestionId: examQuestions[0].questionId,
+			occurredAt: examBaseTime
+		}]
+	}, userId)
+	const afterDuplicateStart = await service.execute({
+		action: 'getExamDraft', subjectId, ...examScope
+	}, userId)
+	assert.equal(afterDuplicateStart.answers.length, 1)
+	assert.equal(afterDuplicateStart.positionQuestionId, examQuestions[1].questionId)
+	const examSummaries = await service.execute({ action: 'getExamDraftSummaries', subjectId }, userId)
+	assert.equal(examSummaries.summaries[examScope.scopeKey].answered, 1)
+	assert.equal(examSummaries.summaries[examScope.scopeKey].total, 2)
+	assert.equal(examSummaries.summaries[examScope.scopeKey].hasProgress, true)
+	assert.equal(environment.collections.question_bank_user_states.size, officialStateCountBeforeExam)
+	assert.equal(environment.collections.question_bank_user_stats.size, officialStatsCountBeforeExam)
+
+	await service.execute({
+		action: 'syncEvents',
+		events: [{
+			type: 'examComplete',
+			eventId: 'exam-complete-cloud-one',
+			subjectId,
+			...examScope,
+			roundId: examRoundId,
+			occurredAt: examBaseTime + 3000
+		}]
+	}, userId)
+	const completedExamDraft = await service.execute({
+		action: 'getExamDraft', subjectId, ...examScope
+	}, userId)
+	assert.equal(completedExamDraft.active, false)
+	const replacementRoundId = 'exam-round-cloud-two'
+	await service.execute({
+		action: 'syncEvents',
+		events: [{
+			type: 'examStart',
+			eventId: 'exam-start-cloud-two',
+			subjectId,
+			...examScope,
+			roundId: replacementRoundId,
+			questionVersion: examQuestions[0].version,
+			questionIds: examQuestions.map(item => item.questionId),
+			initialQuestionId: examQuestions[0].questionId,
+			positionQuestionId: examQuestions[0].questionId,
+			occurredAt: examBaseTime + 5000
+		}, {
+			type: 'examAnswer',
+			eventId: 'exam-answer-old-round-late',
+			subjectId,
+			...examScope,
+			roundId: examRoundId,
+			questionId: examQuestions[1].questionId,
+			selected: ['B'],
+			positionQuestionId: examQuestions[1].questionId,
+			occurredAt: examBaseTime + 6000
+		}]
+	}, userId)
+	const replacementDraft = await service.execute({
+		action: 'getExamDraft', subjectId, ...examScope
+	}, userId)
+	assert.equal(replacementDraft.roundId, replacementRoundId)
+	assert.equal(replacementDraft.answers.length, 0)
+	await service.execute({
+		action: 'syncEvents',
+		events: [{
+			type: 'examAnswer',
+			eventId: 'exam-answer-delayed-one',
+			subjectId,
+			...examScope,
+			roundId: examRoundId,
+			questionId: examQuestions[1].questionId,
+			selected: ['B'],
+			positionQuestionId: examQuestions[1].questionId,
+			occurredAt: examBaseTime + 4000
+		}]
+	}, userId)
+	const afterDelayedOldAnswer = await service.execute({
+		action: 'getExamDraft', subjectId, ...examScope
+	}, userId)
+	assert.equal(afterDelayedOldAnswer.active, true)
+	assert.equal(afterDelayedOldAnswer.roundId, replacementRoundId)
+	assert.equal(afterDelayedOldAnswer.answers.length, 0)
+
+	const formalCorrectQuestion = examQuestions[0]
+	const formalWrongQuestion = examQuestions[1]
+	const formalWrongAlias = formalWrongQuestion.options
+		.map(item => item.alias)
+		.find(alias => formalWrongQuestion.answer.indexOf(alias) === -1)
+	const formalAnswerTime = examBaseTime + 7000
+	await service.execute({
+		action: 'syncEvents',
+		events: [{
+			type: 'answer',
+			eventId: 'exam-formal-answer-correct',
+			subjectId,
+			questionId: formalCorrectQuestion.questionId,
+			selected: formalCorrectQuestion.answer.slice(),
+			occurredAt: formalAnswerTime
+		}, {
+			type: 'answer',
+			eventId: 'exam-formal-answer-wrong',
+			subjectId,
+			questionId: formalWrongQuestion.questionId,
+			selected: [formalWrongAlias],
+			occurredAt: formalAnswerTime + 1000
+		}]
+	}, userId)
+	const formalSummary = await service.execute({ action: 'getSummary', subjectId }, userId)
+	assert.equal(formalSummary.attempted, 2)
+	assert.equal(formalSummary.correct, 1)
+	assert.equal(formalSummary.wrong, 1)
+	assert.equal(formalSummary.totalAttempts, 2)
+	const formalRecords = await service.execute({
+		action: 'getRecords', subjectId, type: 'wrong', page: 1, pageSize: 20
+	}, userId)
+	assert.equal(formalRecords.total, 1)
+	assert.equal(formalRecords.items[0].question.questionId, formalWrongQuestion.questionId)
+	const formalSnapshot = await service.execute({
+		action: 'getStateSnapshot',
+		subjectId,
+		questionIds: [formalCorrectQuestion.questionId, formalWrongQuestion.questionId]
+	}, userId)
+	assert.deepEqual(formalSnapshot.wrongQuestionIds, [formalWrongQuestion.questionId])
+	assert.deepEqual(formalSnapshot.answerSelections[formalWrongQuestion.questionId], [formalWrongAlias])
+	const formalRound = await service.execute({
+		action: 'getPracticeRound', subjectId, chapterId: formalCorrectQuestion.chapterId
+	}, userId)
+	assert.equal(formalRound.answers.length, 0)
+	for (const collectionName of ['question_bank_user_states', 'question_bank_user_stats']) {
+		for (const [id, document] of environment.collections[collectionName]) {
+			if (document.userId === userId && document.subjectId === subjectId) {
+				environment.collections[collectionName].delete(id)
+			}
+		}
+	}
+	environment.reads.question_bank_catalogs = 0
+	environment.reads.question_bank_questions = 0
 
 	await assert.rejects(
 		() => service.execute({
@@ -289,6 +498,8 @@ async function run() {
 		'getStateSnapshot',
 		'getProgress',
 		'getPracticeRound',
+		'getExamDraft',
+		'getExamDraftSummaries',
 		'getSmartPractice',
 		'getPreferences',
 		'updatePreferences',
@@ -357,6 +568,7 @@ async function run() {
 	assert.deepEqual(updatedPreferences, {
 		answerMode: 'exam',
 		nightMode: true,
+		smartPractice: require('./smart-practice.js').defaultSmartPractice(),
 		updatedAt: currentTime.getTime()
 	})
 	assert.equal(environment.collections.question_bank_user_preferences.size, 1)
@@ -364,6 +576,15 @@ async function run() {
 		await service.execute({ action: 'getPreferences' }, userId),
 		updatedPreferences
 	)
+	const customPreference = { strategy: 'custom', questionCount: 35, custom: { fresh: 25, wrong: 65, mastered: 10 } }
+	await service.execute({ action: 'updatePreferences', answerMode: 'exam', nightMode: true,
+		smartPractice: customPreference }, userId)
+	const legacySaved = await service.execute({ action: 'updatePreferences', answerMode: 'practice', nightMode: false }, userId)
+	assert.deepEqual(legacySaved.smartPractice, customPreference)
+	assert.deepEqual((await service.execute({ action: 'getPreferences' }, userId)).smartPractice, customPreference)
+	await assert.rejects(service.execute({ action: 'updatePreferences', answerMode: 'practice', nightMode: false,
+		smartPractice: { strategy: 'custom', questionCount: 20, custom: { fresh: 61, wrong: 29, mastered: 10 } } }, userId),
+		error => error.errCode === 'QUESTION_BANK_USER_INVALID_ARGUMENT')
 	await assert.rejects(
 		() => service.execute({ action: 'getPreferences' }, 'user-two'),
 		error => error && error.errCode === 'QUESTION_BANK_MEMBERSHIP_REQUIRED'
@@ -565,6 +786,35 @@ async function run() {
 	assert.equal(smartPractice.total, 822)
 	assert.equal(smartPractice.items.length, 20)
 	assert.ok(smartPractice.stateCounts.sampled <= 100)
+	const ratioEnvironment = createDatabase(loadSeed(), new Date(currentTime))
+	const ratioService = createQuestionBankUserService(ratioEnvironment.db, { now: () => new Date(currentTime) })
+	const categoryById = new Map()
+	Array.from(ratioEnvironment.collections.question_bank_questions.values()).forEach((item, index) => {
+		const category = ['fresh', 'wrong', 'mastered'][index % 3]
+		categoryById.set(item.questionId, category)
+		if (category === 'fresh') return
+		ratioEnvironment.collections.question_bank_user_states.set(item.questionId, {
+			_id: item.questionId, questionId: item.questionId, userId, subjectId,
+			attempted: true, lastCorrect: category === 'mastered', lastAnsweredAt: currentTime
+		})
+	})
+	const mixed = await ratioService.execute({ action: 'getSmartPractice', subjectId, pageSize: 20,
+		seed: 'ratio-test', smartPractice: { strategy: 'balanced', questionCount: 20, custom: { fresh: 60, wrong: 30, mastered: 10 } } }, userId)
+	assert.equal(mixed.items.length, 20)
+	assert.equal(mixed.stateCounts.sampled, 80)
+	assert.deepEqual(['fresh', 'wrong', 'mastered'].map(key => mixed.items.filter(item => categoryById.get(item.id) === key).length), [12, 6, 2])
+	assert.equal(new Set(mixed.items.map(item => item.id)).size, 20)
+	assert.equal(ratioEnvironment.reads.question_bank_user_states, 2)
+	assert.equal(ratioEnvironment.reads.question_bank_questions, 2)
+	assert.equal(ratioEnvironment.reads.question_bank_user_preferences || 0, 0)
+	await assert.rejects(ratioService.execute({ action: 'getSmartPractice', subjectId,
+		smartPractice: { strategy: 'unknown' } }, userId), error => error.errCode === 'QUESTION_BANK_USER_INVALID_ARGUMENT')
+	await assert.rejects(ratioService.execute({ action: 'getSmartPractice', subjectId,
+		smartPractice: { strategy: 'auto', questionCount: 20, custom: { fresh: 60, wrong: 30, mastered: 10 } } }, userId),
+		error => error.errCode === 'QUESTION_BANK_USER_INVALID_ARGUMENT')
+	await assert.rejects(ratioService.execute({ action: 'getSmartPractice', subjectId,
+		smartPractice: { strategy: 'fresh', questionCount: 55, custom: { fresh: 60, wrong: 30, mastered: 10 } } }, userId),
+		error => error.errCode === 'QUESTION_BANK_USER_INVALID_ARGUMENT')
 
 	const savedProgress = await service.execute({
 		action: 'getProgress',

@@ -1,4 +1,4 @@
-import { DAILY_GOAL, DEFAULT_SUBJECT_ID, getPracticeState } from './practice.js'
+import { DEFAULT_SUBJECT_ID, getPracticeState } from './practice.js'
 import {
 	getAllPracticeQuestions,
 	getCatalog,
@@ -8,6 +8,7 @@ import {
 import {
 	getPracticeRecords,
 	getSmartPracticeQuestions,
+	getLocalPracticePreferences,
 	practiceCloudSyncEnabled
 } from '@/services/user-practice.js'
 
@@ -54,15 +55,18 @@ export async function buildPracticeQuestions(options) {
 	const config = options || {}
 	const subjectId = config.subjectId || DEFAULT_SUBJECT_ID
 	const mode = config.mode || 'sequence'
+	let effectiveLimit = Number(config.limit) || 0
 	let list = []
 
 	if (mode === 'wrong' || mode === 'favorite') {
 		list = await loadRecordedQuestions(subjectId, mode)
 	} else if (mode === 'smart') {
-		const pageSize = Number(config.limit) || DAILY_GOAL
+		const smartPractice = getLocalPracticePreferences().smartPractice
+		if (!effectiveLimit) effectiveLimit = smartPractice.questionCount
+		const pageSize = effectiveLimit
 		let result
 		if (practiceCloudSyncEnabled()) {
-			result = await getSmartPracticeQuestions({ subjectId, pageSize })
+			result = await getSmartPracticeQuestions({ subjectId, pageSize, smartPractice })
 		} else {
 			const state = getPracticeState()
 			const localStates = Object.keys(state.answers).map(questionId => {
@@ -80,6 +84,7 @@ export async function buildPracticeQuestions(options) {
 			result = await getPracticePage({
 				subjectId,
 				mode: 'smart',
+				smartPractice,
 				pageSize,
 				answeredQuestionIds,
 				wrongQuestionIds
@@ -120,8 +125,19 @@ export async function buildPracticeQuestions(options) {
 		list = result.items
 	}
 
-	const defaultLimit = mode === 'smart' ? DAILY_GOAL : 0
-	return applyLimit(list, config.limit || defaultLimit)
+	return applyLimit(list, effectiveLimit)
+}
+
+export async function buildPracticeQuestionSet(options) {
+	const config = options || {}
+	const subjectId = config.subjectId || DEFAULT_SUBJECT_ID
+	const items = await buildPracticeQuestions(config)
+	const catalog = await getCatalog(subjectId)
+	return {
+		subjectId,
+		version: catalog.activeVersion || '',
+		items
+	}
 }
 
 export async function getKnowledgeGroups(subjectId) {

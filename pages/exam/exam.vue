@@ -1,11 +1,8 @@
 <template>
 	<view class="practice-home" :class="{ 'night-mode': nightMode }">
 		<view class="subject-bar" @tap="openSubjectPicker">
-			<view class="subject-symbol">
-				<uni-icons type="wallet" size="24" color="#008cff"></uni-icons>
-			</view>
 			<view class="subject-copy">
-				<text class="subject-label">当前考试科目</text>
+				<text class="subject-label">当前科目</text>
 				<text class="subject-name">{{ currentSubject.name }}</text>
 			</view>
 			<view class="subject-switch">
@@ -14,74 +11,78 @@
 			</view>
 		</view>
 
-		<view class="overview-band">
-			<view class="overview-heading">
-				<view>
-					<text class="overview-title">今日刷题</text>
-					<text class="overview-subtitle">每天进步一点，考试从容一点</text>
-				</view>
-				<view class="goal-copy">{{ today.attempts }}/{{ today.goal }} 题</view>
+		<view class="overview-card">
+			<view class="card-heading">
+				<text class="card-title">学习概况</text>
 			</view>
 
-			<view class="overview-content">
-				<view class="progress-ring">
-					<view class="progress-ring-inner">
-						<text class="progress-value">{{ completionText }}</text>
-						<text class="progress-caption">题库进度</text>
-					</view>
+			<view class="completion-heading">
+				<view class="completion-copy">
+					<text class="overview-subtitle">已练习 {{ stats.attempted }} / {{ questionTotalText }} 题</text>
 				</view>
-				<view class="stat-grid">
-					<view class="stat-item">
-						<text class="stat-value">{{ questionTotalText }}</text>
-						<text class="stat-label">总题数</text>
-					</view>
-					<view class="stat-item">
-						<text class="stat-value">{{ stats.attempted }}</text>
-						<text class="stat-label">已练习</text>
-					</view>
-					<view class="stat-item">
-						<text class="stat-value">{{ stats.accuracy }}%</text>
-						<text class="stat-label">正确率</text>
-					</view>
-					<view class="stat-item">
-						<text class="stat-value">{{ stats.wrong }}</text>
-						<text class="stat-label">待巩固</text>
-					</view>
-				</view>
+				<text class="completion-value">{{ completionText }}</text>
 			</view>
 
-		</view>
+			<view class="completion-progress">
+				<view class="completion-progress-fill" :style="{ width: stats.completion + '%' }"></view>
+			</view>
 
-		<view class="primary-actions">
-			<button class="primary-button" @tap="startPractice('smart')">
-				<uni-icons type="paperplane-filled" size="19" color="#ffffff"></uni-icons>
-				<text>智能练习</text>
-			</button>
-			<button class="secondary-button" @tap="goChapter('chapter')">
-				<uni-icons type="list" size="19" color="#008cff"></uni-icons>
-				<text>章节练习</text>
-			</button>
-		</view>
-
-		<view class="search-entry" @tap="goSearch">
-			<uni-icons type="search" size="20" color="#8a8f99"></uni-icons>
-			<text>搜索题目或知识点</text>
-			<uni-icons type="right" size="16" color="#b6bbc3"></uni-icons>
-		</view>
-
-		<view class="section-heading">
-			<text class="section-title">练习中心</text>
-			<text class="section-caption">按你的节奏巩固</text>
-		</view>
-
-		<view class="feature-grid">
-			<view class="feature-item" v-for="item in features" :key="item.key" @tap="handleFeature(item)">
-				<view class="feature-icon" :class="item.tone">
-					<uni-icons :type="item.icon" size="25" :color="item.color"></uni-icons>
-					<view class="feature-badge" v-if="featureCount(item.key)">{{ featureCount(item.key) }}</view>
+			<view class="stat-grid">
+				<view class="stat-item">
+					<text class="stat-value">{{ stats.correct }}</text>
+					<text class="stat-label">答对题数</text>
 				</view>
-				<text class="feature-title">{{ item.title }}</text>
-				<text class="feature-desc">{{ item.desc }}</text>
+				<view class="stat-item">
+					<text class="stat-value">{{ stats.accuracy }}%</text>
+					<text class="stat-label">正确率</text>
+				</view>
+				<view class="stat-item">
+					<text class="stat-value">{{ stats.wrong }}</text>
+					<text class="stat-label">待巩固</text>
+				</view>
+			</view>
+		</view>
+
+		<view class="practice-card">
+			<view class="card-heading">
+				<text class="card-title">开始练习</text>
+			</view>
+
+			<view class="search-entry" @tap="goSearch">
+				<uni-icons type="search" size="20" color="#008cff"></uni-icons>
+				<text>搜索题目或知识点</text>
+				<uni-icons type="right" size="16" color="#b6bbc3"></uni-icons>
+			</view>
+
+			<view class="feature-grid">
+				<view class="feature-item" @tap="startPractice('smart')">
+					<view class="feature-icon">
+						<uni-icons type="scan" size="25" color="#008cff"></uni-icons>
+					</view>
+					<view class="feature-copy">
+						<text class="feature-title">智能练习</text>
+						<text class="feature-desc">智能推荐练习题目</text>
+					</view>
+				</view>
+				<view class="feature-item" @tap="goChapter('chapter')">
+					<view class="feature-icon">
+						<uni-icons type="list" size="25" color="#008cff"></uni-icons>
+					</view>
+					<view class="feature-copy">
+						<text class="feature-title">章节练习</text>
+						<text class="feature-desc">按章节系统练习</text>
+					</view>
+				</view>
+				<view class="feature-item" v-for="item in features" :key="item.key" @tap="handleFeature(item)">
+					<view class="feature-icon" :class="item.tone">
+						<uni-icons :type="item.icon" size="25" :color="item.color"></uni-icons>
+						<view class="feature-badge" v-if="featureCount(item.key)">{{ featureCount(item.key) }}</view>
+					</view>
+					<view class="feature-copy">
+						<text class="feature-title">{{ item.title }}</text>
+						<text class="feature-desc">{{ item.desc }}</text>
+					</view>
+				</view>
 			</view>
 		</view>
 
@@ -187,8 +188,7 @@
 					{ key: 'wrong', title: '错题集', desc: '集中攻克薄弱项', icon: 'refresh', color: '#008cff', tone: 'blue' },
 					{ key: 'favorite', title: '收藏夹', desc: '保存重点题目', icon: 'star', color: '#008cff', tone: 'blue' },
 					{ key: 'knowledge', title: '知识点', desc: '按考点专项练习', icon: 'map', color: '#008cff', tone: 'blue' },
-					{ key: 'settings', title: '答题设置', desc: '答题模式与夜间模式', icon: 'tune', color: '#008cff', tone: 'blue' },
-					{ key: 'coming-soon', title: '敬请期待', desc: '更多功能陆续上线', icon: 'more-filled', color: '#008cff', tone: 'blue' }
+					{ key: 'settings', title: '答题设置', desc: '答题模式与夜间模式', icon: 'tune', color: '#008cff', tone: 'blue' }
 				]
 			}
 		},
@@ -215,6 +215,23 @@
 			},
 			questionTotalText() {
 				return this.currentCatalogPending ? '--' : this.stats.total
+			},
+			todayGoalReached() {
+				const goal = Number(this.today.goal) || 0
+				return goal > 0 && Number(this.today.attempts) >= goal
+			},
+			todayGoalStatus() {
+				return this.todayGoalReached
+					? '已达标'
+					: `${this.today.attempts}/${this.today.goal}题`
+			},
+			todayGoalCaption() {
+				if (this.todayGoalReached) return `今天已完成 ${this.today.attempts} 题`
+				const remaining = Math.max(0, Number(this.today.goal) - Number(this.today.attempts))
+				return `再完成 ${remaining} 题即可达标`
+			},
+			todayProgressPercent() {
+				return Math.max(0, Math.min(100, Number(this.today.percent) || 0))
 			}
 		},
 		async onShow() {
@@ -477,10 +494,6 @@
 				uni.navigateTo({ url: '/practice-pages/answer-settings/answer-settings' })
 			},
 			async handleFeature(item) {
-				if (item.key === 'coming-soon') {
-					uni.showToast({ title: '更多功能敬请期待', icon: 'none' })
-					return
-				}
 				if (item.key === 'settings') {
 					this.goAnswerSettings()
 					return
@@ -502,44 +515,37 @@
 </script>
 
 <style lang="scss">
-	page { background: #ffffff; color: #24272c; }
-	.practice-home { min-height: 100vh; padding-bottom: calc(40rpx + env(safe-area-inset-bottom)); }
-	.subject-bar { display: flex; align-items: center; min-height: 96rpx; padding: 16rpx 32rpx; border-bottom: 1rpx solid #edf0f3; box-sizing: border-box; }
-	.subject-symbol { display: flex; align-items: center; justify-content: center; width: 64rpx; height: 64rpx; margin-right: 20rpx; border-radius: 8rpx; background: #eaf5ff; }
-	.subject-copy { display: flex; flex: 1; flex-direction: column; min-width: 0; }
-	.subject-label, .overview-subtitle, .section-caption, .sheet-caption { font-size: 24rpx; color: #7a7e83; }
-	.subject-name { margin-top: 4rpx; font-size: 32rpx; font-weight: 600; }
-	.subject-switch { display: flex; align-items: center; gap: 4rpx; font-size: 26rpx; color: #008cff; }
-	.overview-band { padding: 32rpx; background: #008cff; color: #ffffff; }
-	.overview-heading, .sheet-header, .section-heading { display: flex; align-items: center; justify-content: space-between; }
-	.overview-heading > view:first-child, .sheet-header > view:first-child { display: flex; flex-direction: column; }
-	.overview-title { font-size: 34rpx; font-weight: 600; }
-	.overview-subtitle { margin-top: 8rpx; color: rgba(255, 255, 255, 0.78); }
-	.goal-copy { font-size: 28rpx; font-weight: 600; }
-	.overview-content { display: flex; align-items: center; margin-top: 30rpx; }
-	.progress-ring { display: flex; align-items: center; justify-content: center; width: 190rpx; height: 190rpx; flex: 0 0 190rpx; border: 14rpx solid rgba(255, 255, 255, 0.88); border-radius: 50%; box-sizing: border-box; }
-	.progress-ring-inner { display: flex; align-items: center; flex-direction: column; }
-	.progress-value { font-size: 42rpx; font-weight: 600; }
-	.progress-caption { margin-top: 4rpx; font-size: 22rpx; color: rgba(255, 255, 255, 0.76); }
-	.stat-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24rpx 16rpx; flex: 1; margin-left: 40rpx; }
-	.stat-item { display: flex; flex-direction: column; }
-	.stat-value { font-size: 32rpx; font-weight: 600; }
-	.stat-label { margin-top: 4rpx; font-size: 22rpx; color: rgba(255, 255, 255, 0.72); }
-	.primary-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20rpx; padding: 28rpx 32rpx 20rpx; }
-	.primary-actions button { display: flex; align-items: center; justify-content: center; gap: 12rpx; height: 84rpx; margin: 0; border-radius: 44rpx; font-size: 29rpx; font-weight: 600; line-height: 84rpx; }
-	.primary-actions button::after { border: 0; }
-	.primary-button { background: #008cff; color: #ffffff; }
-	.secondary-button { border: 2rpx solid #008cff; background: #ffffff; color: #008cff; }
-	.search-entry { display: flex; align-items: center; height: 82rpx; margin: 4rpx 32rpx 30rpx; padding: 0 24rpx; border: 1rpx solid #dfe3e8; border-radius: 8rpx; box-sizing: border-box; background: #f8f9fa; color: #858a92; font-size: 27rpx; }
+	page { background: #f5f6f8; color: #24272c; }
+	.practice-home { min-height: 100vh; padding-bottom: calc(24rpx + env(safe-area-inset-bottom)); background: #f5f6f8; }
+	.subject-bar { display: flex; align-items: center; min-height: 104rpx; padding: 18rpx 24rpx; border-bottom: 1rpx solid #edf0f3; box-sizing: border-box; background: #ffffff; }
+	.subject-copy { display: flex; flex: 1; flex-direction: column; min-width: 0; margin-left: 24rpx; }
+	.subject-label, .sheet-caption { color: #7a828c; font-size: 22rpx; }
+	.subject-name { margin-top: 5rpx; font-size: 30rpx; font-weight: 600; line-height: 1.3; }
+	.subject-switch { display: flex; align-items: center; gap: 4rpx; padding: 10rpx 12rpx; border-radius: 12rpx; background: #f1f8fe; color: #008cff; font-size: 24rpx; }
+	.overview-card,
+	.practice-card { margin: 16rpx 24rpx 0; padding: 24rpx; border: 1rpx solid #e4eaf0; border-radius: 18rpx; background: #ffffff; box-shadow: 0 5rpx 18rpx rgba(31, 48, 65, 0.04); }
+	.overview-card { margin-top: 20rpx; }
+	.card-heading, .completion-heading, .sheet-header { display: flex; align-items: center; justify-content: space-between; }
+	.card-title { font-size: 29rpx; font-weight: 600; }
+	.completion-heading { margin-top: 24rpx; }
+	.completion-copy, .sheet-header > view:first-child { display: flex; flex-direction: column; }
+	.overview-subtitle { color: #7a828c; font-size: 26rpx; }
+	.completion-value { color: #008cff; font-size: 42rpx; font-weight: 600; line-height: 1; }
+	.completion-progress { height: 12rpx; margin-top: 18rpx; overflow: hidden; border-radius: 6rpx; background: #e9edf1; }
+	.completion-progress-fill { height: 100%; border-radius: 6rpx; background: #008cff; transition: width 0.2s ease; }
+	.stat-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12rpx; margin-top: 22rpx; padding-top: 22rpx; border-top: 1rpx solid #eef1f4; }
+	.stat-item { display: flex; align-items: center; flex-direction: column; justify-content: center; min-height: 88rpx; border-radius: 12rpx; background: #f5f9fc; text-align: center; }
+	.stat-value { color: #2f3944; font-size: 28rpx; font-weight: 600; line-height: 1.1; }
+	.stat-label { margin-top: 8rpx; color: #7f8892; font-size: 24rpx; }
+	.search-entry { display: flex; align-items: center; height: 82rpx; margin-top: 16rpx; padding: 0 20rpx; border: 1rpx solid #d6e7f4; border-radius: 14rpx; box-sizing: border-box; background: #f7fbfe; color: #56616d; font-size: 25rpx; }
 	.search-entry text { flex: 1; margin-left: 14rpx; white-space: nowrap; }
-	.section-heading { padding: 0 32rpx 20rpx; }
-	.section-title { font-size: 32rpx; font-weight: 600; }
-	.feature-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); padding: 0 16rpx; }
-	.feature-item { display: flex; align-items: center; flex-direction: column; min-height: 196rpx; padding: 18rpx 8rpx; box-sizing: border-box; text-align: center; }
-	.feature-icon { position: relative; display: flex; align-items: center; justify-content: center; width: 72rpx; height: 72rpx; border-radius: 8rpx; background: #eaf5ff; }
+	.feature-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14rpx; margin-top: 16rpx; }
+	.feature-item { display: flex; align-items: center; min-height: 126rpx; padding: 20rpx; border: 1rpx solid #edf1f4; border-radius: 14rpx; box-sizing: border-box; background: #f8fafc; }
+	.feature-icon { position: relative; display: flex; align-items: center; justify-content: center; width: 72rpx; height: 72rpx; flex: 0 0 72rpx; border-radius: 12rpx; background: #eaf5ff; }
 	.feature-badge { position: absolute; top: -10rpx; right: -14rpx; min-width: 34rpx; height: 34rpx; padding: 0 8rpx; border: 3rpx solid #ffffff; border-radius: 18rpx; box-sizing: border-box; background: #e65757; color: #ffffff; font-size: 19rpx; line-height: 31rpx; }
-	.feature-title { margin-top: 14rpx; font-size: 27rpx; font-weight: 500; }
-	.feature-desc { margin-top: 6rpx; font-size: 21rpx; color: #8c9199; white-space: nowrap; }
+	.feature-copy { display: flex; flex: 1; flex-direction: column; min-width: 0; margin-left: 18rpx; }
+	.feature-title { font-size: 26rpx; font-weight: 600; line-height: 1.25; }
+	.feature-desc { margin-top: 7rpx; color: #8c949d; font-size: 20rpx; line-height: 1.35; }
 	.bank-note { display: flex; align-items: center; gap: 10rpx; margin: 10rpx 32rpx 0; padding: 20rpx 22rpx; border-radius: 8rpx; background: #f5f6f8; font-size: 24rpx; color: #6f747d; }
 	.bank-note.error { background: #fff2f2; color: #bd3f3f; }
 	.subject-sheet { padding: 28rpx; border-radius: 16rpx 16rpx 0 0; background: #ffffff; }
@@ -558,15 +564,23 @@
 
 	.practice-home.night-mode { background: #12171d; color: #e6e9ed; }
 	.night-mode .subject-bar { border-color: #303943; background: #171c22; }
-	.night-mode .subject-symbol,
 	.night-mode .feature-icon { background: #17364d; }
+	.night-mode .subject-switch { background: #17364d; color: #63b9f6; }
 	.night-mode .subject-label,
-	.night-mode .section-caption,
+	.night-mode .overview-subtitle,
+	.night-mode .stat-label,
 	.night-mode .feature-desc,
 	.night-mode .sheet-caption { color: #8f99a5; }
-	.night-mode .overview-band { background: #086cae; }
-	.night-mode .secondary-button { border-color: #168ee5; background: #1b222a; color: #63b9f6; }
-	.night-mode .search-entry { border-color: #39434e; background: #1b222a; color: #9ca6b1; }
+	.night-mode .overview-card,
+	.night-mode .practice-card { border-color: #29333d; background: #1b222a; box-shadow: none; }
+	.night-mode .feature-item { border-color: #303943; background: #202933; }
+	.night-mode .completion-value { color: #63b9f6; }
+	.night-mode .completion-progress { background: #303943; }
+	.night-mode .completion-progress-fill { background: #269df0; }
+	.night-mode .stat-grid { border-color: #303943; }
+	.night-mode .stat-item { background: #202933; }
+	.night-mode .stat-value { color: #e6e9ed; }
+	.night-mode .search-entry { border-color: #39434e; background: #202933; color: #c2c9d1; }
 	.night-mode .feature-badge { border-color: #12171d; }
 	.night-mode .bank-note { background: #1b222a; color: #aeb7c1; }
 	.night-mode .bank-note.error { background: #3b2327; color: #ef9a9a; }

@@ -44,7 +44,7 @@
 					<view class="item-index" v-else>{{ index + 1 }}</view>
 					<view class="item-content">
 						<text class="item-title">{{ item.name }}</text>
-						<view class="item-progress-row" v-if="answerMode !== 'exam'">
+						<view class="item-progress-row">
 							<view class="item-progress">
 								<view class="item-progress-fill" :style="{ width: item.progress.percent + '%' }"></view>
 							</view>
@@ -58,7 +58,7 @@
 						<view class="section-guide"></view>
 						<view class="item-content">
 							<text class="section-title">{{ section.name }}</text>
-							<view class="item-progress-row" v-if="answerMode !== 'exam'">
+							<view class="item-progress-row">
 								<view class="item-progress">
 									<view class="item-progress-fill" :style="{ width: section.progress.percent + '%' }"></view>
 								</view>
@@ -78,7 +78,7 @@
 					<view class="item-content">
 						<text class="item-title">{{ item.name }}</text>
 						<text class="item-meta" v-if="view === 'knowledge'">{{ item.chapter }}</text>
-						<view class="item-progress-row" v-if="answerMode !== 'exam'">
+						<view class="item-progress-row">
 							<view class="item-progress">
 								<view class="item-progress-fill" :style="{ width: item.progress.percent + '%' }"></view>
 							</view>
@@ -118,7 +118,10 @@
 	} from '@/data/practice.js'
 	import { getCatalog } from '@/services/question-bank.js'
 	import {
+		examDraftHasProgress,
 		getChapterPracticePosition,
+		getExamDraftScope,
+		getExamDraftSummaries,
 		getKnowledgeScopeKey,
 		getLocalPracticeRoundSnapshot,
 		getLocalPracticePreferences,
@@ -126,6 +129,7 @@
 		getSectionPracticePosition,
 		getSectionScopeKey,
 		getPracticeStateSnapshot,
+		resetExamDraft,
 		resetPracticeRound
 	} from '@/services/user-practice.js'
 	import { getCachedMembership, getMembership } from '@/services/membership.js'
@@ -154,6 +158,7 @@
 				pageActive: false,
 				hiddenKnowledgeAdPositions: {},
 				entryActionPending: false,
+				examDraftSummaries: {},
 				chapterProgressCloudLoadedAt: 0,
 				practiceProgressUpdatedHandler: null
 			}
@@ -195,7 +200,9 @@
 				this.loadItems()
 				return
 			}
-			if (this.answerMode !== 'exam' && this.items.length) {
+			if (this.answerMode === 'exam' && this.items.length) {
+				this.refreshExamDraftProgress()
+			} else if (this.items.length) {
 				if (this.view === 'knowledge') this.refreshKnowledgeProgress()
 				else this.refreshChapterProgress()
 			}
@@ -295,6 +302,55 @@
 					frontColor: this.nightMode ? '#ffffff' : '#000000',
 					backgroundColor: this.nightMode ? '#171c22' : '#ffffff'
 				})
+			},
+			getExamSummary(options) {
+				const scope = getExamDraftScope(Object.assign({ subjectId: this.subjectId }, options || {}))
+				return scope && this.examDraftSummaries[scope.scopeKey] || null
+			},
+			buildExamProgress(summary, fallbackTotal) {
+				const active = summary && examDraftHasProgress(summary)
+				const attempted = active ? Number(summary.answered) || 0 : 0
+				const total = active ? Number(summary.total) || 0 : Number(fallbackTotal) || 0
+				return {
+					attempted,
+					total,
+					percent: total ? Math.min(100, Math.round(attempted / total * 100)) : 0,
+					positionQuestionId: active ? summary.positionQuestionId || '' : '',
+					roundId: active ? summary.roundId || '' : '',
+					hasProgress: Boolean(active)
+				}
+			},
+			applyExamDraftProgress() {
+				if (this.answerMode !== 'exam') return
+				if (this.view === 'knowledge') {
+					this.items = this.items.map(item => Object.assign({}, item, {
+						progress: this.buildExamProgress(this.getExamSummary({
+							mode: 'knowledge',
+							chapterId: item.chapterId,
+							knowledge: item.name
+						}), item.count)
+					}))
+					return
+				}
+				this.items = this.items.map(item => Object.assign({}, item, {
+					progress: this.buildExamProgress(this.getExamSummary({
+						mode: 'chapter',
+						chapterId: item.id
+					}), item.count),
+					sections: item.sections.map(section => Object.assign({}, section, {
+						progress: this.buildExamProgress(this.getExamSummary({
+							mode: 'section',
+							chapterId: item.id,
+							section: section.name
+						}), section.count)
+					}))
+				}))
+			},
+			async refreshExamDraftProgress() {
+				if (this.answerMode !== 'exam') return
+				const result = await getExamDraftSummaries(this.subjectId)
+				this.examDraftSummaries = result && result.summaries || {}
+				this.applyExamDraftProgress()
 			},
 			refreshChapterProgress() {
 				if (this.answerMode === 'exam') return
@@ -400,6 +456,14 @@
 					})
 					this.catalogName = catalog.name || ''
 					const shouldLoadProgress = this.answerMode !== 'exam'
+					if (!shouldLoadProgress) {
+						try {
+							const examState = await getExamDraftSummaries(this.subjectId)
+							this.examDraftSummaries = examState && examState.summaries || {}
+						} catch (examError) {
+							this.examDraftSummaries = {}
+						}
+					}
 					let cloudState = null
 					if (shouldLoadProgress) {
 						try {
@@ -465,6 +529,7 @@
 								}
 							}
 						})
+						if (!shouldLoadProgress) this.applyExamDraftProgress()
 						this.restoreExpandedChapter(this.items)
 						return
 					}
@@ -499,6 +564,7 @@
 							}
 						}
 					})
+					if (!shouldLoadProgress) this.applyExamDraftProgress()
 				} catch (error) {
 					this.items = []
 					this.loadError = error && error.errCode === 'QUESTION_BANK_SUBJECT_NOT_FOUND'
@@ -519,7 +585,14 @@
 				let url = `/practice-pages/practice/practice?subjectId=${this.subjectId}`
 				if (this.view === 'knowledge') {
 					url += `&mode=knowledge&chapterId=${encodeURIComponent(item.chapterId)}&knowledge=${encodeURIComponent(item.name)}`
-					if (this.answerMode !== 'exam') {
+					if (this.answerMode === 'exam') {
+						this.openExamEntry({
+							mode: 'knowledge',
+							chapterId: item.chapterId,
+							knowledge: item.name
+						}, url, item.progress)
+						return
+					} else {
 						const savedPosition = getKnowledgePracticePosition(this.subjectId, item.chapterId, item.name)
 						const startId = savedPosition && savedPosition.questionId
 							|| item.progress.positionQuestionId
@@ -555,17 +628,56 @@
 					|| savedPosition && savedPosition.questionId
 					|| ''
 			},
-			navigateToRoundPractice(mode, chapter, section, startId) {
-				const url = this.buildRoundPracticeUrl(mode, chapter, section, startId)
+			navigateToRoundPractice(mode, chapter, section, startId, examAction) {
+				let url = this.buildRoundPracticeUrl(mode, chapter, section, startId)
+				if (examAction) url += `&examAction=${examAction}`
 				uni.navigateTo({ url })
+			},
+			openExamEntry(options, baseUrl, progress) {
+				if (this.entryActionPending) return
+				const scope = getExamDraftScope(Object.assign({ subjectId: this.subjectId }, options || {}))
+				if (!scope) return
+				const summary = this.examDraftSummaries[scope.scopeKey]
+				const hasProgress = examDraftHasProgress(summary)
+				const navigate = action => {
+					uni.navigateTo({ url: `${baseUrl}&examAction=${action}` })
+				}
+				if (!hasProgress) {
+					navigate('restart')
+					return
+				}
+				this.entryActionPending = true
+				uni.showActionSheet({
+					itemList: ['重新做题', '继续做题'],
+					success: result => {
+						if (result.tapIndex === 0) {
+							resetExamDraft(Object.assign({}, scope, {
+								roundId: summary.roundId || progress && progress.roundId
+							}))
+							navigate('restart')
+							return
+						}
+						if (result.tapIndex === 1) navigate('continue')
+					},
+					complete: () => {
+						this.entryActionPending = false
+					}
+				})
 			},
 			openRoundEntry(mode, chapter, section) {
 				if (this.entryActionPending) return
 				const progress = section ? section.progress : chapter.progress
 				const hasProgress = progress && Number(progress.attempted) > 0
+				if (this.answerMode === 'exam') {
+					this.openExamEntry({
+						mode,
+						chapterId: chapter.id,
+						section: section ? section.name : ''
+					}, this.buildRoundPracticeUrl(mode, chapter, section, ''), progress)
+					return
+				}
 				if (this.answerMode !== 'practice' || !hasProgress) {
-					const startId = this.answerMode === 'exam'
-						|| (this.answerMode === 'practice' && !hasProgress)
+					const startId = this.answerMode === 'practice' && !hasProgress
 						? ''
 						: this.getRoundPosition(mode, chapter, section)
 					this.navigateToRoundPractice(mode, chapter, section, startId)

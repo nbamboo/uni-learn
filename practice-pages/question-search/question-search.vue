@@ -1,10 +1,10 @@
 <template>
-	<view class="search-page">
+	<view class="search-page" :class="{ 'night-mode': nightMode }">
 		<view class="search-bar">
-			<uni-icons type="search" size="21" color="#737983"></uni-icons>
-			<input v-model="keyword" :focus="true" placeholder="输入题目、章节或知识点" confirm-type="search" />
+			<uni-icons type="search" size="21" :color="nightMode ? '#8fa0af' : '#737983'"></uni-icons>
+			<input v-model="keyword" :focus="true" placeholder="输入题目、章节或知识点" placeholder-class="search-placeholder" confirm-type="search" />
 			<view class="clear-button" v-if="keyword" @tap="keyword = ''">
-				<uni-icons type="clear" size="19" color="#a0a5ad"></uni-icons>
+				<uni-icons type="clear" size="19" :color="nightMode ? '#8fa0af' : '#a0a5ad'"></uni-icons>
 			</view>
 		</view>
 
@@ -28,7 +28,10 @@
 		<view v-else>
 			<view class="result-heading">
 				<text>搜索结果</text>
-				<text>{{ total }} 道</text>
+				<view class="result-counts">
+					<text class="exam-progress-copy" v-if="answerMode === 'exam' && examProgress.hasProgress">测试进度 {{ examProgress.answered }}/{{ examProgress.total }}</text>
+					<text>{{ total }} 道</text>
+				</view>
 			</view>
 			<view class="result-list" v-if="results.length">
 				<view class="result-item" v-for="(question, index) in results" :key="question.id" @tap="startQuestion(question.id)">
@@ -51,7 +54,7 @@
 			</view>
 
 			<view class="empty-state" v-else>
-				<uni-icons type="search" size="42" color="#a1a7ae"></uni-icons>
+				<uni-icons type="search" size="42" :color="nightMode ? '#72808d' : '#a1a7ae'"></uni-icons>
 				<text class="empty-title">没有找到相关题目</text>
 				<text class="empty-caption">换个关键词试试</text>
 			</view>
@@ -75,10 +78,19 @@
 	import { getSubjectById } from '@/data/practice.js'
 	import { searchQuestionBank } from '@/services/question-bank.js'
 	import { getCachedMembership, getMembership } from '@/services/membership.js'
+	import {
+		examDraftHasProgress,
+		getExamDraftScope,
+		getExamDraftSummaries,
+		getLocalPracticePreferences,
+		resetExamDraft
+	} from '@/services/user-practice.js'
 
 	export default {
 		data() {
+			const preferences = getLocalPracticePreferences()
 			return {
+				nightMode: Boolean(preferences.nightMode),
 				membership: getCachedMembership(),
 				membershipLoaded: false,
 				subjectId: '',
@@ -91,7 +103,10 @@
 				loading: true,
 				loadingMore: false,
 				searchTimer: null,
-				searchRequestId: 0
+				searchRequestId: 0,
+				answerMode: preferences.answerMode,
+				examProgress: {},
+				entryActionPending: false
 			}
 		},
 		computed: {
@@ -109,6 +124,7 @@
 			}
 		},
 		async onLoad(options) {
+			this.applyNightMode(getLocalPracticePreferences())
 			this.subjectId = options.subjectId
 			const membershipTask = this.refreshMembership()
 			try {
@@ -121,10 +137,22 @@
 			}
 			await membershipTask
 		},
+		onShow() {
+			this.applyNightMode(getLocalPracticePreferences())
+			this.answerMode = getLocalPracticePreferences().answerMode
+			if (this.keyword.trim()) this.refreshExamProgress(this.keyword.trim())
+		},
 		onUnload() {
 			if (this.searchTimer) clearTimeout(this.searchTimer)
 		},
 		methods: {
+			applyNightMode(preferences) {
+				this.nightMode = Boolean(preferences && preferences.nightMode)
+				uni.setNavigationBarColor({
+					frontColor: this.nightMode ? '#ffffff' : '#000000',
+					backgroundColor: this.nightMode ? '#171c22' : '#ffffff'
+				})
+			},
 			async refreshMembership() {
 				try {
 					this.membership = await getMembership()
@@ -167,6 +195,7 @@
 					if (result.total !== null && result.total !== undefined) this.total = Number(result.total) || 0
 					this.cursor = Number(result.nextCursor) || 0
 					this.hasMore = Boolean(result.hasMore)
+					if (reset) this.refreshExamProgress(keyword)
 				} catch (error) {
 					if (requestId === this.searchRequestId) {
 						uni.showToast({ title: (error && (error.errMsg || error.message)) || '搜索失败', icon: 'none' })
@@ -182,10 +211,53 @@
 				if (!this.hasMore || this.loadingMore) return
 				this.search(false)
 			},
+			async refreshExamProgress(keyword) {
+				if (this.answerMode !== 'exam' || !keyword) {
+					this.examProgress = {}
+					return
+				}
+				const scope = getExamDraftScope({
+					subjectId: this.subjectId,
+					mode: 'search',
+					keyword
+				})
+				const result = await getExamDraftSummaries(this.subjectId)
+				if (keyword !== this.keyword.trim()) return
+				this.examProgress = scope && result && result.summaries
+					? result.summaries[scope.scopeKey] || {}
+					: {}
+			},
 			startQuestion(questionId) {
 				const keyword = encodeURIComponent(this.keyword.trim())
-				uni.navigateTo({
-					url: `/practice-pages/practice/practice?subjectId=${this.subjectId}&mode=search&keyword=${keyword}&startId=${questionId}`
+				let url = `/practice-pages/practice/practice?subjectId=${this.subjectId}&mode=search&keyword=${keyword}&startId=${questionId}`
+				if (this.answerMode !== 'exam') {
+					uni.navigateTo({ url })
+					return
+				}
+				if (this.entryActionPending) return
+				const scope = getExamDraftScope({
+					subjectId: this.subjectId,
+					mode: 'search',
+					keyword: this.keyword.trim()
+				})
+				const summary = this.examProgress
+				const navigate = action => uni.navigateTo({ url: `${url}&examAction=${action}` })
+				if (!examDraftHasProgress(summary)) {
+					navigate('restart')
+					return
+				}
+				this.entryActionPending = true
+				uni.showActionSheet({
+					itemList: ['重新做题', '继续做题'],
+					success: result => {
+						if (result.tapIndex === 0) {
+							resetExamDraft(Object.assign({}, scope, { roundId: summary.roundId }))
+							navigate('restart')
+						} else if (result.tapIndex === 1) {
+							navigate('continue')
+						}
+					},
+					complete: () => { this.entryActionPending = false }
 				})
 			},
 			adLoad() {
@@ -203,11 +275,14 @@
 
 <style lang="scss">
 	page { background: #f5f6f8; color: #292d32; }
-	.search-page { min-height: 100vh; padding: 24rpx; box-sizing: border-box; }
+	.search-page { min-height: 100vh; padding: 24rpx; box-sizing: border-box; background: #f5f6f8; }
 	.search-bar { display: flex; align-items: center; height: 84rpx; padding: 0 22rpx; border: 2rpx solid #008cff; border-radius: 8rpx; box-sizing: border-box; background: #ffffff; }
-	.search-bar input { flex: 1; height: 100%; margin-left: 14rpx; font-size: 28rpx; }
+	.search-bar input { flex: 1; height: 100%; margin-left: 14rpx; color: #292d32; font-size: 28rpx; }
+	.search-placeholder { color: #8d949d; }
 	.clear-button { padding: 12rpx 0 12rpx 16rpx; }
 	.section-heading, .result-heading { display: flex; align-items: center; justify-content: space-between; padding: 30rpx 4rpx 18rpx; }
+	.result-counts { display: flex; align-items: center; gap: 18rpx; color: #7a8088; font-size: 22rpx; }
+	.exam-progress-copy { color: #008cff; }
 	.section-heading text:first-child, .result-heading text:first-child { font-size: 31rpx; font-weight: 600; }
 	.section-heading text:last-child, .result-heading text:last-child { color: #838991; font-size: 23rpx; }
 	.keyword-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14rpx; }
@@ -225,4 +300,23 @@
 	.empty-title { margin-top: 22rpx; font-size: 30rpx; font-weight: 600; }
 	.empty-caption { margin-top: 10rpx; color: #8d939b; font-size: 25rpx; }
 	.search-ad-container { margin-top: 28rpx; overflow: hidden; border-radius: 8rpx; }
+
+	.search-page.night-mode { background: #12171d; color: #e6e9ed; }
+	.night-mode .search-bar { border-color: #269df0; background: #1b222a; }
+	.night-mode .search-bar input { color: #e6e9ed; }
+	.night-mode .search-placeholder { color: #7f8b97; }
+	.night-mode .result-counts,
+	.night-mode .section-heading text:last-child,
+	.night-mode .result-heading text:last-child,
+	.night-mode .result-meta,
+	.night-mode .empty-caption { color: #8f99a5; }
+	.night-mode .keyword-chip,
+	.night-mode .result-item { border-color: #29333d; background: #1b222a; }
+	.night-mode .keyword-chip text:first-child,
+	.night-mode .result-title,
+	.night-mode .empty-title { color: #e6e9ed; }
+	.night-mode .keyword-chip text:last-child,
+	.night-mode .exam-progress-copy { color: #63b9f6; }
+	.night-mode .result-index { background: #17364d; color: #63b9f6; }
+	.night-mode .empty-state { color: #e6e9ed; }
 </style>

@@ -286,6 +286,12 @@ export function recordAnswer(question, selected, options) {
 	return correct
 }
 
+// 考试只在交卷时写入长期答题状态；不携带章节、小节或知识点练习模式，
+// 避免考试结果污染对应的正式练习轮次和目录进度。
+export function recordExamSubmissionAnswer(question, selected) {
+	return recordAnswer(question, selected, { practiceMode: '' })
+}
+
 export function getChapterProgress(subjectId, chapterId, questionCount) {
 	const state = getPracticeState()
 	const chapter = chapters.find(item => item.subjectId === subjectId && item.id === String(chapterId))

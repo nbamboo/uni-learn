@@ -1,6 +1,7 @@
 'use strict'
 
 const crypto = require('crypto')
+const { normalizeSmartPractice, validateSmartPractice, selectSmartPracticeIds } = require('./smart-practice.js')
 
 const CATALOG_COLLECTION = 'question_bank_catalogs'
 const QUESTION_COLLECTION = 'question_bank_questions'
@@ -9,12 +10,15 @@ const STATE_COLLECTION = 'question_bank_user_states'
 const STATS_COLLECTION = 'question_bank_user_stats'
 const PROGRESS_COLLECTION = 'question_bank_user_progress'
 const PRACTICE_ROUND_COLLECTION = 'question_bank_user_rounds'
+const EXAM_DRAFT_COLLECTION = 'question_bank_exam_drafts'
 const PREFERENCES_COLLECTION = 'question_bank_user_preferences'
 const MEMBERSHIP_COLLECTION = 'question_bank_memberships'
 const MAX_SYNC_EVENTS = 50
 const MAX_STATE_ROWS = 2000
 const MAX_PROGRESS_ROWS = 500
 const MAX_PRACTICE_ROUND_ROWS = 500
+const MAX_EXAM_DRAFT_ROWS = 500
+const MAX_EXAM_DRAFT_QUESTIONS = 5000
 const MAX_SNAPSHOT_QUESTION_IDS = 100
 const MAX_SMART_CANDIDATES = 100
 const DEFAULT_PAGE_SIZE = 20
@@ -27,12 +31,15 @@ const RECORD_TYPES = ['wrong', 'favorite']
 const PROGRESS_MODES = ['chapter', 'section', 'knowledge']
 const ANSWER_MODES = ['exam', 'practice', 'review']
 const PRACTICE_ENTRY_MODES = ['smart', 'chapter', 'section', 'knowledge', 'wrong', 'favorite', 'search', 'sequence']
+const EXAM_DRAFT_MODES = ['chapter', 'section', 'knowledge', 'wrong', 'favorite', 'search', 'sequence']
 const MEMBER_SYNC_ACTIONS = new Set([
 	'syncEvents',
 	'getSummary',
 	'getStateSnapshot',
 	'getProgress',
 	'getPracticeRound',
+	'getExamDraft',
+	'getExamDraftSummaries',
 	'getSmartPractice',
 	'getRecords',
 	'getPreferences',
@@ -170,6 +177,14 @@ function readSelected(value) {
 	})
 }
 
+function readExamSelected(value) {
+	if (!Array.isArray(value) || value.length > ANSWER_ALIASES.length) {
+		invalidArgument('selected选项数量不正确')
+	}
+	if (!value.length) return []
+	return readSelected(value)
+}
+
 function readOccurredAt(value, currentTime) {
 	const timestamp = Number(value)
 	if (!Number.isFinite(timestamp) || timestamp < MIN_EVENT_TIME) {
@@ -229,6 +244,19 @@ function progressDocumentId(userId, subjectId, mode, scopeKey) {
 function practiceRoundDocumentId(userId, subjectId, chapterId) {
 	const chapterHash = crypto.createHash('sha256').update(String(chapterId)).digest('hex').slice(0, 24)
 	return `${userId}|${subjectId}|round|${chapterHash}`
+}
+
+function examDraftDocumentId(userId, subjectId, scopeKey) {
+	const scopeHash = crypto.createHash('sha256').update(scopeKey).digest('hex').slice(0, 32)
+	return `${userId}|${subjectId}|exam|${scopeHash}`
+}
+
+function examDraftScopeKey(mode, chapterId, section, knowledge, keyword) {
+	if (mode === 'chapter') return `chapter|${String(chapterId || '')}`
+	if (mode === 'section') return `section|${String(chapterId || '')}|${String(section || '')}`
+	if (mode === 'knowledge') return `knowledge|${String(chapterId || '')}|${String(knowledge || '')}`
+	if (mode === 'search') return `search|${String(keyword || '').trim().toLowerCase().replace(/\s+/g, ' ')}`
+	return mode
 }
 
 function knowledgeScopeKey(chapterId, knowledge) {
@@ -408,10 +436,165 @@ function practiceRoundResponse(round, section) {
 	return result
 }
 
+function emptyExamDraft(userId, scope, timestamp) {
+	return {
+		_id: examDraftDocumentId(userId, scope.subjectId, scope.scopeKey),
+		userId,
+		subjectId: scope.subjectId,
+		mode: scope.mode,
+		scopeKey: scope.scopeKey,
+		chapterId: scope.chapterId || '',
+		section: scope.section || '',
+		knowledge: scope.knowledge || '',
+		keyword: scope.keyword || '',
+		roundId: '',
+		active: false,
+		questionVersion: '',
+		questionIds: [],
+		answers: [],
+		initialQuestionId: '',
+		positionQuestionId: '',
+		positionAt: new Date(0),
+		stateAt: new Date(0),
+		startedAt: new Date(0),
+		createdAt: timestamp,
+		updatedAt: timestamp
+	}
+}
+
+function normalizeExamDraft(saved, userId, scope, timestamp) {
+	const draft = saved || emptyExamDraft(userId, scope, timestamp)
+	draft.questionIds = Array.isArray(draft.questionIds)
+		? Array.from(new Set(draft.questionIds.filter(Boolean))).slice(0, MAX_EXAM_DRAFT_QUESTIONS)
+		: []
+	const availableIds = new Set(draft.questionIds)
+	draft.answers = Array.isArray(draft.answers)
+		? draft.answers.filter(answer => (
+			answer && availableIds.has(answer.questionId) && Array.isArray(answer.selected) && answer.selected.length
+		))
+		: []
+	draft.active = Boolean(draft.active && draft.roundId && draft.questionIds.length)
+	return draft
+}
+
+function examDraftResponse(draft) {
+	if (!draft || !draft.active) return { active: false }
+	const latestAnswerAt = draft.answers.reduce((latest, answer) => (
+		Math.max(latest, getDateValue(answer.updatedAt))
+	), 0)
+	return {
+		subjectId: draft.subjectId,
+		mode: draft.mode,
+		scopeKey: draft.scopeKey,
+		chapterId: draft.chapterId || '',
+		section: draft.section || '',
+		knowledge: draft.knowledge || '',
+		keyword: draft.keyword || '',
+		roundId: draft.roundId,
+		active: true,
+		questionVersion: draft.questionVersion || '',
+		questionIds: draft.questionIds.slice(),
+		answers: draft.answers.map(answer => ({
+			questionId: answer.questionId,
+			selected: answer.selected.slice(),
+			updatedAt: getDateValue(answer.updatedAt)
+		})),
+		initialQuestionId: draft.initialQuestionId || draft.questionIds[0] || '',
+		positionQuestionId: draft.positionQuestionId || draft.initialQuestionId || draft.questionIds[0] || '',
+		positionAt: getDateValue(draft.positionAt),
+		startedAt: getDateValue(draft.startedAt),
+		updatedAt: Math.max(getDateValue(draft.stateAt), getDateValue(draft.positionAt), latestAnswerAt)
+	}
+}
+
+function applyExamDraftEvent(draft, item) {
+	const eventTime = item.occurredAt.getTime()
+	const stateTime = Math.max(
+		getDateValue(draft.startedAt),
+		getDateValue(draft.resetAt),
+		getDateValue(draft.completedAt)
+	)
+	if (item.type === 'examStart') {
+		if (draft.active && draft.roundId === item.roundId
+			&& eventTime <= getDateValue(draft.startedAt)) return false
+		if (eventTime < stateTime) return false
+		draft.mode = item.mode
+		draft.scopeKey = item.scopeKey
+		draft.chapterId = item.chapterId || ''
+		draft.section = item.section || ''
+		draft.knowledge = item.knowledge || ''
+		draft.keyword = item.keyword || ''
+		draft.roundId = item.roundId
+		draft.active = true
+		draft.questionVersion = item.questionVersion || ''
+		draft.questionIds = item.questionIds.slice()
+		draft.answers = []
+		draft.initialQuestionId = item.initialQuestionId
+		draft.positionQuestionId = item.positionQuestionId
+		draft.positionAt = item.occurredAt
+		draft.startedAt = item.occurredAt
+		draft.stateAt = item.occurredAt
+		return true
+	}
+	if (item.type === 'examReset' || item.type === 'examComplete') {
+		if (!draft.active || draft.roundId !== item.roundId) return false
+		draft.active = false
+		draft.questionIds = []
+		draft.answers = []
+		draft.initialQuestionId = ''
+		draft.positionQuestionId = ''
+		draft.positionAt = item.occurredAt
+		draft.stateAt = item.occurredAt
+		if (item.type === 'examReset') draft.resetAt = item.occurredAt
+		else draft.completedAt = item.occurredAt
+		return true
+	}
+	if (!draft.active || draft.roundId !== item.roundId) return false
+	if (item.type === 'examReconcile') {
+		const availableIds = new Set(item.questionIds)
+		draft.questionIds = item.questionIds.slice()
+		draft.answers = draft.answers.filter(answer => availableIds.has(answer.questionId))
+		draft.initialQuestionId = item.initialQuestionId
+		draft.positionQuestionId = item.positionQuestionId
+		return true
+	}
+	if (draft.questionIds.indexOf(item.questionId) === -1) return false
+	if (item.type === 'examPosition') {
+		if (eventTime >= getDateValue(draft.positionAt)) {
+			draft.positionQuestionId = item.questionId
+			draft.positionAt = item.occurredAt
+		}
+		return true
+	}
+	if (draft.questionIds.indexOf(item.positionQuestionId) === -1) return false
+	const savedIndex = draft.answers.findIndex(answer => answer.questionId === item.questionId)
+	const saved = savedIndex > -1 ? draft.answers[savedIndex] : null
+	if (!saved || eventTime >= getDateValue(saved.updatedAt)) {
+		if (!item.selected.length) {
+			if (savedIndex > -1) draft.answers.splice(savedIndex, 1)
+		} else {
+			const answer = {
+				questionId: item.questionId,
+				selected: item.selected.slice(),
+				updatedAt: item.occurredAt,
+				eventId: item.eventId
+			}
+			if (savedIndex > -1) draft.answers.splice(savedIndex, 1, answer)
+			else draft.answers.push(answer)
+		}
+	}
+	if (eventTime >= getDateValue(draft.positionAt)) {
+		draft.positionQuestionId = item.positionQuestionId
+		draft.positionAt = item.occurredAt
+	}
+	return true
+}
+
 function defaultPreferences() {
 	return {
 		answerMode: 'practice',
 		nightMode: false,
+		smartPractice: normalizeSmartPractice(),
 		updatedAt: 0
 	}
 }
@@ -548,17 +731,6 @@ function createRandom(seed) {
 	}
 }
 
-function shuffle(list, random) {
-	const result = list.slice()
-	for (let index = result.length - 1; index > 0; index -= 1) {
-		const target = Math.floor(random() * (index + 1))
-		const current = result[index]
-		result[index] = result[target]
-		result[target] = current
-	}
-	return result
-}
-
 function toPublicQuestion(document) {
 	const result = Object.assign({}, document)
 	delete result._id
@@ -585,11 +757,44 @@ async function loadFullQuestionsByIds(db, catalog, questionIds) {
 	return questionIds.map(questionId => byId.get(questionId)).filter(Boolean)
 }
 
+function readExamEventScope(event, index) {
+	const mode = readString(event.mode, `events[${index}].mode`, {
+		required: true,
+		values: EXAM_DRAFT_MODES
+	})
+	const chapterId = readString(event.chapterId, `events[${index}].chapterId`, {
+		required: ['chapter', 'section', 'knowledge'].indexOf(mode) > -1,
+		maxLength: 32
+	})
+	const section = readString(event.section, `events[${index}].section`, {
+		required: mode === 'section',
+		maxLength: 128
+	})
+	const knowledge = readString(event.knowledge, `events[${index}].knowledge`, {
+		required: mode === 'knowledge',
+		maxLength: 128
+	})
+	const keyword = readString(event.keyword, `events[${index}].keyword`, {
+		required: mode === 'search',
+		maxLength: 128
+	}).toLowerCase().replace(/\s+/g, ' ')
+	const scopeKey = examDraftScopeKey(mode, chapterId, section, knowledge, keyword)
+	const suppliedScopeKey = readString(event.scopeKey, `events[${index}].scopeKey`, {
+		required: true,
+		maxLength: 512
+	})
+	if (suppliedScopeKey !== scopeKey) invalidArgument(`events[${index}].scopeKey与测试范围不一致`)
+	return { mode, chapterId, section, knowledge, keyword, scopeKey }
+}
+
 function readSyncEvent(rawEvent, currentTime, index) {
 	const event = requireObject(rawEvent, `events[${index}]`)
 	const type = readString(event.type, `events[${index}].type`, {
 		required: true,
-		values: ['answer', 'favorite', 'roundReset']
+		values: [
+			'answer', 'favorite', 'roundReset',
+			'examStart', 'examAnswer', 'examPosition', 'examReconcile', 'examReset', 'examComplete'
+		]
 	})
 	const result = {
 		type,
@@ -597,6 +802,42 @@ function readSyncEvent(rawEvent, currentTime, index) {
 		subjectId: readSubjectId(event.subjectId),
 		occurredAt: readOccurredAt(event.occurredAt, currentTime),
 		originalIndex: index
+	}
+	if (type.indexOf('exam') === 0) {
+		Object.assign(result, readExamEventScope(event, index), {
+			roundId: readString(event.roundId, `events[${index}].roundId`, {
+				required: true,
+				minLength: 8,
+				maxLength: 96,
+				pattern: EVENT_ID_PATTERN
+			})
+		})
+		if (type === 'examStart' || type === 'examReconcile') {
+			result.questionIds = readQuestionIds(
+				event.questionIds,
+				`events[${index}].questionIds`,
+				MAX_EXAM_DRAFT_QUESTIONS
+			)
+			if (!result.questionIds.length) invalidArgument(`events[${index}].questionIds不能为空`)
+			result.initialQuestionId = readQuestionId(event.initialQuestionId)
+			result.positionQuestionId = readQuestionId(event.positionQuestionId)
+			if (result.questionIds.indexOf(result.initialQuestionId) === -1
+				|| result.questionIds.indexOf(result.positionQuestionId) === -1) {
+				invalidArgument(`events[${index}]的起始题或位置不在试卷中`)
+			}
+			if (type === 'examStart') {
+				result.questionVersion = readString(event.questionVersion, `events[${index}].questionVersion`, {
+					maxLength: 64
+				})
+			}
+		}
+		if (type === 'examAnswer') {
+			result.questionId = readQuestionId(event.questionId)
+			result.selected = readExamSelected(event.selected)
+			result.positionQuestionId = readQuestionId(event.positionQuestionId)
+		}
+		if (type === 'examPosition') result.questionId = readQuestionId(event.questionId)
+		return result
 	}
 	if (type === 'roundReset') {
 		result.chapterId = readString(event.chapterId, `events[${index}].chapterId`, {
@@ -848,7 +1089,9 @@ function createQuestionBankUserService(db, options) {
 			const stateCache = new Map()
 			const statsCache = new Map()
 			const roundCache = new Map()
+			const examDraftCache = new Map()
 			const dirtyRoundIds = new Set()
+			const dirtyExamDraftIds = new Set()
 			const acceptedEventIds = []
 			const duplicateEventIds = []
 			const answerResults = []
@@ -888,7 +1131,34 @@ function createQuestionBankUserService(db, options) {
 				return roundCache.get(id)
 			}
 
+			async function getExamDraft(item) {
+				const scope = {
+					subjectId: item.subjectId,
+					mode: item.mode,
+					scopeKey: item.scopeKey,
+					chapterId: item.chapterId || '',
+					section: item.section || '',
+					knowledge: item.knowledge || '',
+					keyword: item.keyword || ''
+				}
+				const id = examDraftDocumentId(userId, item.subjectId, item.scopeKey)
+				if (!examDraftCache.has(id)) {
+					const saved = await getDocument(store, EXAM_DRAFT_COLLECTION, id)
+					examDraftCache.set(id, normalizeExamDraft(saved, userId, scope, currentTime))
+				}
+				return examDraftCache.get(id)
+			}
+
 			for (const item of events) {
+				if (item.type.indexOf('exam') === 0) {
+					const draft = await getExamDraft(item)
+					if (applyExamDraftEvent(draft, item)) {
+						draft.updatedAt = serverDate()
+						dirtyExamDraftIds.add(draft._id)
+					}
+					acceptedEventIds.push(item.eventId)
+					continue
+				}
 				if (item.type === 'roundReset') {
 					const round = await getRound(item.subjectId, item.chapterId)
 					if (applyPracticeRoundReset(round, item)) {
@@ -1036,7 +1306,9 @@ function createQuestionBankUserService(db, options) {
 				}
 			}
 
-			const summarySubjectIds = Array.from(new Set(events.map(item => item.subjectId)))
+			const summarySubjectIds = Array.from(new Set(events
+				.filter(item => item.type === 'answer' || item.type === 'favorite')
+				.map(item => item.subjectId)))
 			for (const subjectId of summarySubjectIds) await getStats(subjectId)
 
 			for (const state of stateCache.values()) {
@@ -1050,6 +1322,10 @@ function createQuestionBankUserService(db, options) {
 				const document = Object.assign({}, round)
 				if (!document.chapterPosition) delete document.chapterPosition
 				await setDocument(store, PRACTICE_ROUND_COLLECTION, round._id, document)
+			}
+			for (const draftId of dirtyExamDraftIds) {
+				const draft = examDraftCache.get(draftId)
+				await setDocument(store, EXAM_DRAFT_COLLECTION, draft._id, draft)
 			}
 			const summaries = {}
 			statsCache.forEach(stats => {
@@ -1100,6 +1376,7 @@ function createQuestionBankUserService(db, options) {
 		return {
 			answerMode,
 			nightMode: Boolean(saved.nightMode),
+			smartPractice: normalizeSmartPractice(saved.smartPractice),
 			updatedAt: getDateValue(saved.updatedAt)
 		}
 	}
@@ -1110,19 +1387,25 @@ function createQuestionBankUserService(db, options) {
 			values: ANSWER_MODES
 		})
 		const nightMode = readBoolean(event.nightMode, 'nightMode')
+		let smartPractice
+		try { smartPractice = validateSmartPractice(event.smartPractice) }
+		catch (error) { invalidArgument(error.message) }
 		const currentTime = now()
 		const saved = await getDocument(db, PREFERENCES_COLLECTION, userId)
+		if (event.smartPractice === undefined) smartPractice = normalizeSmartPractice(saved && saved.smartPractice)
 		await setDocument(db, PREFERENCES_COLLECTION, userId, {
 			_id: userId,
 			userId,
 			answerMode,
 			nightMode,
+			smartPractice,
 			createdAt: saved && saved.createdAt || serverDate(),
 			updatedAt: serverDate()
 		})
 		return {
 			answerMode,
 			nightMode,
+			smartPractice,
 			updatedAt: currentTime.getTime()
 		}
 	}
@@ -1141,7 +1424,8 @@ function createQuestionBankUserService(db, options) {
 				STATE_COLLECTION,
 				STATS_COLLECTION,
 				PROGRESS_COLLECTION,
-				PRACTICE_ROUND_COLLECTION
+				PRACTICE_ROUND_COLLECTION,
+				EXAM_DRAFT_COLLECTION
 			]
 			const deletedByCollection = {}
 			for (const collectionName of targets) {
@@ -1493,7 +1777,75 @@ function createQuestionBankUserService(db, options) {
 		return practiceRoundResponse(round, section)
 	}
 
+	async function getExamDraft(event, userId) {
+		const subjectId = readSubjectId(event.subjectId)
+		const scope = Object.assign({ subjectId }, readExamEventScope(event, 'request'))
+		const saved = await getDocument(
+			db,
+			EXAM_DRAFT_COLLECTION,
+			examDraftDocumentId(userId, subjectId, scope.scopeKey)
+		)
+		return examDraftResponse(normalizeExamDraft(saved, userId, scope, now()))
+	}
+
+	async function getExamDraftSummaries(event, userId) {
+		const subjectId = readSubjectId(event.subjectId)
+		const response = await db.collection(EXAM_DRAFT_COLLECTION)
+			.where({ userId, subjectId, active: true })
+			.limit(MAX_EXAM_DRAFT_ROWS + 1)
+			.get()
+		const rows = getRows(response)
+		if (rows.length > MAX_EXAM_DRAFT_ROWS) {
+			throw new QuestionBankUserError('QUESTION_BANK_USER_EXAM_DRAFT_LIMIT', '考试草稿数量超过处理上限')
+		}
+		const summaries = {}
+		rows.forEach(saved => {
+			const scope = {
+				subjectId,
+				mode: saved.mode,
+				scopeKey: saved.scopeKey,
+				chapterId: saved.chapterId || '',
+				section: saved.section || '',
+				knowledge: saved.knowledge || '',
+				keyword: saved.keyword || ''
+			}
+			const draft = normalizeExamDraft(saved, userId, scope, now())
+			if (!draft.active) return
+			const latestAnswerAt = draft.answers.reduce((latest, answer) => (
+				Math.max(latest, getDateValue(answer.updatedAt))
+			), 0)
+			summaries[draft.scopeKey] = {
+				subjectId,
+				mode: draft.mode,
+				scopeKey: draft.scopeKey,
+				chapterId: draft.chapterId || '',
+				section: draft.section || '',
+				knowledge: draft.knowledge || '',
+				keyword: draft.keyword || '',
+				roundId: draft.roundId,
+				answered: draft.answers.length,
+				total: draft.questionIds.length,
+				initialQuestionId: draft.initialQuestionId || draft.questionIds[0] || '',
+				positionQuestionId: draft.positionQuestionId || '',
+				updatedAt: Math.max(
+					getDateValue(draft.stateAt),
+					getDateValue(draft.positionAt),
+					latestAnswerAt
+				),
+				hasProgress: draft.answers.length > 0 || Boolean(
+					draft.positionQuestionId
+					&& draft.initialQuestionId
+					&& draft.positionQuestionId !== draft.initialQuestionId
+				)
+			}
+		})
+		return { subjectId, summaries }
+	}
+
 	async function getSmartPractice(event, userId) {
+		let smartPractice
+		try { smartPractice = validateSmartPractice(event.smartPractice) }
+		catch (error) { invalidArgument(error.message) }
 		const subjectId = readSubjectId(event.subjectId)
 		const pageSize = readInteger(event.pageSize, 'pageSize', {
 			defaultValue: DEFAULT_PAGE_SIZE,
@@ -1557,9 +1909,9 @@ function createQuestionBankUserService(db, options) {
 			.limit(Math.min(MAX_SMART_CANDIDATES, pageSize * 2))
 			.get()
 		const recentWrongIds = getRows(wrongResponse).map(item => item.questionId)
-		const orderedIds = shuffle(freshIds, random)
-			.concat(shuffle(recentWrongIds.concat(sampledWrongIds), random), shuffle(masteredIds, random))
-		const selectedIds = Array.from(new Set(orderedIds)).slice(0, pageSize)
+		const selectedIds = selectSmartPracticeIds({ fresh: freshIds,
+			wrong: recentWrongIds.concat(sampledWrongIds), mastered: masteredIds
+		}, pageSize, smartPractice, random)
 		const documents = await loadFullQuestionsByIds(db, catalog, selectedIds)
 		return {
 			subjectId,
@@ -1644,6 +1996,8 @@ function createQuestionBankUserService(db, options) {
 		getStateSnapshot,
 		getProgress,
 		getPracticeRound,
+		getExamDraft,
+		getExamDraftSummaries,
 		getSmartPractice,
 		getRecords,
 		getUserProfile,
@@ -1673,6 +2027,8 @@ module.exports = {
 	QuestionBankUserError,
 	createQuestionBankUserService,
 	chinaDayKey,
+	examDraftDocumentId,
+	examDraftScopeKey,
 	stateDocumentId,
 	progressDocumentId,
 	practiceRoundDocumentId,

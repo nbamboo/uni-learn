@@ -135,7 +135,7 @@
 								v-if="canConfirmSlide(slide)"
 								:disabled="!slide.selected.length"
 								@tap="confirmCurrentAnswer"
-							>确认答案</button>
+							>{{ examInProgress ? '确认选择' : '确认答案' }}</button>
 
 							<view class="analysis-panel" v-if="slide.revealed">
 								<view class="result-line" v-if="slide.submitted" :class="slide.correct ? 'correct-text' : 'wrong-text'">
@@ -246,22 +246,31 @@
 </template>
 
 <script>
-	import { buildPracticeQuestions } from '@/data/practice-questions.js'
+	import { buildPracticeQuestionSet, buildPracticeQuestions } from '@/data/practice-questions.js'
 	import {
 		getPracticeState,
 		isCorrectAnswer,
 		isFavorite,
+		recordExamSubmissionAnswer,
 		recordAnswer,
 		toggleFavorite
 	} from '@/data/practice.js'
-	import { getAllPracticeQuestions } from '@/services/question-bank.js'
+	import { getAllPracticeQuestions, getQuestionsByIds } from '@/services/question-bank.js'
 	import {
+		completeExamDraft,
+		examDraftHasProgress,
 		flushPracticeEvents,
+		getExamDraft,
 		getLocalPracticePreferences,
 		getPracticePreferences,
 		getPracticeRound,
 		getPracticeStateSnapshot,
-		savePracticeProgress
+		reconcileExamDraft,
+		resetExamDraft,
+		saveExamDraftAnswer,
+		saveExamDraftPosition,
+		savePracticeProgress,
+		startExamDraft
 	} from '@/services/user-practice.js'
 	import {
 		getCachedMembership,
@@ -293,6 +302,7 @@
 				examSubmitted: false,
 				showExamResult: false,
 				examResult: null,
+				examDraft: null,
 				isSharedExamResult: false,
 				correctCount: 0,
 				wrongCount: 0,
@@ -381,7 +391,8 @@
 				keyword: options.keyword ? decodeURIComponent(options.keyword) : '',
 				startId: options.startId,
 				startNumber: Number(options.startNumber) || 0,
-				limit: options.limit
+				limit: options.limit,
+				examAction: options.examAction || ''
 			}
 			this.setNavigationTitle()
 			this.applyNavigationTheme()
@@ -586,6 +597,82 @@
 					backgroundColor: this.nightMode ? '#171c22' : '#ffffff'
 				})
 			},
+			examDraftEnabled() {
+				return this.answerMode === 'exam' && this.mode !== 'smart'
+			},
+			examDraftOptions(extra) {
+				return Object.assign({
+					subjectId: this.practiceConfig.subjectId,
+					mode: this.mode,
+					chapterId: this.practiceConfig.chapterId,
+					section: this.practiceConfig.section,
+					knowledge: this.practiceConfig.knowledge,
+					keyword: this.practiceConfig.keyword
+				}, extra || {})
+			},
+			resolveNewQuestionIndex() {
+				const startIndex = this.practiceConfig.startId
+					? this.questionList.findIndex(item => item.id === this.practiceConfig.startId)
+					: -1
+				if (startIndex > -1) return startIndex
+				if (this.practiceConfig.startNumber > 0) {
+					return Math.min(this.practiceConfig.startNumber - 1, this.questionList.length - 1)
+				}
+				return 0
+			},
+			resolveExamDraftIndex(draft) {
+				if (!draft) return this.resolveNewQuestionIndex()
+				const positionIndex = draft.positionQuestionId
+					? this.questionList.findIndex(item => item.id === draft.positionQuestionId)
+					: -1
+				if (positionIndex > -1) return positionIndex
+				const answeredIds = new Set(Object.keys(draft.answers || {}))
+				const unansweredIndex = this.questionList.findIndex(item => !answeredIds.has(item.id))
+				if (unansweredIndex > -1) return unansweredIndex
+				const initialIndex = draft.initialQuestionId
+					? this.questionList.findIndex(item => item.id === draft.initialQuestionId)
+					: -1
+				return initialIndex > -1 ? initialIndex : 0
+			},
+			hydrateExamDraft(draft) {
+				this.draftAnswers = {}
+				if (!draft || !draft.answers) return
+				const availableIds = new Set(this.questionList.map(question => question.id))
+				Object.keys(draft.answers).forEach(questionId => {
+					const answer = draft.answers[questionId]
+					if (!availableIds.has(questionId) || !answer || !Array.isArray(answer.selected)
+						|| !answer.selected.length) return
+					this.$set(this.draftAnswers, questionId, answer.selected.slice())
+				})
+			},
+			requestExamEntryAction(draft) {
+				return new Promise(resolve => {
+					uni.showActionSheet({
+						itemList: ['重新做题', '继续做题'],
+						success: result => {
+							if (result.tapIndex === 0) resolve('restart')
+							else if (result.tapIndex === 1) resolve('continue')
+							else resolve('cancel')
+						},
+						fail: () => resolve('cancel')
+					})
+				}).then(action => {
+					if (action === 'restart') {
+						resetExamDraft(this.examDraftOptions({ roundId: draft.roundId }))
+					}
+					return action
+				})
+			},
+			async buildNewExamQuestionSet(forceRefresh) {
+				if (this.mode === 'chapter' || this.mode === 'section') {
+					return getAllPracticeQuestions(Object.assign({}, this.practiceConfig, {
+						pageSize: 50
+					}), {
+						forceRefresh: Boolean(forceRefresh)
+					})
+				}
+				return buildPracticeQuestionSet(this.practiceConfig)
+			},
 			async loadQuestions(forceRefresh) {
 				this.loading = true
 				this.loadError = ''
@@ -597,19 +684,60 @@
 				this.examSubmitted = false
 				this.showExamResult = false
 				this.examResult = null
+				this.examDraft = null
 				this.isSharedExamResult = false
 				this.resetSwiperPosition()
 				try {
 					await this.loadAnswerPreferences()
-					if (this.mode === 'chapter' || this.mode === 'section') {
-						const result = await getAllPracticeQuestions(Object.assign({}, this.practiceConfig, {
-							pageSize: 50
-						}), {
-							forceRefresh: Boolean(forceRefresh)
-						})
-						this.questionList = result.items
-					} else {
-						this.questionList = await buildPracticeQuestions(this.practiceConfig)
+					let questionVersion = ''
+					if (this.examDraftEnabled() && this.practiceConfig.examAction !== 'restart') {
+						const savedDraft = await getExamDraft(this.examDraftOptions())
+						if (savedDraft && examDraftHasProgress(savedDraft)) {
+							const entryAction = this.practiceConfig.examAction === 'continue'
+								? 'continue'
+								: await this.requestExamEntryAction(savedDraft)
+							if (entryAction === 'cancel') {
+								uni.navigateBack()
+								return
+							}
+							if (entryAction === 'restart') {
+								this.practiceConfig.examAction = 'restart'
+							} else {
+								const restored = await getQuestionsByIds({
+									subjectId: this.practiceConfig.subjectId,
+									questionIds: savedDraft.questionIds
+								})
+								if (restored.items.length) {
+									this.questionList = restored.items
+									questionVersion = restored.version || savedDraft.questionVersion || ''
+									this.examDraft = restored.items.length === savedDraft.questionIds.length
+										? savedDraft
+										: reconcileExamDraft(this.examDraftOptions({
+											roundId: savedDraft.roundId,
+											questionIds: restored.items.map(item => item.id)
+										}))
+									this.hydrateExamDraft(this.examDraft)
+								} else {
+									resetExamDraft(this.examDraftOptions({ roundId: savedDraft.roundId }))
+								}
+							}
+						}
+					}
+					if (!this.questionList.length) {
+						if (this.examDraftEnabled()) {
+							const result = await this.buildNewExamQuestionSet(forceRefresh)
+							this.questionList = result.items || []
+							questionVersion = result.version || ''
+						} else if (this.mode === 'chapter' || this.mode === 'section') {
+							const result = await getAllPracticeQuestions(Object.assign({}, this.practiceConfig, {
+								pageSize: 50
+							}), {
+								forceRefresh: Boolean(forceRefresh)
+							})
+							this.questionList = result.items
+						} else {
+							this.questionList = await buildPracticeQuestions(this.practiceConfig)
+						}
 					}
 					let practiceRound = null
 					if (this.answerMode === 'practice'
@@ -620,10 +748,20 @@
 							section: this.mode === 'section' ? this.practiceConfig.section : ''
 						})
 						this.hydratePracticeRound(practiceRound)
-					} else {
+					} else if (!this.examDraft) {
 						this.resetSessionAnswers()
 					}
-					const initialQuestionIndex = this.resolveInitialQuestionIndex(practiceRound)
+					let initialQuestionIndex = this.examDraft
+						? this.resolveExamDraftIndex(this.examDraft)
+						: this.resolveInitialQuestionIndex(practiceRound)
+					if (this.examDraftEnabled() && !this.examDraft && this.questionList.length) {
+						initialQuestionIndex = this.resolveNewQuestionIndex()
+						this.examDraft = startExamDraft(this.examDraftOptions({
+							questionVersion,
+							questionIds: this.questionList.map(item => item.id),
+							initialQuestionId: this.questionList[initialQuestionIndex].id
+						}))
+					}
 					let snapshot = null
 					try {
 						snapshot = await getPracticeStateSnapshot(this.practiceConfig.subjectId, {
@@ -686,9 +824,18 @@
 				this.saveCurrentQuestionProgress(question)
 			},
 			saveCurrentQuestionProgress(question) {
-				if (this.answerMode === 'exam'
-					|| !question
-					|| ['chapter', 'section', 'knowledge'].indexOf(this.mode) === -1) return null
+				if (!question) return null
+				if (this.examDraftEnabled()) {
+					if (!this.examDraft || this.examSubmitted) return null
+					const saved = saveExamDraftPosition(this.examDraftOptions({
+						roundId: this.examDraft.roundId,
+						questionId: question.id
+					}))
+					if (saved) this.examDraft = saved
+					return saved && saved.roundId
+				}
+				if (this.answerMode === 'exam') return null
+				if (['chapter', 'section', 'knowledge'].indexOf(this.mode) === -1) return null
 				return savePracticeProgress(question, {
 					mode: this.mode,
 					chapterId: this.practiceConfig.chapterId,
@@ -699,7 +846,20 @@
 			syncCurrentProgress() {
 				if (this.progressSavedOnLeave) return
 				this.progressSavedOnLeave = true
-				if (this.answerMode === 'exam' || this.isSharedExamResult) return
+				if (this.isSharedExamResult) return
+				if (this.answerMode === 'exam') {
+					if (this.examDraftEnabled() && this.examDraft && !this.examSubmitted) {
+						const saved = saveExamDraftPosition(this.examDraftOptions({
+							roundId: this.examDraft.roundId,
+							questionId: this.currentQuestion && this.currentQuestion.id
+						}))
+						if (saved) this.examDraft = saved
+						flushPracticeEvents({ includeProgress: false }).catch(() => {
+							// 考试草稿已保存在本机，下次启动会自动重试云同步。
+						})
+					}
+					return
+				}
 				this.saveCurrentQuestionProgress(this.currentQuestion)
 				flushPracticeEvents().catch(() => {
 					// 进度已持久化在本机，下次启动会自动重试。
@@ -771,6 +931,8 @@
 				this.saveCurrentDraft()
 				if (this.answerMode === 'practice' && this.currentQuestion.type !== 'multiple') {
 					this.submitAnswer()
+				} else if (this.examInProgress && this.currentQuestion.type !== 'multiple') {
+					this.advanceAfterExamSelection()
 				}
 			},
 			saveCurrentDraft() {
@@ -779,6 +941,15 @@
 					this.$set(this.draftAnswers, this.currentQuestion.id, this.selectedAnswers.slice())
 				} else {
 					this.$delete(this.draftAnswers, this.currentQuestion.id)
+				}
+				if (this.examDraftEnabled() && this.examDraft && !this.examSubmitted) {
+					const saved = saveExamDraftAnswer(this.examDraftOptions({
+						roundId: this.examDraft.roundId,
+						questionId: this.currentQuestion.id,
+						selected: this.selectedAnswers,
+						positionQuestionId: this.currentQuestion.id
+					}))
+					if (saved) this.examDraft = saved
 				}
 			},
 			chooseSlideOption(slide, alias) {
@@ -792,16 +963,26 @@
 			},
 			canConfirmSlide(slide) {
 				return slide.offset === 0
-					&& this.answerMode === 'practice'
 					&& slide.question.type === 'multiple'
-					&& !slide.submitted
+					&& ((this.answerMode === 'practice' && !slide.submitted)
+						|| this.examInProgress)
 			},
 			confirmCurrentAnswer() {
 				if (!this.selectedAnswers.length) {
 					uni.showToast({ title: '请至少选择一个选项', icon: 'none' })
 					return
 				}
+				if (this.examInProgress) {
+					this.advanceAfterExamSelection()
+					return
+				}
 				this.submitAnswer()
+			},
+			advanceAfterExamSelection() {
+				if (!this.examInProgress || !this.currentQuestion || !this.selectedAnswers.length) return
+				if (this.currentIndex < this.questionList.length - 1) {
+					this.animateToQuestion(this.currentIndex + 1)
+				}
 			},
 			submitAnswer() {
 				if (!this.currentQuestion || !this.selectedAnswers.length || this.submitted) return
@@ -840,11 +1021,13 @@
 				let wrongCount = 0
 				let partialCount = 0
 				let answeredCount = 0
+				const submittedAnswers = []
 				const sessionAnswers = {}
 				this.questionList.forEach(question => {
 					const selected = this.draftAnswers[question.id]
 					if (!selected || !selected.length) return
 					answeredCount += 1
+					submittedAnswers.push({ question, selected: selected.slice() })
 					const correct = isCorrectAnswer(selected, question.answer)
 					const partial = !correct && this.isPartialExamAnswer(question, selected)
 					sessionAnswers[question.id] = {
@@ -873,7 +1056,17 @@
 					unansweredCount: totalCount - answeredCount,
 					totalCount
 				}
+				submittedAnswers.forEach(item => {
+					recordExamSubmissionAnswer(item.question, item.selected)
+				})
 				this.showExamResult = true
+				if (this.examDraftEnabled() && this.examDraft) {
+					completeExamDraft(this.examDraftOptions({ roundId: this.examDraft.roundId }))
+					this.examDraft = null
+					flushPracticeEvents({ includeProgress: false }).catch(() => {
+						// 本地已完成交卷，云端完成事件将在下次联网时重试。
+					})
+				}
 				uni.setNavigationBarTitle({ title: '测试结果' })
 			},
 			isPartialExamAnswer(question, selected) {
@@ -894,23 +1087,11 @@
 				if (chapterNames.length === 1) return chapterNames[0]
 				return chapterNames.length ? '综合测试' : '当前测试'
 			},
-			restartExam() {
-				this.showExamResult = false
-				this.examResult = null
-				this.examSubmitted = false
-				this.sessionAnswers = {}
-				this.draftAnswers = {}
-				this.visitedQuestionIds = []
-				this.selectedAnswers = []
-				this.submitted = false
-				this.lastResult = false
-				this.correctCount = 0
-				this.wrongCount = 0
-				this.currentIndex = 0
-				this.resetSwiperPosition()
-				if (this.questionList.length) this.loadQuestion(0)
+			async restartExam() {
+				if (this.practiceConfig) this.practiceConfig.examAction = 'restart'
 				this.setNavigationTitle()
 				this.applyNavigationTheme()
+				return this.loadQuestions()
 			},
 			goToPracticeHome() {
 				this.destroyExamSession()
@@ -921,6 +1102,7 @@
 				this.examResult = null
 				this.sessionAnswers = {}
 				this.draftAnswers = {}
+				this.examDraft = null
 				this.visitedQuestionIds = []
 				this.selectedAnswers = []
 				this.isSharedExamResult = false

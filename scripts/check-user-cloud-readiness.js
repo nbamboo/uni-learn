@@ -75,6 +75,8 @@ if (config) {
 	'uniCloud-alipay/database/question_bank_user_progress.index.json',
 	'uniCloud-alipay/database/question_bank_user_rounds.schema.json',
 	'uniCloud-alipay/database/question_bank_user_rounds.index.json',
+	'uniCloud-alipay/database/question_bank_exam_drafts.schema.json',
+	'uniCloud-alipay/database/question_bank_exam_drafts.index.json',
 	'uniCloud-alipay/database/question_bank_user_preferences.schema.json',
 	'uniCloud-alipay/database/question_bank_user_preferences.index.json'
 ].forEach(readJson)

@@ -1,0 +1,62 @@
+{
+  "bsonType": "object",
+  "description": "用户未交卷的考试草稿；与正式练习状态和统计隔离",
+  "required": ["_id", "userId", "subjectId", "mode", "scopeKey", "roundId", "active", "questionIds", "answers", "stateAt", "createdAt", "updatedAt"],
+  "permission": {
+    "read": false,
+    "create": false,
+    "update": false,
+    "delete": false,
+    "count": false
+  },
+  "properties": {
+    "_id": { "bsonType": "string", "minLength": 8, "maxLength": 192 },
+    "userId": { "bsonType": "string", "minLength": 1, "maxLength": 64 },
+    "subjectId": { "bsonType": "string", "minLength": 1, "maxLength": 64, "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" },
+    "mode": { "bsonType": "string", "enum": ["chapter", "section", "knowledge", "wrong", "favorite", "search", "sequence"] },
+    "scopeKey": { "bsonType": "string", "minLength": 1, "maxLength": 512 },
+    "chapterId": { "bsonType": "string", "maxLength": 32 },
+    "section": { "bsonType": "string", "maxLength": 128 },
+    "knowledge": { "bsonType": "string", "maxLength": 128 },
+    "keyword": { "bsonType": "string", "maxLength": 128 },
+    "roundId": { "bsonType": "string", "minLength": 8, "maxLength": 96 },
+    "active": { "bsonType": "bool" },
+    "questionVersion": { "bsonType": "string", "maxLength": 64 },
+    "questionIds": {
+      "bsonType": "array",
+      "arrayType": "string",
+      "maxLength": 5000,
+      "items": { "bsonType": "string", "minLength": 1, "maxLength": 64, "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" }
+    },
+    "answers": {
+      "bsonType": "array",
+      "arrayType": "object",
+      "maxLength": 5000,
+      "items": {
+        "bsonType": "object",
+        "required": ["questionId", "selected", "updatedAt", "eventId"],
+        "properties": {
+          "questionId": { "bsonType": "string", "minLength": 1, "maxLength": 64, "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" },
+          "selected": {
+            "bsonType": "array",
+            "arrayType": "string",
+            "minLength": 1,
+            "maxLength": 6,
+            "items": { "bsonType": "string", "enum": ["A", "B", "C", "D", "E", "F"] }
+          },
+          "updatedAt": { "bsonType": "date" },
+          "eventId": { "bsonType": "string", "minLength": 8, "maxLength": 96 }
+        }
+      }
+    },
+    "initialQuestionId": { "bsonType": "string", "maxLength": 64 },
+    "positionQuestionId": { "bsonType": "string", "maxLength": 64 },
+    "positionAt": { "bsonType": "date" },
+    "stateAt": { "bsonType": "date" },
+    "startedAt": { "bsonType": "date" },
+    "resetAt": { "bsonType": "date" },
+    "completedAt": { "bsonType": "date" },
+    "createdAt": { "bsonType": "date" },
+    "updatedAt": { "bsonType": "date" }
+  }
+}

@@ -1,5 +1,7 @@
 'use strict'
 
+const { validateSmartPractice, selectSmartPracticeIds } = require('./smart-practice.js')
+
 const CATALOG_COLLECTION = 'question_bank_catalogs'
 const QUESTION_COLLECTION = 'question_bank_questions'
 const DEFAULT_PAGE_SIZE = 20
@@ -365,17 +367,6 @@ function createRandom(seed) {
 	}
 }
 
-function shuffle(list, random) {
-	const result = list.slice()
-	for (let index = result.length - 1; index > 0; index -= 1) {
-		const target = Math.floor(random() * (index + 1))
-		const current = result[index]
-		result[index] = result[target]
-		result[target] = current
-	}
-	return result
-}
-
 async function getSampledQuestionReferences(db, catalog, pageSize, random) {
 	const questionCount = Math.max(0, Number(catalog.questionCount) || 0)
 	if (!questionCount) return []
@@ -529,6 +520,9 @@ function createQuestionBankService(db, options) {
 	}
 
 	async function getSmartPractice(event, subjectId) {
+		let smartPractice
+		try { smartPractice = validateSmartPractice(event.smartPractice) }
+		catch (error) { invalidArgument(error.message) }
 		const pageSize = readPageSize(event.pageSize, DEFAULT_PAGE_SIZE)
 		const answeredQuestionIds = readQuestionIds(
 			event.answeredQuestionIds,
@@ -560,12 +554,11 @@ function createQuestionBankService(db, options) {
 		const sampledIds = new Set(references.map(reference => reference.questionId))
 		const sampledWrongIds = groups.wrong.map(reference => reference.questionId)
 		const externalWrongIds = wrongQuestionIds.filter(questionId => !sampledIds.has(questionId))
-		const orderedIds = shuffle(groups.fresh, random).map(reference => reference.questionId)
-			.concat(
-				shuffle(sampledWrongIds.concat(externalWrongIds), random),
-				shuffle(groups.mastered, random).map(reference => reference.questionId)
-			)
-		const selectedIds = Array.from(new Set(orderedIds)).slice(0, pageSize)
+		const selectedIds = selectSmartPracticeIds({
+			fresh: groups.fresh.map(item => item.questionId),
+			wrong: sampledWrongIds.concat(externalWrongIds),
+			mastered: groups.mastered.map(item => item.questionId)
+		}, pageSize, smartPractice, random)
 		const documents = await getQuestionsByIdsInternal(db, catalog, selectedIds)
 		return {
 			subjectId,

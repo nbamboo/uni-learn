@@ -11,6 +11,7 @@ function loadComponent(environment, relativePath) {
 		relativePath || '../practice-pages/practice/practice.vue'
 	)
 	const file = fs.readFileSync(filePath, 'utf8')
+	environment.require = name => require(name.startsWith('@/') ? path.resolve(__dirname, '..', name.slice(2)) : name)
 	const match = file.match(/<script>([\s\S]*?)<\/script>/)
 	if (!match) throw new Error('practice.vue script block not found')
 	const source = match[1]
@@ -59,6 +60,12 @@ async function run() {
 	let interstitialShowCalls = 0
 	let interstitialDestroyCalls = 0
 	let resetRoundCalls = 0
+	let examDraftSummaries = {}
+	let currentExamDraft = null
+	let examDraftAnswerSaves = 0
+	let examDraftPositionSaves = 0
+	let examDraftCompletes = 0
+	let examDraftResets = 0
 	let localRoundSnapshot = {
 		chapterIds: [],
 		chapterAttempts: {},
@@ -109,6 +116,7 @@ async function run() {
 		},
 		PRACTICE_PROGRESS_UPDATED_EVENT: practiceProgressEvent,
 		buildPracticeQuestions: async () => [],
+		buildPracticeQuestionSet: async () => ({ version: 'test-version', items: allPracticeQuestions }),
 		getAllPracticeQuestions: async () => ({ items: allPracticeQuestions }),
 		getPracticeState: () => ({
 			currentSubjectId: 'junior-personal-finance',
@@ -164,6 +172,9 @@ async function run() {
 			}
 			return selected.slice().sort().join(',') === question.answer.slice().sort().join(',')
 		},
+		recordExamSubmissionAnswer(question, selected) {
+			return environment.recordAnswer(question, selected, { practiceMode: '' })
+		},
 		toggleFavorite: () => {
 			favoriteToggleCalls += 1
 			return true
@@ -201,6 +212,67 @@ async function run() {
 		},
 		getLocalPracticeRoundSnapshot: () => localRoundSnapshot,
 		getPracticeRound: async () => practiceRoundResponse,
+		examDraftHasProgress: draft => Boolean(draft && draft.hasProgress !== false && (
+			Number(draft.answered) > 0
+			|| draft.answers && Object.keys(draft.answers).length > 0
+			|| draft.positionQuestionId && draft.initialQuestionId
+				&& draft.positionQuestionId !== draft.initialQuestionId
+		)),
+		getExamDraftScope: input => {
+			if (!input || input.mode === 'smart') return null
+			let scopeKey = input.mode
+			if (input.mode === 'chapter') scopeKey += `|${input.chapterId}`
+			if (input.mode === 'section') scopeKey += `|${input.chapterId}|${input.section}`
+			if (input.mode === 'knowledge') scopeKey += `|${input.chapterId}|${input.knowledge}`
+			if (input.mode === 'search') scopeKey += `|${String(input.keyword || '').trim().toLowerCase()}`
+			return Object.assign({}, input, { scopeKey })
+		},
+		getExamDraft: async () => currentExamDraft,
+		getExamDraftSummaries: async () => ({
+			subjectId: 'junior-personal-finance',
+			summaries: examDraftSummaries
+		}),
+		startExamDraft: input => {
+			currentExamDraft = Object.assign({}, input, {
+				roundId: input.roundId || 'exam-round-test-new',
+				active: true,
+				answers: {},
+				positionQuestionId: input.initialQuestionId,
+				initialQuestionId: input.initialQuestionId
+			})
+			return currentExamDraft
+		},
+		saveExamDraftAnswer: input => {
+			examDraftAnswerSaves += 1
+			if (!currentExamDraft) return null
+			if (input.selected.length) {
+				currentExamDraft.answers[input.questionId] = { selected: input.selected.slice() }
+			} else {
+				delete currentExamDraft.answers[input.questionId]
+			}
+			return currentExamDraft
+		},
+		saveExamDraftPosition: input => {
+			examDraftPositionSaves += 1
+			if (!currentExamDraft) return null
+			currentExamDraft.positionQuestionId = input.questionId
+			return currentExamDraft
+		},
+		reconcileExamDraft: input => {
+			if (!currentExamDraft) return null
+			currentExamDraft.questionIds = input.questionIds.slice()
+			return currentExamDraft
+		},
+		completeExamDraft: () => {
+			examDraftCompletes += 1
+			currentExamDraft = null
+			return { closed: true }
+		},
+		resetExamDraft: () => {
+			examDraftResets += 1
+			currentExamDraft = null
+			return { closed: true }
+		},
 		resetPracticeRound: async input => {
 			resetRoundCalls += 1
 			if (input.section) {
@@ -249,16 +321,19 @@ async function run() {
 				timestamp: Date.now()
 			}]
 		}),
-		getQuestionsByIds: async () => ({
-			items: [{
+		getQuestionsByIds: async input => {
+			const requested = input && input.questionIds || []
+			const matched = allPracticeQuestions.filter(question => requested.indexOf(question.id) > -1)
+			if (matched.length) return { version: 'test-version-current', items: matched }
+			return { items: [{
 				id: 'local-record',
 				subjectId: 'junior-personal-finance',
 				chapterId: '1',
 				section: '第一节',
 				title: '本地错题',
 				knowledge: '本地记录'
-			}]
-		}),
+			}] }
+		},
 		getCatalog: async () => {
 			catalogCalls += 1
 			return {
@@ -452,6 +527,43 @@ async function run() {
 		answeredQuestionIds: [single.id]
 	}), 1)
 
+	allPracticeQuestions = [single, multiple, following]
+	preferenceResponse = { answerMode: 'exam', nightMode: false }
+	currentExamDraft = {
+		subjectId: 'junior-personal-finance',
+		mode: 'chapter',
+		chapterId: '1',
+		scopeKey: 'chapter|1',
+		roundId: 'exam-round-resume-one',
+		active: true,
+		questionVersion: 'old-version',
+		questionIds: [single.id, 'missing-exam-question', multiple.id, following.id],
+		answers: {
+			[single.id]: { questionId: single.id, selected: ['A'], updatedAt: Date.now() }
+		},
+		initialQuestionId: single.id,
+		positionQuestionId: following.id
+	}
+	const resumedExam = createContext('exam', [])
+	resumedExam.mode = 'chapter'
+	resumedExam.practiceConfig = {
+		subjectId: 'junior-personal-finance',
+		chapterId: '1',
+		section: '',
+		knowledge: '',
+		keyword: '',
+		startId: '',
+		startNumber: 0,
+		examAction: 'continue'
+	}
+	await resumedExam.loadQuestions()
+	assert.deepEqual(Array.from(resumedExam.questionList.map(item => item.id)), [single.id, multiple.id, following.id])
+	assert.deepEqual(Array.from(resumedExam.draftAnswers[single.id]), ['A'])
+	assert.equal(resumedExam.currentQuestion.id, following.id)
+	assert.equal(resumedExam.visibleSlides[1].revealed, false)
+	preferenceResponse = { answerMode: 'practice', nightMode: false }
+	currentExamDraft = null
+
 	// 章节轮次独立恢复全部答案，不受状态快照最多 100 道题的限制。
 	allPracticeQuestions = Array.from({ length: 120 }, (_, index) => {
 		const question = createQuestion(`round-${index + 1}`, 'single', ['A'])
@@ -529,18 +641,51 @@ async function run() {
 	const flushesBeforeExam = flushCalls
 	const progressSavesBeforeExam = progressSaveCalls
 	exam.mode = 'chapter'
+	exam.practiceConfig = {
+		subjectId: 'junior-personal-finance',
+		chapterId: '1',
+		section: '',
+		knowledge: '',
+		keyword: ''
+	}
+	currentExamDraft = {
+		subjectId: 'junior-personal-finance',
+		mode: 'chapter',
+		chapterId: '1',
+		scopeKey: 'chapter|1',
+		roundId: 'exam-round-page-one',
+		active: true,
+		questionIds: [single, multiple, following, unanswered].map(item => item.id),
+		answers: {},
+		initialQuestionId: single.id,
+		positionQuestionId: single.id
+	}
+	exam.examDraft = currentExamDraft
 	exam.loadQuestion(0)
 	exam.chooseOption('A')
+	assert.ok(examDraftPositionSaves > 0)
+	assert.equal(examDraftAnswerSaves, 1)
+	assert.equal(exam.swiperCurrent, 2)
+	assert.equal(exam.currentIndex, 0)
 	assert.equal(recordCalls.length, callsBeforeExam)
 	assert.equal(exam.visibleSlides[1].revealed, false)
 	assert.match(exam.answerNumberClass(0), /(?:^|\s)answered(?:\s|$)/)
 	exam.loadQuestion(1)
+	exam.resetSwiperPosition()
 	exam.chooseOption('A')
+	assert.equal(exam.swiperCurrent, 1)
+	assert.equal(exam.canConfirmSlide(getCurrentSlide(exam)), true)
+	exam.confirmCurrentAnswer()
+	assert.equal(exam.swiperCurrent, 2)
 	exam.loadQuestion(2)
 	exam.chooseOption('A')
 	exam.finalizeExam()
-	assert.equal(recordCalls.length, callsBeforeExam)
-	assert.equal(flushCalls, flushesBeforeExam)
+	assert.equal(examDraftCompletes, 1)
+	assert.equal(exam.examDraft, null)
+	assert.equal(recordCalls.length, callsBeforeExam + 3)
+	assert.deepEqual(Array.from(recordCalls.slice(-3).map(call => call.question.id)), [single.id, multiple.id, following.id])
+	assert.equal(recordCalls.slice(-3).every(call => !call.options.practiceMode), true)
+	assert.equal(flushCalls, flushesBeforeExam + 1)
 	assert.equal(progressSaveCalls, progressSavesBeforeExam)
 	assert.equal(exam.examSubmitted, true)
 	assert.equal(exam.showExamResult, true)
@@ -560,7 +705,7 @@ async function run() {
 	assert.equal(navigationTitles.slice(-1)[0], '测试结果')
 	exam.progressSavedOnLeave = false
 	exam.syncCurrentProgress()
-	assert.equal(flushCalls, flushesBeforeExam)
+	assert.equal(flushCalls, flushesBeforeExam + 1)
 	assert.equal(progressSaveCalls, progressSavesBeforeExam)
 
 	const shareOptions = component.onShareAppMessage.call(exam)
@@ -590,13 +735,28 @@ async function run() {
 	assert.equal(invalidSharedResult.openSharedExamResult('%7Bbad'), false)
 	assert.equal(invalidSharedResult.loadError, '分享的考试结果无效或已损坏')
 
-	exam.restartExam()
+	allPracticeQuestions = [single, multiple]
+	preferenceResponse = { answerMode: 'exam', nightMode: false }
+	exam.practiceConfig = {
+		subjectId: 'junior-personal-finance',
+		chapterId: '1',
+		section: '',
+		knowledge: '',
+		keyword: '',
+		startId: '',
+		startNumber: 0,
+		examAction: 'restart'
+	}
+	await exam.restartExam()
 	assert.equal(exam.showExamResult, false)
 	assert.equal(exam.examResult, null)
 	assert.equal(exam.examSubmitted, false)
 	assert.deepEqual(JSON.parse(JSON.stringify(exam.draftAnswers)), {})
 	assert.deepEqual(JSON.parse(JSON.stringify(exam.sessionAnswers)), {})
 	assert.equal(exam.currentIndex, 0)
+	assert.equal(exam.examDraft.roundId, 'exam-round-test-new')
+	allPracticeQuestions = []
+	preferenceResponse = { answerMode: 'practice', nightMode: false }
 
 	const review = createContext('review', [single])
 	const callsBeforeReview = recordCalls.length
@@ -624,6 +784,23 @@ async function run() {
 	modalOptions.slice(-1)[0].success({ confirm: true })
 	assert.equal(answerSheetCloseCalls, 1)
 	assert.equal(answerSheetExam.showExamResult, true)
+	const smartExam = createContext('exam', [single])
+	smartExam.mode = 'smart'
+	smartExam.practiceConfig = {
+		subjectId: 'junior-personal-finance',
+		chapterId: '',
+		section: '',
+		knowledge: '',
+		keyword: ''
+	}
+	const callsBeforeSmartExam = recordCalls.length
+	smartExam.loadQuestion(0)
+	smartExam.chooseOption('B')
+	smartExam.finalizeExam()
+	assert.equal(recordCalls.length, callsBeforeSmartExam + 1)
+	assert.equal(recordCalls.slice(-1)[0].question.id, single.id)
+	assert.equal(recordCalls.slice(-1)[0].options.practiceMode, '')
+	assert.equal(smartExam.examDraft, null)
 
 	const chapterComponent = loadComponent(environment, '../practice-pages/chapter/chapter.vue')
 	practiceAnswers = {}
@@ -708,14 +885,43 @@ async function run() {
 	const chapterCallsBeforeExam = chapterPositionCalls
 	chapterExam.startItem(catalogItem)
 	assert.equal(chapterPositionCalls, chapterCallsBeforeExam)
-	assert.equal(navigationUrls.slice(-1)[0], '/practice-pages/practice/practice?subjectId=junior-personal-finance&mode=chapter&chapterId=1')
+	assert.equal(navigationUrls.slice(-1)[0], '/practice-pages/practice/practice?subjectId=junior-personal-finance&mode=chapter&chapterId=1&examAction=restart')
 	const sectionCallsBeforeExam = sectionPositionCalls
 	chapterExam.startSection(chapterExam.items[0], chapterExam.items[0].sections[0])
 	assert.equal(sectionPositionCalls, sectionCallsBeforeExam)
 	assert.equal(
 		navigationUrls.slice(-1)[0],
-		'/practice-pages/practice/practice?subjectId=junior-personal-finance&mode=section&chapterId=1&section=%E7%AC%AC%E4%B8%80%E8%8A%82'
+		'/practice-pages/practice/practice?subjectId=junior-personal-finance&mode=section&chapterId=1&section=%E7%AC%AC%E4%B8%80%E8%8A%82&examAction=restart'
 	)
+	examDraftSummaries = {
+		'chapter|1': {
+			mode: 'chapter',
+			scopeKey: 'chapter|1',
+			roundId: 'exam-round-menu-one',
+			answered: 3,
+			total: 10,
+			initialQuestionId: 'exam-question-1',
+			positionQuestionId: 'exam-question-4',
+			hasProgress: true
+		}
+	}
+	await chapterExam.refreshExamDraftProgress()
+	assert.equal(chapterExam.items[0].progress.attempted, 3)
+	assert.equal(chapterExam.items[0].progress.total, 10)
+	assert.equal(chapterExam.items[0].progress.positionQuestionId, 'exam-question-4')
+	chapterExam.startChapter(chapterExam.items[0])
+	const examContinueSheet = actionSheetOptions.slice(-1)[0]
+	assert.deepEqual(Array.from(examContinueSheet.itemList), ['重新做题', '继续做题'])
+	examContinueSheet.success({ tapIndex: 1 })
+	examContinueSheet.complete()
+	assert.match(navigationUrls.slice(-1)[0], /examAction=continue$/)
+	chapterExam.startChapter(chapterExam.items[0])
+	const examRestartSheet = actionSheetOptions.slice(-1)[0]
+	examRestartSheet.success({ tapIndex: 0 })
+	examRestartSheet.complete()
+	assert.equal(examDraftResets, 1)
+	assert.match(navigationUrls.slice(-1)[0], /examAction=restart$/)
+	examDraftSummaries = {}
 
 	const knowledgeExam = Object.assign(chapterComponent.data(), chapterComponent.methods, {
 		subjectId: 'junior-personal-finance',
@@ -727,7 +933,7 @@ async function run() {
 	const knowledgeCallsBeforeExam = knowledgePositionCalls
 	knowledgeExam.startItem(knowledgeExam.items[0])
 	assert.equal(knowledgePositionCalls, knowledgeCallsBeforeExam)
-	assert.equal(navigationUrls.slice(-1)[0], '/practice-pages/practice/practice?subjectId=junior-personal-finance&mode=knowledge&chapterId=1&knowledge=%E6%B5%8B%E8%AF%95%E7%9F%A5%E8%AF%86%E7%82%B9')
+	assert.equal(navigationUrls.slice(-1)[0], '/practice-pages/practice/practice?subjectId=junior-personal-finance&mode=knowledge&chapterId=1&knowledge=%E6%B5%8B%E8%AF%95%E7%9F%A5%E8%AF%86%E7%82%B9&examAction=restart')
 
 	const chapterPractice = Object.assign(chapterComponent.data(), chapterComponent.methods, {
 		subjectId: 'junior-personal-finance',
@@ -918,7 +1124,6 @@ async function run() {
 		frontColor: '#ffffff',
 		backgroundColor: '#171c22'
 	})
-
 	const chapterTheme = Object.assign(chapterComponent.data(), chapterComponent.methods, {
 		items: []
 	})
@@ -954,6 +1159,27 @@ async function run() {
 		frontColor: '#ffffff',
 		backgroundColor: '#171c22'
 	})
+	examDraftSummaries = {
+		wrong: {
+			mode: 'wrong',
+			scopeKey: 'wrong',
+			roundId: 'exam-round-wrong-one',
+			answered: 2,
+			total: 7,
+			initialQuestionId: 'wrong-one',
+			positionQuestionId: 'wrong-three',
+			hasProgress: true
+		}
+	}
+	freeRecords.answerMode = 'exam'
+	await freeRecords.refreshExamProgress()
+	assert.equal(freeRecords.examProgress.answered, 2)
+	freeRecords.startAll()
+	const wrongContinueSheet = actionSheetOptions.slice(-1)[0]
+	wrongContinueSheet.success({ tapIndex: 1 })
+	wrongContinueSheet.complete()
+	assert.match(navigationUrls.slice(-1)[0], /mode=wrong&examAction=continue$/)
+	examDraftSummaries = {}
 
 	const settingsComponent = loadComponent(
 		environment,
@@ -978,6 +1204,37 @@ async function run() {
 	await settings.persistPreferences({ nightMode: true })
 	assert.equal(settings.nightMode, true)
 	assert.equal(preferenceResponse.nightMode, true)
+	assert.equal(settings.smartPractice.strategy, 'fresh')
+	assert.equal(settings.smartPractice.questionCount, 20)
+	await settings.adjustSmartQuestionCount(5)
+	assert.equal(settings.smartPractice.questionCount, 25)
+	await settings.adjustSmartQuestionCount(100)
+	assert.equal(settings.smartPractice.questionCount, 50)
+	await settings.adjustSmartQuestionCount(5)
+	assert.equal(settings.smartPractice.questionCount, 50)
+	await settings.adjustSmartQuestionCount(-100)
+	assert.equal(settings.smartPractice.questionCount, 10)
+	await settings.adjustSmartQuestionCount(-5)
+	assert.equal(settings.smartPractice.questionCount, 10)
+	await settings.adjustSmartQuestionCount(15)
+	assert.equal(settings.smartPractice.questionCount, 25)
+	await settings.selectSmartStrategy('custom')
+	assert.equal(settings.smartPractice.questionCount, 25)
+	assert.deepEqual(JSON.parse(JSON.stringify(settings.smartPractice.custom)), { fresh: 60, wrong: 30, mastered: 10 })
+	await settings.adjustSmartRatio('fresh', 15)
+	assert.deepEqual(JSON.parse(JSON.stringify(settings.smartPractice.custom)), { fresh: 75, wrong: 25, mastered: 0 })
+	assert.equal(settings.smartPractice.questionCount, 25)
+	await settings.adjustSmartRatio('wrong', 5)
+	assert.equal(settings.smartPractice.custom.wrong, 25)
+	await settings.selectSmartStrategy('balanced')
+	assert.deepEqual(Object.values(settingsComponent.computed.smartQuotas.call(settings)), [15, 8, 2])
+	await settings.selectSmartStrategy('custom')
+	assert.equal(settings.smartPractice.custom.fresh, 75)
+	const ratiosBeforeMasteredAdjustment = JSON.stringify(settings.smartPractice.custom)
+	await settings.adjustSmartRatio('mastered', -5)
+	assert.equal(JSON.stringify(settings.smartPractice.custom), ratiosBeforeMasteredAdjustment)
+	await settings.persistPreferences({ nightMode: true })
+	assert.equal(settings.smartPractice.custom.wrong, 25)
 	assert.deepEqual(JSON.parse(JSON.stringify(navigationColors.slice(-1)[0])), {
 		frontColor: '#ffffff',
 		backgroundColor: '#171c22'
@@ -1070,6 +1327,33 @@ async function run() {
 	const settingsPageSource = fs.readFileSync(path.resolve(__dirname, '../practice-pages/answer-settings/answer-settings.vue'), 'utf8')
 	assert.match(settingsPageSource, /unit-id="adunit-a5cd0c36c24ffd76"/)
 	assert.match(settingsPageSource, /v-if="showAds"/)
+	assert.match(settingsPageSource, /class="mode-segments"/)
+	assert.match(settingsPageSource, /class="strategy-segments"/)
+	assert.match(settingsPageSource, /class="section-heading smart-heading"/)
+	assert.match(settingsPageSource, /class="smart-question-count-control"/)
+	assert.doesNotMatch(settingsPageSource, />每组题量</)
+	assert.match(settingsPageSource, /PREFERENCES_SYNC_DEBOUNCE_MS = 800/)
+	assert.match(settingsPageSource, /updatePracticePreferences\(next, \{ deferSync: true \}\)/)
+	assert.match(settingsPageSource, /onHide\(\)[\s\S]*flushPendingPreferences\(\{ notify: false \}\)/)
+	assert.match(settingsPageSource, /onUnload\(\)[\s\S]*flushPendingPreferences\(\{ notify: false \}\)/)
+	assert.match(settingsPageSource, /smartPractice\.questionCount <= smartQuestionCountMin/)
+	assert.match(settingsPageSource, /smartPractice\.questionCount >= smartQuestionCountMax/)
+	assert.match(settingsPageSource, />预计组成</)
+	assert.match(settingsPageSource, /未答\{\{ smartQuotas\.fresh \}\}题/)
+	assert.doesNotMatch(settingsPageSource, /ratio-summary-item|ratio-summary-name|class="ratio-summary-value"|某类题目不足时自动补充其他类型/)
+	assert.doesNotMatch(settingsPageSource, /自动优先|strategy === 'auto'|strategy !== 'auto'/)
+	assert.match(settingsPageSource, /v-for="item in smartCategories"/)
+	assert.match(settingsPageSource, /item\.key === 'mastered'/)
+	assert.doesNotMatch(settingsPageSource, /mastered-result|已答对题自动补足/)
+	assert.doesNotMatch(settingsPageSource, /class="smart-options"/)
+	assert.match(settingsPageSource, /class="settings-section other-section"/)
+	assert.ok(
+		settingsPageSource.indexOf('class="settings-ad-container"')
+			> settingsPageSource.indexOf('class="settings-section other-section"'),
+		'答题设置广告应位于页面最后一个设置区块之后'
+	)
+	assert.match(settingsPageSource, /\.settings-ad-container \{[^}]*display: block;[^}]*width: 100%;[^}]*\}/)
+	assert.doesNotMatch(settingsPageSource, /\.settings-ad-container \{[^}]*overflow:\s*hidden/)
 	const searchComponent = loadComponent(
 		environment,
 		'../practice-pages/question-search/question-search.vue'
@@ -1085,6 +1369,24 @@ async function run() {
 		entitlements: { adFree: false }
 	}
 	assert.equal(searchComponent.computed.showAds.call(searchPage), true)
+	searchPage.subjectId = 'junior-personal-finance'
+	searchPage.keyword = '现金流量'
+	searchPage.answerMode = 'exam'
+	searchPage.examProgress = {
+		mode: 'search',
+		scopeKey: 'search|现金流量',
+		roundId: 'exam-round-search-one',
+		answered: 1,
+		total: 5,
+		initialQuestionId: 'search-one',
+		positionQuestionId: 'search-two',
+		hasProgress: true
+	}
+	searchPage.startQuestion('search-one')
+	const searchContinueSheet = actionSheetOptions.slice(-1)[0]
+	searchContinueSheet.success({ tapIndex: 1 })
+	searchContinueSheet.complete()
+	assert.match(navigationUrls.slice(-1)[0], /mode=search.*examAction=continue$/)
 	const searchPageSource = fs.readFileSync(path.resolve(__dirname, '../practice-pages/question-search/question-search.vue'), 'utf8')
 	assert.match(searchPageSource, /unit-id="adunit-482241fd0b438f17"/)
 	assert.match(searchPageSource, /v-if="showAds"/)

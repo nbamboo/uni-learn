@@ -77,6 +77,25 @@ console.log(result.data)
 - `search`：必须传 `keyword`，返回完整题目。
 - `smart`：非会员智能练习入口；客户端传入本机的已答和错题 ID，仅用于本次候选排序且不写入云数据库。服务端最多抽取 100 个随机候选题号。会员使用 `questionBankUser.getSmartPractice` 读取云端状态。
 
+智能练习可传入可选 `smartPractice` 配置：
+
+```js
+smartPractice: {
+	strategy: 'balanced', // fresh / balanced / wrong / custom
+	questionCount: 20, // 10～50，必须为 5 的整数倍
+	custom: { fresh: 60, wrong: 30, mastered: 10 }
+}
+```
+
+缺省使用 `fresh`（新题优先）和每组 20 题。传入 `smartPractice` 时必须包含 `questionCount`。
+预设 `fresh`、`balanced`、`wrong` 分别为 80/20/0、60/30/10、20/70/10；
+`custom` 使用自定义比例，每项为 0～100 的 5 的整数倍，合计 100。
+固定比例在现有候选内按最大余数法分配题数，类别不足按未答题→错题→已答对题补位（包括 0% 类别），
+去重并混合打乱，不扩大查询范围。客户端缓存键包含配置，下一组练习生效。
+
+`smart-practice.js` 随云函数一起部署，与客户端和会员云函数的同名模块保持一致；
+`node scripts/test-smart-practice.js` 检查三份代码一致性及组题规则。
+
 普通分页响应包含 `total`、`nextCursor`、`hasMore` 和 `items`；只有首屏执行 `count()` 并返回精确 `total`，后续页的 `total` 为 `null`。当前试点版本会在完整题目中返回
 `answer` 与 `explanation`，后续切换服务端判题时可从练习响应中移除这两个字段。
 

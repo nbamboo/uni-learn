@@ -315,6 +315,22 @@ async function run() {
 	assert.ok(smartPage.stateCounts.fresh + smartPage.stateCounts.mastered <= 100)
 	assert.equal(smartPage.items.length, 10)
 	assert.ok(smartPage.items.some(item => wrongQuestionIds.indexOf(item.id) > -1))
+	const ratioPage = await service.execute({ action: 'getPracticePage', subjectId, mode: 'smart',
+		pageSize: 10, seed: 'fixed-test-seed', answeredQuestionIds, wrongQuestionIds,
+		smartPractice: { strategy: 'custom', questionCount: 20, custom: { fresh: 0, wrong: 50, mastered: 50 } } })
+	assert.equal(ratioPage.items.length, 10)
+	assert.equal(ratioPage.stateCounts.sampled, 100)
+	assert.equal(ratioPage.items.filter(item => wrongQuestionIds.includes(item.id)).length, 5)
+	assert.equal(new Set(ratioPage.items.map(item => item.id)).size, 10)
+	await assert.rejects(service.execute({ action: 'getPracticePage', subjectId, mode: 'smart',
+		smartPractice: { strategy: 'custom', questionCount: 20, custom: { fresh: 60, wrong: 40, mastered: 10 } } }),
+		error => error.errCode === 'QUESTION_BANK_INVALID_ARGUMENT')
+	await assert.rejects(service.execute({ action: 'getPracticePage', subjectId, mode: 'smart',
+		smartPractice: { strategy: 'auto', questionCount: 20, custom: { fresh: 60, wrong: 30, mastered: 10 } } }),
+		error => error.errCode === 'QUESTION_BANK_INVALID_ARGUMENT')
+	await assert.rejects(service.execute({ action: 'getPracticePage', subjectId, mode: 'smart',
+		smartPractice: { strategy: 'fresh', questionCount: 12, custom: { fresh: 60, wrong: 30, mastered: 10 } } }),
+		error => error.errCode === 'QUESTION_BANK_INVALID_ARGUMENT')
 
 	await assert.rejects(
 		service.execute({ action: 'getPracticePage', subjectId, pageSize: 51 }),

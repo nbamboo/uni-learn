@@ -7,6 +7,7 @@ const vm = require('node:vm')
 
 function loadService(environment) {
 	const servicePath = path.resolve(__dirname, '../services/user-practice.js')
+	environment.require = require('node:module').createRequire(servicePath)
 	let source = fs.readFileSync(servicePath, 'utf8')
 	source = source
 		.replace(/export default \{[\s\S]*?\}\s*$/, '')
@@ -14,16 +15,23 @@ function loadService(environment) {
 	source += `\n;globalThis.__service = {
 		createPracticeEventId,
 		clearCurrentSubjectPracticeData,
+		completeExamDraft,
+		examDraftHasProgress,
 		ensurePracticeUser,
 		flushPracticeEvents,
 		getChapterPracticePosition,
 		getCachedPracticeSummary,
+		getExamDraft,
+		getExamDraftScope,
+		getExamDraftSummaries,
 		getKnowledgeScopeKey,
 		getKnowledgePracticePosition,
 		getSectionScopeKey,
 		getSectionPracticePosition,
 		getLocalPracticeRound,
 		getLocalPracticeRoundSnapshot,
+		getLocalExamDraft,
+		getLocalExamDraftSummaries,
 		getLocalPracticePreferences,
 		getPracticeProgress,
 		getPracticePreferences,
@@ -40,8 +48,13 @@ function loadService(environment) {
 		practiceCloudSyncEnabled,
 		queuePracticeAnswer,
 		queuePracticeFavorite,
+		reconcileExamDraft,
+		resetExamDraft,
 		resetPracticeRound,
+		saveExamDraftAnswer,
+		saveExamDraftPosition,
 		savePracticeProgress,
+		startExamDraft,
 		updatePracticePreferences
 	}`
 	vm.createContext(environment)
@@ -210,6 +223,7 @@ async function testPreferenceOfflineRetry() {
 						data: {
 							answerMode: request.data.answerMode,
 							nightMode: request.data.nightMode,
+							smartPractice: request.data.smartPractice,
 							updatedAt: Date.now()
 						}
 					}
@@ -235,13 +249,15 @@ async function testPreferenceOfflineRetry() {
 	const service = loadService(environment)
 	await assert.rejects(service.updatePracticePreferences({
 		answerMode: 'exam',
-		nightMode: true
+		nightMode: true,
+		smartPractice: { strategy: 'wrong', questionCount: 20, custom: { fresh: 60, wrong: 30, mastered: 10 } }
 	}))
 	assert.equal(service.getLocalPracticePreferences().answerMode, 'exam')
 	assert.equal(service.getLocalPracticePreferences()._syncPending, true)
 	const retried = await service.getPracticePreferences()
 	assert.equal(retried.answerMode, 'exam')
 	assert.equal(retried.nightMode, true)
+	assert.equal(retried.smartPractice.strategy, 'wrong')
 	assert.equal(retried._syncPending, false)
 	assert.equal(cloudCalls, 2)
 }
@@ -603,12 +619,114 @@ async function testNonMemberLocalOnly() {
 		restartedService.getKnowledgePracticePosition(subjectId, '3', '旧版同名知识点'),
 		null
 	)
+	const chapterExam = restartedService.startExamDraft({
+		subjectId,
+		mode: 'chapter',
+		chapterId: '1',
+		questionVersion: '2026-09-12',
+		questionIds: ['exam-question-1', 'exam-question-2'],
+		initialQuestionId: 'exam-question-1',
+		roundId: 'exam-round-local-one',
+		eventId: 'exam-start-local-one'
+	})
+	const sectionExam = restartedService.startExamDraft({
+		subjectId,
+		mode: 'section',
+		chapterId: '1',
+		section: question.section,
+		questionIds: ['exam-question-1'],
+		initialQuestionId: 'exam-question-1',
+		roundId: 'exam-round-local-two',
+		eventId: 'exam-start-local-two'
+	})
+	assert.notEqual(chapterExam.scopeKey, sectionExam.scopeKey)
+	assert.equal(restartedService.examDraftHasProgress(chapterExam), false)
+	const answeredExam = restartedService.saveExamDraftAnswer({
+		subjectId,
+		mode: 'chapter',
+		chapterId: '1',
+		roundId: chapterExam.roundId,
+		questionId: 'exam-question-1',
+		selected: ['A'],
+		positionQuestionId: 'exam-question-1',
+		eventId: 'exam-answer-local-one'
+	})
+	assert.equal(restartedService.examDraftHasProgress(answeredExam), true)
+	const clearedExamAnswer = restartedService.saveExamDraftAnswer({
+		subjectId,
+		mode: 'chapter',
+		chapterId: '1',
+		roundId: chapterExam.roundId,
+		questionId: 'exam-question-1',
+		selected: [],
+		positionQuestionId: 'exam-question-1',
+		eventId: 'exam-answer-local-clear'
+	})
+	assert.equal(Object.keys(clearedExamAnswer.answers).length, 0)
+	restartedService.saveExamDraftAnswer({
+		subjectId,
+		mode: 'chapter',
+		chapterId: '1',
+		roundId: chapterExam.roundId,
+		questionId: 'exam-question-1',
+		selected: ['A'],
+		positionQuestionId: 'exam-question-1',
+		eventId: 'exam-answer-local-restored'
+	})
+	restartedService.saveExamDraftPosition({
+		subjectId,
+		mode: 'chapter',
+		chapterId: '1',
+		roundId: chapterExam.roundId,
+		questionId: 'exam-question-2',
+		eventId: 'exam-position-local-one'
+	})
+	const examSummaries = await restartedService.getExamDraftSummaries(subjectId)
+	assert.equal(examSummaries._localOnly, true)
+	assert.equal(examSummaries.summaries[chapterExam.scopeKey].answered, 1)
+	assert.equal(examSummaries.summaries[chapterExam.scopeKey].total, 2)
+	assert.equal(examSummaries.summaries[chapterExam.scopeKey].positionQuestionId, 'exam-question-2')
+	assert.equal(examSummaries.summaries[sectionExam.scopeKey].answered, 0)
+	const reconciledExam = restartedService.reconcileExamDraft({
+		subjectId,
+		mode: 'chapter',
+		chapterId: '1',
+		roundId: chapterExam.roundId,
+		questionIds: ['exam-question-2'],
+		eventId: 'exam-reconcile-local-one'
+	})
+	assert.deepEqual(Array.from(reconciledExam.questionIds), ['exam-question-2'])
+	assert.equal(Object.keys(reconciledExam.answers).length, 0)
+	restartedService.completeExamDraft({
+		subjectId,
+		mode: 'section',
+		chapterId: '1',
+		section: question.section,
+		roundId: sectionExam.roundId,
+		eventId: 'exam-complete-local-one'
+	})
+	const queuedSectionExamEvents = storage.get(`uni-learn-practice-cloud-outbox-v1:${user.uid}`).events
+		.filter(event => event.roundId === sectionExam.roundId)
+	assert.deepEqual(Array.from(queuedSectionExamEvents.map(event => event.type)), ['examStart', 'examComplete'])
+	assert.equal(await restartedService.getExamDraft({
+		subjectId,
+		mode: 'section',
+		chapterId: '1',
+		section: question.section
+	}), null)
+	assert.equal(restartedService.getExamDraftScope({ subjectId, mode: 'smart' }), null)
+	assert.equal(restartedService.getExamDraftScope({
+		subjectId,
+		mode: 'search',
+		keyword: '  Cash   FLOW  '
+	}).scopeKey, 'search|cash flow')
 	user.uid = 'other-non-member'
 	assert.equal(restartedService.getKnowledgePracticePosition(subjectId, question.chapterId, question.knowledge), null)
 	user.uid = 'member-expired-user'
 	const cleared = await service.clearCurrentSubjectPracticeData(subjectId)
 	assert.equal(cleared.localOnly, true)
 	assert.equal(storage.has(`uni-learn-practice-rounds-v1:${user.uid}`), false)
+	assert.equal(storage.has(`uni-learn-exam-drafts-v1:${user.uid}`), false)
 	assert.equal(cloudCalls, 0)
 }
 
@@ -890,6 +1008,7 @@ async function run() {
 					cloudPreferences = {
 						answerMode: request.data.answerMode,
 						nightMode: request.data.nightMode,
+						smartPractice: request.data.smartPractice,
 						updatedAt: Date.now()
 					}
 					return { result: { errCode: 0, data: Object.assign({}, cloudPreferences) } }
@@ -1033,11 +1152,12 @@ async function run() {
 	const service = loadService(environment)
 	assert.deepEqual(
 		JSON.parse(JSON.stringify(service.getLocalPracticePreferences())),
-		{ answerMode: 'practice', nightMode: false, updatedAt: 0, _syncPending: false }
+		{ answerMode: 'practice', nightMode: false, smartPractice: require('../services/smart-practice.js').defaultSmartPractice(), updatedAt: 0, _syncPending: false }
 	)
 	const savedPreferences = await service.updatePracticePreferences({
 		answerMode: 'review',
-		nightMode: true
+		nightMode: true,
+		smartPractice: { strategy: 'balanced', questionCount: 35, custom: { fresh: 25, wrong: 65, mastered: 10 } }
 	})
 	assert.equal(savedPreferences.answerMode, 'review')
 	assert.equal(savedPreferences.nightMode, true)
@@ -1045,12 +1165,32 @@ async function run() {
 	user.uid = 'user-two'
 	assert.equal(service.getLocalPracticePreferences().answerMode, 'practice')
 	assert.equal(service.getLocalPracticePreferences().nightMode, false)
+	assert.equal(service.getLocalPracticePreferences().smartPractice.strategy, 'fresh')
+	const callsBeforeLocalRatios = calls.length
+	await service.updatePracticePreferences({ smartPractice: { strategy: 'custom', questionCount: 25, custom: { fresh: 0, wrong: 100, mastered: 0 } } })
+	assert.equal(calls.length, callsBeforeLocalRatios)
+	assert.equal(service.getLocalPracticePreferences().smartPractice.custom.wrong, 100)
 	user.uid = 'user-one'
 	const cloudSavedPreferences = await service.getPracticePreferences()
 	assert.equal(cloudSavedPreferences.answerMode, 'review')
 	assert.equal(cloudSavedPreferences.nightMode, true)
+	assert.equal(cloudSavedPreferences.smartPractice.strategy, 'balanced')
+	assert.equal(cloudSavedPreferences.smartPractice.questionCount, 35)
+	assert.equal(cloudSavedPreferences.smartPractice.custom.wrong, 65)
 	assert.equal(calls.filter(item => item.data.action === 'updatePreferences').length, 1)
 	assert.equal(calls.filter(item => item.data.action === 'getPreferences').length, 1)
+	const callsBeforeDeferredPreference = calls.length
+	const deferredPreference = await service.updatePracticePreferences({
+		smartPractice: { strategy: 'fresh', questionCount: 40, custom: { fresh: 60, wrong: 30, mastered: 10 } }
+	}, { deferSync: true })
+	assert.equal(calls.length, callsBeforeDeferredPreference)
+	assert.equal(deferredPreference._syncPending, true)
+	assert.equal(service.getLocalPracticePreferences().smartPractice.questionCount, 40)
+	assert.equal(service.getLocalPracticePreferences()._syncPending, true)
+	const flushedPreference = await service.getPracticePreferences()
+	assert.equal(flushedPreference.smartPractice.questionCount, 40)
+	assert.equal(flushedPreference._syncPending, false)
+	assert.equal(calls.filter(item => item.data.action === 'updatePreferences').length, 2)
 	const question = {
 		id: 'ipf-1',
 		subjectId: 'junior-personal-finance',
@@ -1203,6 +1343,15 @@ async function run() {
 	await service.getSmartPracticeQuestions({ subjectId: question.subjectId, pageSize: 20 })
 	await service.getSmartPracticeQuestions({ subjectId: question.subjectId, pageSize: 20 })
 	assert.equal(calls.filter(item => item.data.action === 'getSmartPractice').length, 1)
+	const preferenceReadsBeforeRatios = calls.filter(item => item.data.action === 'getPreferences').length
+	await service.updatePracticePreferences({ smartPractice: { strategy: 'wrong', questionCount: 30, custom: { fresh: 25, wrong: 65, mastered: 10 } } })
+	await service.getSmartPracticeQuestions({ subjectId: question.subjectId })
+	await service.getSmartPracticeQuestions({ subjectId: question.subjectId })
+	const smartCalls = calls.filter(item => item.data.action === 'getSmartPractice')
+	assert.equal(smartCalls.length, 2)
+	assert.equal(smartCalls[1].data.smartPractice.strategy, 'wrong')
+	assert.equal(smartCalls[1].data.pageSize, 30)
+	assert.equal(calls.filter(item => item.data.action === 'getPreferences').length, preferenceReadsBeforeRatios)
 	const profile = await service.getPracticeUserProfile()
 	const cachedProfile = await service.getPracticeUserProfile()
 	assert.equal(profile.nickname, '理财学员')

@@ -17,7 +17,8 @@
 				<text class="summary-value">{{ total }}</text>
 				<text class="summary-label">{{ activeTab.unit }}</text>
 			</view>
-			<button v-if="records.length" @tap="startAll">开始练习</button>
+			<text class="exam-progress-copy" v-if="answerMode === 'exam' && examProgress.hasProgress">测试进度 {{ examProgress.answered }}/{{ examProgress.total }}</text>
+			<button v-if="records.length" @tap="startAll">{{ answerMode === 'exam' ? '开始测试' : '开始练习' }}</button>
 		</view>
 
 		<view class="loading-state" v-if="loading">
@@ -74,8 +75,12 @@
 	import { getSubjectById } from '@/data/practice.js'
 	import { getQuestionsByIds } from '@/services/question-bank.js'
 	import {
+		examDraftHasProgress,
+		getExamDraftScope,
+		getExamDraftSummaries,
 		getLocalPracticePreferences,
-		getPracticeRecords
+		getPracticeRecords,
+		resetExamDraft
 	} from '@/services/user-practice.js'
 
 	function formatRecordTime(timestamp) {
@@ -98,6 +103,9 @@
 				loadingMore: false,
 				loadError: '',
 				requestId: 0,
+				answerMode: localPreferences.answerMode,
+				examProgress: {},
+				entryActionPending: false,
 				nightMode: Boolean(localPreferences.nightMode),
 				tabs: [
 					{ key: 'wrong', label: '错题集', unit: '道题待巩固', icon: 'refresh', emptyTitle: '暂时没有错题', emptyCaption: '继续保持，答错的题目会自动加入这里。' },
@@ -119,9 +127,12 @@
 			this.applyNavigationTheme()
 		},
 		onShow() {
-			this.nightMode = Boolean(getLocalPracticePreferences().nightMode)
+			const preferences = getLocalPracticePreferences()
+			this.nightMode = Boolean(preferences.nightMode)
+			this.answerMode = preferences.answerMode
 			this.applyNavigationTheme()
 			this.loadRecords()
+			this.refreshExamProgress()
 		},
 		methods: {
 			applyNavigationTheme() {
@@ -133,6 +144,7 @@
 			switchView(view) {
 				this.activeView = view
 				this.loadRecords(true)
+				this.refreshExamProgress()
 			},
 			async loadRecords(reset, forceRefresh) {
 				const shouldReset = reset !== false
@@ -194,11 +206,51 @@
 			retryLoad() {
 				this.loadRecords(true, true)
 			},
+			async refreshExamProgress() {
+				if (this.answerMode !== 'exam') {
+					this.examProgress = {}
+					return
+				}
+				const scope = getExamDraftScope({ subjectId: this.subjectId, mode: this.activeView })
+				const result = await getExamDraftSummaries(this.subjectId)
+				this.examProgress = scope && result && result.summaries
+					? result.summaries[scope.scopeKey] || {}
+					: {}
+			},
+			openTest(startId) {
+				let url = `/practice-pages/practice/practice?subjectId=${this.subjectId}&mode=${this.activeView}`
+				if (startId) url += `&startId=${encodeURIComponent(startId)}`
+				if (this.answerMode !== 'exam') {
+					uni.navigateTo({ url })
+					return
+				}
+				if (this.entryActionPending) return
+				const scope = getExamDraftScope({ subjectId: this.subjectId, mode: this.activeView })
+				const summary = this.examProgress
+				const navigate = action => uni.navigateTo({ url: `${url}&examAction=${action}` })
+				if (!examDraftHasProgress(summary)) {
+					navigate('restart')
+					return
+				}
+				this.entryActionPending = true
+				uni.showActionSheet({
+					itemList: ['重新做题', '继续做题'],
+					success: result => {
+						if (result.tapIndex === 0) {
+							resetExamDraft(Object.assign({}, scope, { roundId: summary.roundId }))
+							navigate('restart')
+						} else if (result.tapIndex === 1) {
+							navigate('continue')
+						}
+					},
+					complete: () => { this.entryActionPending = false }
+				})
+			},
 			startAll() {
-				uni.navigateTo({ url: `/practice-pages/practice/practice?subjectId=${this.subjectId}&mode=${this.activeView}` })
+				this.openTest('')
 			},
 			startFrom(questionId) {
-				uni.navigateTo({ url: `/practice-pages/practice/practice?subjectId=${this.subjectId}&mode=${this.activeView}&startId=${questionId}` })
+				this.openTest(questionId)
 			},
 			goPractice() {
 				uni.navigateTo({ url: `/practice-pages/practice/practice?subjectId=${this.subjectId}&mode=smart` })
@@ -218,6 +270,7 @@
 	.record-tab { display: flex; align-items: center; justify-content: center; flex: 1; border-radius: 10rpx; color: #68707a; font-size: 26rpx; transition: color 0.16s ease, background-color 0.16s ease; }
 	.record-tab.active { background: #ffffff; color: #008cff; font-weight: 600; box-shadow: 0 2rpx 8rpx rgba(35, 54, 72, 0.08); }
 	.records-summary { display: flex; align-items: center; justify-content: space-between; min-height: 112rpx; margin: 18rpx 24rpx 0; padding: 22rpx 24rpx; border: 1rpx solid #e0edf7; border-radius: 14rpx; box-sizing: border-box; background: #ffffff; box-shadow: 0 4rpx 14rpx rgba(29, 47, 63, 0.035); }
+	.exam-progress-copy { margin-left: auto; margin-right: 18rpx; color: #008cff; font-size: 22rpx; }
 	.summary-count { display: flex; align-items: baseline; min-width: 0; }
 	.summary-value { color: #008cff; font-size: 42rpx; font-weight: 700; line-height: 1; }
 	.summary-label { margin-left: 10rpx; color: #68717c; font-size: 23rpx; }

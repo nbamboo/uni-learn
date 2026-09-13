@@ -7,6 +7,7 @@ const vm = require('node:vm')
 
 function loadService(sandbox) {
 	const servicePath = path.resolve(__dirname, '../services/question-bank.js')
+	sandbox.require = require('node:module').createRequire(servicePath)
 	let source = fs.readFileSync(servicePath, 'utf8')
 	source = source
 		.replace(/export default questionBankService\s*$/, '')
@@ -303,6 +304,24 @@ async function testPersistentChapterCache() {
 	}, { versionFromResponse: true })
 	assert.equal(localSmart.items.length, 2)
 	assert.equal(localSmart._localOnly, true)
+	const ratioRequest = { subjectId, mode: 'smart', pageSize: 1,
+		answeredQuestionIds: ['ipf-1', 'ipf-2'], wrongQuestionIds: ['ipf-2'],
+		smartPractice: { strategy: 'custom', questionCount: 20, custom: { fresh: 0, wrong: 100, mastered: 0 } } }
+	const wrongOnly = await reuseService.getPracticePage(ratioRequest, { versionFromResponse: true })
+	assert.deepEqual(Array.from(wrongOnly.items, item => item.id), ['ipf-2'])
+	ratioRequest.smartPractice.custom = { fresh: 0, wrong: 0, mastered: 100 }
+	const correctOnly = await reuseService.getPracticePage(ratioRequest, { versionFromResponse: true })
+	assert.deepEqual(Array.from(correctOnly.items, item => item.id), ['ipf-1'])
+	assert.deepEqual(Array.from(wrongOnly.items, item => item.id), ['ipf-2'])
+	await assert.rejects(reuseService.getPracticePage(Object.assign({}, ratioRequest, {
+		smartPractice: { strategy: 'custom', questionCount: 20, custom: { fresh: 60, wrong: 40, mastered: 10 } }
+	})), error => error.errCode === 'QUESTION_BANK_INVALID_ARGUMENT')
+	await assert.rejects(reuseService.getPracticePage(Object.assign({}, ratioRequest, {
+		smartPractice: { strategy: 'auto', questionCount: 20, custom: { fresh: 60, wrong: 30, mastered: 10 } }
+	})), error => error.errCode === 'QUESTION_BANK_INVALID_ARGUMENT')
+	await assert.rejects(reuseService.getPracticePage(Object.assign({}, ratioRequest, {
+		smartPractice: { strategy: 'fresh', questionCount: 12, custom: { fresh: 60, wrong: 30, mastered: 10 } }
+	})), error => error.errCode === 'QUESTION_BANK_INVALID_ARGUMENT')
 	const localSearch = await reuseService.searchQuestionBank({
 		subjectId,
 		keyword: '题目一',

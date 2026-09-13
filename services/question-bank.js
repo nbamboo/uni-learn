@@ -1,3 +1,4 @@
+const { validateSmartPractice, selectSmartPracticeIds } = require('./smart-practice.js')
 const CLOUD_FUNCTION_NAME = 'questionBank'
 const CATALOG_STORAGE_KEY = 'uni-learn-question-bank-catalog-cache-v1'
 const CHAPTER_CACHE_INDEX_KEY = 'uni-learn-question-bank-chapter-cache-index-v1'
@@ -14,7 +15,7 @@ const MAX_PERSISTED_CHAPTER_ENTRIES = 64
 const MAX_PERSISTED_CHAPTER_BYTES = 6 * 1024 * 1024
 const MAX_PAGE_SIZE = 50
 const MAX_BATCH_SIZE = 100
-const MAX_QUESTION_IDS = 2000
+const MAX_QUESTION_IDS = 5000
 const MAX_PRACTICE_PAGES = 100
 const DEFAULT_RETRY_COUNT = 1
 const RETRY_DELAY = 120
@@ -703,17 +704,6 @@ function createRandom(seed) {
 	}
 }
 
-function shuffle(list, random) {
-	const result = list.slice()
-	for (let index = result.length - 1; index > 0; index -= 1) {
-		const target = Math.floor(random() * (index + 1))
-		const current = result[index]
-		result[index] = result[target]
-		result[target] = current
-	}
-	return result
-}
-
 function buildLocalSmartPage(catalog, items, payload) {
 	const answered = new Set(payload.answeredQuestionIds || [])
 	const wrong = new Set(payload.wrongQuestionIds || [])
@@ -727,9 +717,13 @@ function buildLocalSmartPage(catalog, items, payload) {
 	const seed = payload.seed
 		|| `${catalog.subjectId}:${catalog.activeVersion}:${new Date().toISOString().slice(0, 10)}`
 	const random = createRandom(hashSeed(seed))
-	const selected = shuffle(groups.fresh, random)
-		.concat(shuffle(groups.wrong, random), shuffle(groups.mastered, random))
-		.slice(0, payload.pageSize)
+	const byId = new Map(items.map(item => [item.questionId || item.id, item]))
+	const ids = selectSmartPracticeIds({
+		fresh: groups.fresh.map(item => item.questionId || item.id),
+		wrong: groups.wrong.map(item => item.questionId || item.id),
+		mastered: groups.mastered.map(item => item.questionId || item.id)
+	}, payload.pageSize, payload.smartPractice, random)
+	const selected = ids.map(id => byId.get(id))
 	return {
 		subjectId: catalog.subjectId,
 		version: catalog.activeVersion,
@@ -935,6 +929,11 @@ function buildPracticePayload(input, subjectId, mode) {
 		})
 	}
 	if (mode === 'smart') {
+		try {
+			payload.smartPractice = validateSmartPractice(input.smartPractice)
+		} catch (error) {
+			throw new QuestionBankServiceError('QUESTION_BANK_INVALID_ARGUMENT', error.message)
+		}
 		payload.answeredQuestionIds = normalizeQuestionIds(
 			input.answeredQuestionIds,
 			'answeredQuestionIds',

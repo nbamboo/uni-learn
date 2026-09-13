@@ -1,3 +1,4 @@
+const { normalizeSmartPractice, validateSmartPractice } = require('./smart-practice.js')
 const CLOUD_FUNCTION_NAME = 'questionBankUser'
 const OUTBOX_STORAGE_KEY = 'uni-learn-practice-cloud-outbox-v1'
 const PROGRESS_STORAGE_KEY = 'uni-learn-practice-cloud-progress-v1'
@@ -5,6 +6,7 @@ const CHAPTER_POSITION_STORAGE_KEY = 'uni-learn-practice-chapter-position-v1'
 const SECTION_POSITION_STORAGE_KEY = 'uni-learn-practice-section-position-v1'
 const KNOWLEDGE_POSITION_STORAGE_KEY = 'uni-learn-practice-knowledge-position-v1'
 const PRACTICE_ROUNDS_STORAGE_KEY = 'uni-learn-practice-rounds-v1'
+const EXAM_DRAFTS_STORAGE_KEY = 'uni-learn-exam-drafts-v1'
 const PREFERENCES_STORAGE_KEY = 'uni-learn-practice-preferences-v1'
 const PRACTICE_STATE_STORAGE_KEY = 'uni-learn-practice-state-v1'
 const SUMMARY_STORAGE_KEY = 'uni-learn-practice-summary-v1'
@@ -25,6 +27,8 @@ const SYNC_DELAY = 15 * 1000
 const RETRY_DELAY = 180
 const ANSWER_MODES = ['exam', 'practice', 'review']
 const PRACTICE_ENTRY_MODES = ['smart', 'chapter', 'section', 'knowledge', 'wrong', 'favorite', 'search', 'sequence']
+const EXAM_DRAFT_MODES = ['chapter', 'section', 'knowledge', 'wrong', 'favorite', 'search', 'sequence']
+const MAX_EXAM_DRAFT_QUESTIONS = 5000
 const MAX_PERSISTED_SUMMARIES = 20
 
 const snapshotCache = new Map()
@@ -107,6 +111,35 @@ export function getKnowledgeScopeKey(chapterId, knowledge) {
 export function getSectionScopeKey(chapterId, section) {
 	if (chapterId === undefined || chapterId === null || !String(chapterId) || !section) return ''
 	return `${String(chapterId)}|${String(section)}`
+}
+
+function normalizeExamKeyword(keyword) {
+	return typeof keyword === 'string'
+		? keyword.trim().toLowerCase().replace(/\s+/g, ' ')
+		: ''
+}
+
+export function getExamDraftScope(options) {
+	const input = options || {}
+	const subjectId = typeof input.subjectId === 'string' ? input.subjectId.trim() : ''
+	const mode = EXAM_DRAFT_MODES.indexOf(input.mode) > -1 ? input.mode : ''
+	const chapterId = input.chapterId === undefined || input.chapterId === null
+		? ''
+		: String(input.chapterId).trim()
+	const section = typeof input.section === 'string' ? input.section.trim() : ''
+	const knowledge = typeof input.knowledge === 'string' ? input.knowledge.trim() : ''
+	const keyword = normalizeExamKeyword(input.keyword)
+	if (!subjectId || !mode) return null
+	if (['chapter', 'section', 'knowledge'].indexOf(mode) > -1 && !chapterId) return null
+	if (mode === 'section' && !section) return null
+	if (mode === 'knowledge' && !knowledge) return null
+	if (mode === 'search' && !keyword) return null
+	let scopeKey = mode
+	if (mode === 'chapter') scopeKey += `|${chapterId}`
+	if (mode === 'section') scopeKey += `|${chapterId}|${section}`
+	if (mode === 'knowledge') scopeKey += `|${chapterId}|${knowledge}`
+	if (mode === 'search') scopeKey += `|${keyword}`
+	return { subjectId, mode, scopeKey, chapterId, section, knowledge, keyword }
 }
 
 function readPersistedSummaries() {
@@ -238,6 +271,7 @@ function normalizePracticePreferences(value) {
 			? source.answerMode
 			: 'practice',
 		nightMode: Boolean(source.nightMode),
+		smartPractice: normalizeSmartPractice(source.smartPractice),
 		updatedAt: Number(source.updatedAt) || 0
 	}
 }
@@ -698,6 +732,326 @@ export function getLocalPracticeRoundSnapshot(subjectId) {
 	}
 }
 
+function examDraftStorageKey(scope) {
+	return scope ? `${scope.subjectId}|${scope.scopeKey}` : ''
+}
+
+function normalizeExamDraft(value, fallbackScope) {
+	const source = isObject(value) ? value : {}
+	const scope = getExamDraftScope(Object.assign({}, fallbackScope || {}, source))
+	if (!scope) return null
+	const seen = new Set()
+	const questionIds = (Array.isArray(source.questionIds) ? source.questionIds : [])
+		.filter(questionId => {
+			if (typeof questionId !== 'string' || !questionId || seen.has(questionId)) return false
+			seen.add(questionId)
+			return true
+		})
+		.slice(0, MAX_EXAM_DRAFT_QUESTIONS)
+	const availableIds = new Set(questionIds)
+	const answers = {}
+	const sourceAnswers = Array.isArray(source.answers)
+		? source.answers.reduce((result, answer) => {
+			if (isObject(answer) && answer.questionId) result[answer.questionId] = answer
+			return result
+		}, {})
+		: (isObject(source.answers) ? source.answers : {})
+	Object.keys(sourceAnswers).forEach(questionId => {
+		const answer = sourceAnswers[questionId]
+		if (!availableIds.has(questionId) || !isObject(answer) || !Array.isArray(answer.selected)) return
+		const selected = Array.from(new Set(answer.selected.filter(Boolean)))
+		if (!selected.length) return
+		answers[questionId] = {
+			questionId,
+			selected,
+			updatedAt: Number(answer.updatedAt || answer.answeredAt) || 0
+		}
+	})
+	const initialQuestionId = availableIds.has(source.initialQuestionId)
+		? source.initialQuestionId
+		: (questionIds[0] || '')
+	const firstUnansweredQuestionId = questionIds.find(questionId => !answers[questionId]) || initialQuestionId
+	const positionQuestionId = availableIds.has(source.positionQuestionId)
+		? source.positionQuestionId
+		: firstUnansweredQuestionId
+	return Object.assign({}, scope, {
+		roundId: typeof source.roundId === 'string' ? source.roundId : '',
+		questionVersion: typeof source.questionVersion === 'string' ? source.questionVersion : '',
+		questionIds,
+		answers,
+		initialQuestionId,
+		positionQuestionId,
+		positionAt: Number(source.positionAt) || 0,
+		startedAt: Number(source.startedAt) || 0,
+		updatedAt: Number(source.updatedAt) || 0,
+		active: source.active !== false
+	})
+}
+
+function readExamDrafts() {
+	const saved = getStorage(userScopedStorageKey(EXAM_DRAFTS_STORAGE_KEY))
+	if (!saved || saved.version !== 1 || !isObject(saved.drafts)) return {}
+	const drafts = {}
+	Object.keys(saved.drafts).forEach(key => {
+		const draft = normalizeExamDraft(saved.drafts[key])
+		if (draft && draft.active && draft.roundId && draft.questionIds.length) {
+			drafts[examDraftStorageKey(draft)] = draft
+		}
+	})
+	return drafts
+}
+
+function writeExamDrafts(drafts) {
+	const storageKey = userScopedStorageKey(EXAM_DRAFTS_STORAGE_KEY)
+	if (!Object.keys(drafts).length) {
+		if (removeStorage(storageKey)) return true
+		return setStorage(storageKey, null)
+	}
+	return setStorage(storageKey, { version: 1, drafts })
+}
+
+function saveLocalExamDraft(draft) {
+	const normalized = normalizeExamDraft(draft)
+	if (!normalized) return null
+	const drafts = readExamDrafts()
+	drafts[examDraftStorageKey(normalized)] = normalized
+	writeExamDrafts(drafts)
+	return cloneValue(normalized)
+}
+
+function removeLocalExamDraft(scope) {
+	if (!scope) return false
+	const drafts = readExamDrafts()
+	const key = examDraftStorageKey(scope)
+	if (!drafts[key]) return false
+	delete drafts[key]
+	writeExamDrafts(drafts)
+	return true
+}
+
+export function examDraftHasProgress(draft) {
+	if (!draft || draft.active === false) return false
+	const total = Array.isArray(draft.questionIds) ? draft.questionIds.length : Number(draft.total) || 0
+	if (!total) return false
+	const answered = isObject(draft.answers)
+		? Object.keys(draft.answers).filter(questionId => {
+			const answer = draft.answers[questionId]
+			return answer && Array.isArray(answer.selected) && answer.selected.length
+		}).length
+		: Number(draft.answered) || 0
+	return answered > 0 || Boolean(
+		draft.positionQuestionId
+		&& draft.initialQuestionId
+		&& draft.positionQuestionId !== draft.initialQuestionId
+	)
+}
+
+function toExamDraftSummary(draft) {
+	if (!draft) return null
+	const answers = isObject(draft.answers) ? draft.answers : {}
+	const answered = Object.keys(answers).filter(questionId => (
+		answers[questionId] && Array.isArray(answers[questionId].selected) && answers[questionId].selected.length
+	)).length
+	return {
+		subjectId: draft.subjectId,
+		mode: draft.mode,
+		scopeKey: draft.scopeKey,
+		chapterId: draft.chapterId || '',
+		section: draft.section || '',
+		knowledge: draft.knowledge || '',
+		keyword: draft.keyword || '',
+		roundId: draft.roundId,
+		answered,
+		total: draft.questionIds.length,
+		initialQuestionId: draft.initialQuestionId || draft.questionIds[0] || '',
+		positionQuestionId: draft.positionQuestionId || '',
+		updatedAt: Number(draft.updatedAt) || 0,
+		hasProgress: examDraftHasProgress(draft)
+	}
+}
+
+export function getLocalExamDraft(options) {
+	const scope = getExamDraftScope(options)
+	if (!scope) return null
+	const draft = readExamDrafts()[examDraftStorageKey(scope)]
+	return draft ? cloneValue(draft) : null
+}
+
+export function getLocalExamDraftSummaries(subjectId) {
+	const summaries = {}
+	const drafts = readExamDrafts()
+	Object.keys(drafts).forEach(key => {
+		const draft = drafts[key]
+		if (!draft || draft.subjectId !== subjectId) return
+		const summary = toExamDraftSummary(draft)
+		if (summary) summaries[summary.scopeKey] = summary
+	})
+	return { subjectId, summaries, _localOnly: true }
+}
+
+function examEventScope(draft) {
+	return {
+		subjectId: draft.subjectId,
+		mode: draft.mode,
+		chapterId: draft.chapterId || '',
+		section: draft.section || '',
+		knowledge: draft.knowledge || '',
+		keyword: draft.keyword || '',
+		scopeKey: draft.scopeKey
+	}
+}
+
+export function startExamDraft(options) {
+	const input = options || {}
+	const scope = getExamDraftScope(input)
+	const questionIds = Array.from(new Set((Array.isArray(input.questionIds) ? input.questionIds : [])
+		.filter(questionId => typeof questionId === 'string' && questionId)))
+		.slice(0, MAX_EXAM_DRAFT_QUESTIONS)
+	if (!scope || !questionIds.length) {
+		throw new UserPracticeServiceError('QUESTION_BANK_USER_CLIENT_ERROR', '考试草稿参数无效')
+	}
+	const occurredAt = Number(input.occurredAt) || Date.now()
+	const initialQuestionId = questionIds.indexOf(input.initialQuestionId) > -1
+		? input.initialQuestionId
+		: questionIds[0]
+	const draft = Object.assign({}, scope, {
+		roundId: input.roundId || createPracticeEventId('exam-round'),
+		questionVersion: typeof input.questionVersion === 'string' ? input.questionVersion : '',
+		questionIds,
+		answers: {},
+		initialQuestionId,
+		positionQuestionId: initialQuestionId,
+		positionAt: occurredAt,
+		startedAt: occurredAt,
+		updatedAt: occurredAt,
+		active: true
+	})
+	saveLocalExamDraft(draft)
+	enqueueEvent(Object.assign(examEventScope(draft), {
+		type: 'examStart',
+		eventId: input.eventId || createPracticeEventId('exam-start'),
+		roundId: draft.roundId,
+		questionVersion: draft.questionVersion,
+		questionIds: draft.questionIds.slice(),
+		initialQuestionId,
+		positionQuestionId: initialQuestionId,
+		occurredAt
+	}))
+	return cloneValue(draft)
+}
+
+export function saveExamDraftAnswer(options) {
+	const input = options || {}
+	const draft = getLocalExamDraft(input)
+	const questionId = typeof input.questionId === 'string' ? input.questionId : ''
+	if (!draft || !questionId || draft.questionIds.indexOf(questionId) === -1) return null
+	if (input.roundId && input.roundId !== draft.roundId) return null
+	const selected = Array.from(new Set((Array.isArray(input.selected) ? input.selected : []).filter(Boolean)))
+	const occurredAt = Number(input.occurredAt) || Date.now()
+	if (selected.length) {
+		draft.answers[questionId] = { questionId, selected, updatedAt: occurredAt }
+	} else {
+		delete draft.answers[questionId]
+	}
+	const positionQuestionId = draft.questionIds.indexOf(input.positionQuestionId) > -1
+		? input.positionQuestionId
+		: questionId
+	draft.positionQuestionId = positionQuestionId
+	draft.positionAt = occurredAt
+	draft.updatedAt = occurredAt
+	saveLocalExamDraft(draft)
+	enqueueEvent(Object.assign(examEventScope(draft), {
+		type: 'examAnswer',
+		eventId: input.eventId || createPracticeEventId('exam-answer'),
+		roundId: draft.roundId,
+		questionId,
+		selected,
+		positionQuestionId,
+		occurredAt
+	}))
+	return cloneValue(draft)
+}
+
+export function saveExamDraftPosition(options) {
+	const input = options || {}
+	const draft = getLocalExamDraft(input)
+	const questionId = typeof input.questionId === 'string' ? input.questionId : ''
+	if (!draft || !questionId || draft.questionIds.indexOf(questionId) === -1) return null
+	if (input.roundId && input.roundId !== draft.roundId) return null
+	const occurredAt = Number(input.occurredAt) || Date.now()
+	draft.positionQuestionId = questionId
+	draft.positionAt = occurredAt
+	draft.updatedAt = occurredAt
+	saveLocalExamDraft(draft)
+	enqueueEvent(Object.assign(examEventScope(draft), {
+		type: 'examPosition',
+		eventId: input.eventId || createPracticeEventId('exam-position'),
+		roundId: draft.roundId,
+		questionId,
+		occurredAt
+	}))
+	return cloneValue(draft)
+}
+
+export function reconcileExamDraft(options) {
+	const input = options || {}
+	const draft = getLocalExamDraft(input)
+	if (!draft || input.roundId && input.roundId !== draft.roundId) return null
+	const questionIds = Array.from(new Set((Array.isArray(input.questionIds) ? input.questionIds : [])
+		.filter(questionId => draft.questionIds.indexOf(questionId) > -1)))
+		.slice(0, MAX_EXAM_DRAFT_QUESTIONS)
+	if (!questionIds.length) return null
+	const availableIds = new Set(questionIds)
+	Object.keys(draft.answers).forEach(questionId => {
+		if (!availableIds.has(questionId)) delete draft.answers[questionId]
+	})
+	draft.questionIds = questionIds
+	if (!availableIds.has(draft.initialQuestionId)) draft.initialQuestionId = questionIds[0]
+	if (!availableIds.has(draft.positionQuestionId)) {
+		draft.positionQuestionId = questionIds.find(questionId => !draft.answers[questionId])
+			|| draft.initialQuestionId
+	}
+	const occurredAt = Number(input.occurredAt) || Date.now()
+	draft.updatedAt = occurredAt
+	saveLocalExamDraft(draft)
+	enqueueEvent(Object.assign(examEventScope(draft), {
+		type: 'examReconcile',
+		eventId: input.eventId || createPracticeEventId('exam-reconcile'),
+		roundId: draft.roundId,
+		questionIds: draft.questionIds.slice(),
+		initialQuestionId: draft.initialQuestionId,
+		positionQuestionId: draft.positionQuestionId,
+		occurredAt
+	}))
+	return cloneValue(draft)
+}
+
+function closeExamDraft(options, type) {
+	const input = options || {}
+	const scope = getExamDraftScope(input)
+	if (!scope) return null
+	const draft = getLocalExamDraft(scope)
+	const roundId = input.roundId || draft && draft.roundId
+	if (!roundId) return null
+	const occurredAt = Number(input.occurredAt) || Date.now()
+	removeLocalExamDraft(scope)
+	enqueueEvent(Object.assign(examEventScope(Object.assign({}, scope, { scopeKey: scope.scopeKey })), {
+		type,
+		eventId: input.eventId || createPracticeEventId(type === 'examReset' ? 'exam-reset' : 'exam-complete'),
+		roundId,
+		occurredAt
+	}))
+	return { subjectId: scope.subjectId, scopeKey: scope.scopeKey, roundId, closed: true }
+}
+
+export function resetExamDraft(options) {
+	return closeExamDraft(options, 'examReset')
+}
+
+export function completeExamDraft(options) {
+	return closeExamDraft(options, 'examComplete')
+}
+
 function savePracticePosition(storageKey, positionKey, progress) {
 	const positions = readPracticePositions(storageKey)
 	positions[positionKey] = {
@@ -715,6 +1069,26 @@ function enqueueEvent(event) {
 	const events = readOutbox()
 	const duplicateIndex = events.findIndex(item => item.eventId === event.eventId)
 	if (duplicateIndex > -1) events.splice(duplicateIndex, 1)
+	if (event.type && event.type.indexOf('exam') === 0) {
+		for (let index = events.length - 1; index >= 0; index -= 1) {
+			const pending = events[index]
+			if (!pending.type || pending.type.indexOf('exam') !== 0
+				|| pending.subjectId !== event.subjectId
+				|| pending.scopeKey !== event.scopeKey) continue
+			const replacesScope = event.type === 'examStart'
+			const closesRound = ['examReset', 'examComplete'].indexOf(event.type) > -1
+				&& pending.roundId === event.roundId
+				&& pending.type !== 'examStart'
+			const replacesAnswer = event.type === 'examAnswer'
+				&& pending.type === 'examAnswer'
+				&& pending.roundId === event.roundId
+				&& pending.questionId === event.questionId
+			const replacesPosition = (event.type === 'examPosition' || event.type === 'examAnswer')
+				&& pending.type === 'examPosition'
+				&& pending.roundId === event.roundId
+			if (replacesScope || closesRound || replacesAnswer || replacesPosition) events.splice(index, 1)
+		}
+	}
 	if (event.type === 'favorite') {
 		for (let index = events.length - 1; index >= 0; index -= 1) {
 			const pending = events[index]
@@ -1525,6 +1899,45 @@ export async function getPracticeRound(options) {
 	}
 }
 
+export async function getExamDraft(options) {
+	const scope = getExamDraftScope(options)
+	if (!scope) return null
+	if (!practiceCloudSyncEnabled()) return getLocalExamDraft(scope)
+	try {
+		await flushPracticeEvents({ includeProgress: false })
+		const result = await executeCloudCall('getExamDraft', scope)
+		if (!result || !result.active || !result.roundId || !Array.isArray(result.questionIds)
+			|| !result.questionIds.length) {
+			removeLocalExamDraft(scope)
+			return null
+		}
+		return saveLocalExamDraft(result)
+	} catch (error) {
+		const local = getLocalExamDraft(scope)
+		return local ? Object.assign(local, {
+			_localFallback: true,
+			_syncError: error && (error.errMsg || error.message) || '考试草稿同步失败'
+		}) : null
+	}
+}
+
+export async function getExamDraftSummaries(subjectId) {
+	const normalizedSubjectId = typeof subjectId === 'string' ? subjectId.trim() : ''
+	if (!normalizedSubjectId) {
+		throw new UserPracticeServiceError('QUESTION_BANK_USER_CLIENT_ERROR', '考试科目信息无效')
+	}
+	if (!practiceCloudSyncEnabled()) return getLocalExamDraftSummaries(normalizedSubjectId)
+	try {
+		await flushPracticeEvents({ includeProgress: false })
+		return await executeCloudCall('getExamDraftSummaries', { subjectId: normalizedSubjectId })
+	} catch (error) {
+		return Object.assign(getLocalExamDraftSummaries(normalizedSubjectId), {
+			_localFallback: true,
+			_syncError: error && (error.errMsg || error.message) || '考试进度同步失败'
+		})
+	}
+}
+
 export async function resetPracticeRound(options) {
 	const input = options || {}
 	const subjectId = typeof input.subjectId === 'string' ? input.subjectId.trim() : ''
@@ -1594,9 +2007,11 @@ export async function getSmartPracticeQuestions(options) {
 		)
 	}
 	const subjectId = input.subjectId
-	const pageSize = Number(input.pageSize) || 20
 	const seed = input.seed || ''
-	const cacheKey = `${subjectId}|${pageSize}|${seed}`
+	const smartPractice = validateSmartPractice(input.smartPractice === undefined
+		? getLocalPracticePreferences().smartPractice : input.smartPractice)
+	const pageSize = Number(input.pageSize) || smartPractice.questionCount
+	const cacheKey = `${subjectId}|${pageSize}|${seed}|${JSON.stringify(smartPractice)}`
 	if (!input.forceRefresh && pendingPracticeEventCount() === 0) {
 		const cached = getCached(smartCache, cacheKey)
 		if (cached) return cached
@@ -1605,7 +2020,8 @@ export async function getSmartPracticeQuestions(options) {
 	const result = await executeCloudCall('getSmartPractice', {
 		subjectId,
 		pageSize,
-		seed
+		seed,
+		smartPractice
 	})
 	return setCached(smartCache, cacheKey, result, SMART_CACHE_TTL)
 }
@@ -1680,6 +2096,11 @@ function clearSubjectLocalSyncData(subjectId) {
 		if (rounds[key] && rounds[key].subjectId === subjectId) delete rounds[key]
 	})
 	writePracticeRounds(rounds)
+	const examDrafts = readExamDrafts()
+	Object.keys(examDrafts).forEach(key => {
+		if (examDrafts[key] && examDrafts[key].subjectId === subjectId) delete examDrafts[key]
+	})
+	writeExamDrafts(examDrafts)
 	removePersistedSummary(subjectId)
 	summaryRefreshRequiredKeys.delete(summaryCacheKey(subjectId))
 	invalidateUserPracticeCache(subjectId)
@@ -1783,7 +2204,9 @@ export async function getPracticePreferences(options) {
 	return preferencesRequest
 }
 
-export async function updatePracticePreferences(preferences) {
+export async function updatePracticePreferences(preferences, options) {
+	const config = options || {}
+	if (preferences && preferences.smartPractice !== undefined) validateSmartPractice(preferences.smartPractice)
 	const next = normalizePracticePreferences(Object.assign(
 		{},
 		readPreferencesEntry().preferences,
@@ -1797,6 +2220,9 @@ export async function updatePracticePreferences(preferences) {
 			_syncPending: false,
 			_localOnly: true
 		})
+	}
+	if (config.deferSync) {
+		return Object.assign({}, next, { _syncPending: true })
 	}
 	let result
 	try {
@@ -1825,6 +2251,8 @@ export function pendingPracticeEventCount() {
 
 export default {
 	clearCurrentSubjectPracticeData,
+	completeExamDraft,
+	examDraftHasProgress,
 	ensurePracticeUser,
 	flushPracticeEvents,
 	getChapterPracticePosition,
@@ -1834,6 +2262,9 @@ export default {
 	getSectionPracticePosition,
 	getCurrentPracticeUser,
 	getCachedPracticeSummary,
+	getExamDraft,
+	getExamDraftScope,
+	getExamDraftSummaries,
 	getPracticeProgress,
 	getPracticePreferences,
 	getPracticeRound,
@@ -1845,6 +2276,8 @@ export default {
 	getPracticeSummary,
 	getPracticeUserProfile,
 	getLocalPracticePreferences,
+	getLocalExamDraft,
+	getLocalExamDraftSummaries,
 	markPracticePreferencesRefreshRequired,
 	markPracticeRecordsRefreshRequired,
 	markPracticeSummaryRefreshRequired,
@@ -1853,7 +2286,12 @@ export default {
 	practiceUserLoggedIn,
 	queuePracticeAnswer,
 	queuePracticeFavorite,
+	reconcileExamDraft,
+	resetExamDraft,
 	resetPracticeRound,
+	saveExamDraftAnswer,
+	saveExamDraftPosition,
 	savePracticeProgress,
+	startExamDraft,
 	updatePracticePreferences
 }

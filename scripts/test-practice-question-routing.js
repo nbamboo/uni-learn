@@ -23,10 +23,14 @@ async function run() {
 	let questionBankPageCalls = 0
 	let questionBankAllCalls = 0
 	let lastAllParams = null
+	let expectedSmartPageSize = 35
 	const environment = {
 		DAILY_GOAL: 20,
 		DEFAULT_SUBJECT_ID: 'junior-personal-finance',
 		practiceCloudSyncEnabled: () => member,
+		getLocalPracticePreferences: () => ({ smartPractice: {
+			strategy: 'balanced', questionCount: 35, custom: { fresh: 60, wrong: 30, mastered: 10 }
+		} }),
 		getPracticeState: () => ({
 			answers: {
 				'local-wrong': { subjectId: 'junior-personal-finance', correct: false },
@@ -34,7 +38,9 @@ async function run() {
 				'other-subject': { subjectId: 'junior-law', correct: false }
 			}
 		}),
-		getSmartPracticeQuestions: async () => {
+		getSmartPracticeQuestions: async params => {
+			assert.equal(params.smartPractice.strategy, 'balanced')
+			assert.equal(params.pageSize, expectedSmartPageSize)
 			cloudSmartCalls += 1
 			return { items: [{ id: 'member-smart' }] }
 		},
@@ -47,6 +53,8 @@ async function run() {
 		getPracticePage: async (params, options) => {
 			questionBankPageCalls += 1
 			assert.equal(params.mode, 'smart')
+			assert.equal(params.smartPractice.strategy, 'balanced')
+			assert.equal(params.pageSize, expectedSmartPageSize)
 			assert.deepEqual(Array.from(params.answeredQuestionIds), ['local-wrong', 'local-correct'])
 			assert.deepEqual(Array.from(params.wrongQuestionIds), ['local-wrong'])
 			assert.equal(options.versionFromResponse, true)
@@ -71,13 +79,19 @@ async function run() {
 	const module = loadModule(environment)
 	const localItems = await module.buildPracticeQuestions({
 		subjectId: 'junior-personal-finance',
-		mode: 'smart',
-		limit: 20
+		mode: 'smart'
 	})
 	assert.equal(localItems[0].id, 'local-smart')
 	assert.equal(questionBankPageCalls, 1)
 	assert.equal(questionBankAllCalls, 0)
 	assert.equal(cloudSmartCalls, 0)
+	expectedSmartPageSize = 20
+	await module.buildPracticeQuestions({
+		subjectId: 'junior-personal-finance',
+		mode: 'smart',
+		limit: 20
+	})
+	assert.equal(questionBankPageCalls, 2)
 	await module.buildPracticeQuestions({
 		subjectId: 'junior-personal-finance',
 		mode: 'knowledge',
@@ -98,13 +112,13 @@ async function run() {
 	assert.equal(lastAllParams.section, '第二节 测试小节')
 
 	member = true
+	expectedSmartPageSize = 35
 	const memberItems = await module.buildPracticeQuestions({
 		subjectId: 'junior-personal-finance',
-		mode: 'smart',
-		limit: 20
+		mode: 'smart'
 	})
 	assert.equal(memberItems[0].id, 'member-smart')
-	assert.equal(questionBankPageCalls, 1)
+	assert.equal(questionBankPageCalls, 2)
 	assert.equal(questionBankAllCalls, 2)
 	assert.equal(cloudSmartCalls, 1)
 
