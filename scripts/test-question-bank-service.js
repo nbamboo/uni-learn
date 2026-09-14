@@ -33,6 +33,7 @@ function createEnvironment() {
 	const calls = []
 	let networkFailures = 0
 	let catalogVersion = '2026-08-21'
+	let catalogSchemaVersion = 2
 	const questions = {
 		q1: {
 			id: 'ipf-1',
@@ -42,6 +43,8 @@ function createEnvironment() {
 			chapter: '第一章',
 			section: '第一节',
 			knowledge: '共同知识点',
+			type: 'single',
+			selectionMode: 'single',
 			title: '题目一',
 			options: [{ alias: 'A', text: '选项一' }],
 			answer: ['A'],
@@ -55,6 +58,8 @@ function createEnvironment() {
 			chapter: '第一章',
 			section: '第一节',
 			knowledge: '共同知识点',
+			type: 'judgment',
+			selectionMode: 'single',
 			title: '题目二',
 			options: [{ alias: 'B', text: '选项二' }],
 			answer: ['B'],
@@ -68,6 +73,8 @@ function createEnvironment() {
 			chapter: '第一章',
 			section: '第二节',
 			knowledge: '另一个知识点',
+			type: 'material',
+			selectionMode: 'multiple',
 			title: '题目三',
 			options: [{ alias: 'C', text: '选项三' }],
 			answer: ['C'],
@@ -114,6 +121,7 @@ function createEnvironment() {
 							id: data.subjectId,
 							subjectId: data.subjectId,
 							activeVersion: catalogVersion,
+							questionSchemaVersion: catalogSchemaVersion,
 							questionCount: 3,
 							chapters: [{
 								id: '1',
@@ -138,10 +146,12 @@ function createEnvironment() {
 							items: [{
 								subjectId: 'junior-personal-finance',
 								activeVersion: catalogVersion,
+								questionSchemaVersion: catalogSchemaVersion,
 								questionCount: 3
 							}, {
 								subjectId: 'junior-law',
 								activeVersion: '2026-09-01',
+								questionSchemaVersion: catalogSchemaVersion,
 								questionCount: 1250
 							}]
 						}
@@ -193,7 +203,7 @@ function createEnvironment() {
 							version: catalogVersion,
 							keyword: data.keyword,
 							total: 1,
-							items: [{ id: 'ipf-1', questionId: 'ipf-1', title: '题目一' }]
+							items: [{ id: 'ipf-1', questionId: 'ipf-1', type: 'single', title: '题目一' }]
 						}
 					}
 				}
@@ -205,6 +215,7 @@ function createEnvironment() {
 						errMsg: 'ok',
 						data: {
 							questionId: data.questionId,
+							type: 'single',
 							selected: data.selected,
 							correct: data.selected.join(',') === 'A',
 							answer: ['A'],
@@ -240,11 +251,15 @@ function createEnvironment() {
 		},
 		calls,
 		storage,
+		questions,
 		setNetworkFailures(value) {
 			networkFailures = value
 		},
 		setCatalogVersion(value) {
 			catalogVersion = value
+		},
+		setCatalogSchemaVersion(value) {
+			catalogSchemaVersion = value
 		}
 	}
 }
@@ -433,6 +448,46 @@ async function testPracticePageVersionFromResponse() {
 	)
 }
 
+async function testInvalidPersistentV2CacheFailsFast() {
+	const environment = createEnvironment()
+	const subjectId = 'junior-personal-finance'
+	const service = loadService(environment.sandbox)
+	await service.getAllPracticeQuestions({ subjectId, mode: 'chapter', chapterId: '1' })
+	const index = environment.storage.get('uni-learn-question-bank-chapter-cache-index-v1')
+	const metadata = Object.values(index.entries)[0]
+	const savedChapter = environment.storage.get(metadata.storageKey)
+	delete savedChapter.items[0].selectionMode
+	environment.storage.set(metadata.storageKey, savedChapter)
+	await assert.rejects(
+		reloadService(environment).getAllPracticeQuestions({
+			subjectId,
+			mode: 'chapter',
+			chapterId: '1'
+		}),
+		error => error.errCode === 'QUESTION_BANK_INVALID_QUESTION_SCHEMA'
+	)
+
+	const oldCatalogEnvironment = createEnvironment()
+	oldCatalogEnvironment.storage.set('uni-learn-question-bank-catalog-cache-v1', {
+		version: 1,
+		entries: {
+			[subjectId]: {
+				expiresAt: Date.now() + 60 * 1000,
+				data: {
+					subjectId,
+					activeVersion: 'legacy-v1',
+					questionSchemaVersion: 1
+				}
+			}
+		}
+	})
+	await assert.rejects(
+		loadService(oldCatalogEnvironment.sandbox).getQuestionCatalog(subjectId),
+		error => error.errCode === 'QUESTION_BANK_SCHEMA_VERSION_UNSUPPORTED'
+	)
+	assert.equal(oldCatalogEnvironment.calls.length, 0)
+}
+
 async function run() {
 	const environment = createEnvironment()
 	const service = loadService(environment.sandbox)
@@ -448,11 +503,14 @@ async function run() {
 		service.getQuestionCatalog(subjectId)
 	])
 	assert.equal(catalogs[0].activeVersion, '2026-08-21')
+	assert.equal(catalogs[0].questionSchemaVersion, 2)
 	assert.equal(environment.calls.filter(call => call.data.action === 'getCatalog').length, 1)
 
 	const firstPage = await service.getPracticePage({ subjectId, mode: 'sequence', pageSize: 20 })
 	const cachedPage = await service.getPracticePage({ subjectId, mode: 'sequence', pageSize: 20 })
 	assert.equal(firstPage.items.length, 2)
+	assert.equal(firstPage.items[0].type, 'single')
+	assert.equal(firstPage.items[0].selectionMode, 'single')
 	assert.equal(cachedPage.items.length, 2)
 	assert.equal(environment.calls.filter(call => call.data.action === 'getPracticePage').length, 1)
 
@@ -490,6 +548,7 @@ async function run() {
 		selected: ['A']
 	})
 	assert.equal(answer.correct, true)
+	assert.equal(answer.type, 'single')
 	await service.checkQuestionAnswer({ subjectId, questionId: 'ipf-1', selected: ['A'] })
 	assert.equal(environment.calls.filter(call => call.data.action === 'checkAnswer').length, 1)
 
@@ -512,12 +571,30 @@ async function run() {
 		error => error.errCode === 'QUESTION_BANK_INVALID_ARGUMENT'
 	)
 
+	const oldCatalogEnvironment = createEnvironment()
+	oldCatalogEnvironment.setCatalogSchemaVersion(1)
+	await assert.rejects(
+		loadService(oldCatalogEnvironment.sandbox).getQuestionCatalog(subjectId),
+		error => error.errCode === 'QUESTION_BANK_SCHEMA_VERSION_UNSUPPORTED'
+	)
+	const invalidQuestionEnvironment = createEnvironment()
+	delete invalidQuestionEnvironment.questions.q1.selectionMode
+	await assert.rejects(
+		loadService(invalidQuestionEnvironment.sandbox).getPracticePage({
+			subjectId,
+			mode: 'sequence',
+			pageSize: 20
+		}),
+		error => error.errCode === 'QUESTION_BANK_INVALID_QUESTION_SCHEMA'
+	)
+
 }
 
 async function main() {
 	await run()
 	await testPersistentChapterCache()
 	await testPracticePageVersionFromResponse()
+	await testInvalidPersistentV2CacheFailsFast()
 	console.log('question-bank service tests passed')
 }
 

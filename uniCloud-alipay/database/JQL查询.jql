@@ -3,9 +3,9 @@
 // 可以全部运行，也可以选中部分代码运行。点击工具栏上的运行按钮或者按下【F5】键运行代码
 // 如果文档中存在多条JQL语句，只有最后一条语句生效
 db.collection('question_bank_questions')
-  .where("subjectId == 'middle-personal-finance'")
+  .where("subjectId == 'junior-personal-finance' || subjectId == 'middle-personal-finance'")
   .remove()
 
-db.collection('question_bank_catalogs')
-  .where("status == 1")
-  .remove()
+// db.collection('question_bank_catalogs')
+//   .where("status == 1")
+//   .remove()

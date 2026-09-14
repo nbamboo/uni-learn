@@ -22,6 +22,20 @@ IMAGE_PATTERN = re.compile(r"\[图片:\s*(https?://[^\]]+)\]")
 SUBJECT_ID_PATTERN = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
 QUESTION_ID_PATTERN = SUBJECT_ID_PATTERN
 EMPTY_QUESTION_PATTERN = re.compile(r"\[题目\]\s*$")
+MATERIAL_MARKER = "[材料]"
+QUESTION_SCHEMA_VERSION = 2
+QUESTION_TYPE_NAMES = {
+    1: "single",
+    2: "judgment",
+    3: "multiple",
+    4: "material",
+}
+QUESTION_SELECTION_MODES = {
+    1: "single",
+    2: "single",
+    3: "multiple",
+    4: "multiple",
+}
 SECTION_ORDINAL_PATTERN = re.compile(
     r"^第\s*([0-9一二三四五六七八九十百零〇两]+)\s*(?:节|部分)"
 )
@@ -191,6 +205,90 @@ def clean_text(value):
     return "\n".join(re.sub(r"[ \t]+", " ", line).strip() for line in value.splitlines()).strip()
 
 
+def normalized_answers(row):
+    return [
+        part.strip()
+        for part in (row.get("P", "") or "").replace("，", ",").split(",")
+        if part.strip()
+    ]
+
+
+def parsed_question_type(value):
+    text = clean_text(str(value)) if value is not None else ""
+    if not re.fullmatch(r"[1-4](?:\.0+)?", text):
+        return None
+    return int(float(text))
+
+
+def expected_question_type(row):
+    title = clean_text(row.get("H"))
+    options = [
+        clean_text(row.get(column))
+        for _alias, column in OPTION_COLUMNS
+        if clean_text(row.get(column))
+    ]
+    answers = normalized_answers(row)
+    if MATERIAL_MARKER in title:
+        return 4
+    if len(options) == 2:
+        return 2
+    if len(answers) > 1:
+        return 3
+    if len(answers) == 1:
+        return 1
+    return None
+
+
+def validate_question_types(rows):
+    mismatches = []
+    for row in rows:
+        expected = expected_question_type(row)
+        if expected is None:
+            continue
+        actual = parsed_question_type(row.get("G"))
+        if actual != expected:
+            mismatches.append(
+                {
+                    "row": row.get("__row__"),
+                    "questionId": clean_text(row.get("S")) or "缺少题目ID",
+                    "expected": expected,
+                    "actual": clean_text(str(row.get("G", ""))) or "空",
+                }
+            )
+    if mismatches:
+        preview = "；".join(
+            f"第 {item['row']} 行（题目ID {item['questionId']}）"
+            f"应为 {item['expected']}，实际为 {item['actual']}"
+            for item in mismatches[:10]
+        )
+        remainder = f"；另有 {len(mismatches) - 10} 行" if len(mismatches) > 10 else ""
+        raise ValueError(f"Excel 题型校验失败：{preview}{remainder}")
+    return True
+
+
+def validate_judgment_answers(rows):
+    mismatches = []
+    for row in rows:
+        if parsed_question_type(row.get("G")) != 2:
+            continue
+        answers = normalized_answers(row)
+        if any(answer in {"0", "1"} for answer in answers):
+            mismatches.append(
+                {
+                    "row": row.get("__row__"),
+                    "questionId": clean_text(row.get("S")) or "缺少题目ID",
+                }
+            )
+    if mismatches:
+        preview = "；".join(
+            f"第 {item['row']} 行（题目ID {item['questionId']}）"
+            for item in mismatches[:10]
+        )
+        remainder = f"；另有 {len(mismatches) - 10} 行" if len(mismatches) > 10 else ""
+        raise ValueError(f"Excel 判断题答案必须为 A/B，不得使用 1/0：{preview}{remainder}")
+    return True
+
+
 def info_values(rows):
     return {
         clean_text(row.get("A")): clean_text(row.get("B"))
@@ -226,9 +324,8 @@ def build_candidate(row, config, version):
         for alias, column in OPTION_COLUMNS
         if clean_text(row.get(column))
     ]
-    answers = [part.strip() for part in (row.get("P", "") or "").split(",") if part.strip()]
-    if len(options) == 2 and options[0]["text"] == "对" and options[1]["text"] == "错":
-        answers = [{"1": "A", "0": "B"}.get(answer, answer) for answer in answers]
+    answers = normalized_answers(row)
+    question_type_code = parsed_question_type(row.get("G"))
 
     source_id = clean_text(row.get("S"))
     question_id = f"{config['questionPrefix']}-{source_id}" if source_id else ""
@@ -240,12 +337,16 @@ def build_candidate(row, config, version):
         "chapter": clean_text(row.get("D")),
         "section": clean_text(row.get("E")),
         "knowledge": clean_text(row.get("F")),
+        "type": QUESTION_TYPE_NAMES.get(question_type_code),
+        "selectionMode": QUESTION_SELECTION_MODES.get(question_type_code),
         "title": clean_text(row.get("H")),
         "options": options,
         "answer": answers,
         "explanation": clean_text(row.get("Q")) or "暂无解析",
     }
     reasons = []
+    if question_type_code not in QUESTION_TYPE_NAMES:
+        reasons.append("invalid_question_type")
     images = find_images(row)
     if images:
         reasons.append("contains_image")
@@ -297,7 +398,8 @@ def question_document(candidate, sort_order, updated_at):
         "chapter": fields["chapter"],
         "section": fields["section"],
         "knowledge": fields["knowledge"],
-        "type": "multiple" if len(fields["answer"]) > 1 else "single",
+        "type": fields["type"],
+        "selectionMode": fields["selectionMode"],
         "title": fields["title"],
         "options": fields["options"],
         "answer": fields["answer"],
@@ -436,6 +538,7 @@ def catalog_document(questions, config, version, updated_at):
     return {
         "_id": config["subjectId"],
         "subjectId": config["subjectId"],
+        "questionSchemaVersion": QUESTION_SCHEMA_VERSION,
         "name": config["name"],
         "level": config["level"],
         "status": 1,
@@ -466,7 +569,7 @@ def file_metadata(path):
     }
 
 
-def validate_outputs(questions, catalog):
+def validate_outputs(questions, catalog, *, question_types_match=True):
     ids = [question["questionId"] for question in questions]
     document_ids = [question["_id"] for question in questions]
     expected_orders = list(range(1, len(questions) + 1))
@@ -494,6 +597,35 @@ def validate_outputs(questions, catalog):
         ]
         for chapter in catalog["chapters"]
     )
+    json_question_types_match = all(
+        (
+            question["type"] == "single"
+            and question["selectionMode"] == "single"
+            and MATERIAL_MARKER not in question["title"]
+            and len(question["options"]) != 2
+            and len(question["answer"]) == 1
+        )
+        or (
+            question["type"] == "judgment"
+            and question["selectionMode"] == "single"
+            and MATERIAL_MARKER not in question["title"]
+            and len(question["options"]) == 2
+            and len(question["answer"]) == 1
+        )
+        or (
+            question["type"] == "multiple"
+            and question["selectionMode"] == "multiple"
+            and MATERIAL_MARKER not in question["title"]
+            and len(question["options"]) != 2
+            and len(question["answer"]) > 1
+        )
+        or (
+            question["type"] == "material"
+            and question["selectionMode"] == "multiple"
+            and MATERIAL_MARKER in question["title"]
+        )
+        for question in questions
+    )
     checks = {
         "uniqueQuestionIds": len(ids) == len(set(ids)),
         "uniqueDocumentIds": len(document_ids) == len(set(document_ids)),
@@ -506,6 +638,24 @@ def validate_outputs(questions, catalog):
         ),
         "naturalSectionOrder": natural_section_order,
         "questionsFollowSectionOrder": actual_scopes == expected_scopes,
+        "questionTypesMatch": question_types_match is True,
+        "jsonQuestionTypesMatch": json_question_types_match,
+        "selectionModesMatch": all(
+            question["selectionMode"]
+            == ("multiple" if question["type"] in {"multiple", "material"} else "single")
+            for question in questions
+        ),
+        "judgmentAnswersNormalized": all(
+            question["type"] != "judgment"
+            or (
+                len(question["answer"]) == 1
+                and question["answer"][0] in {"A", "B"}
+            )
+            for question in questions
+        ),
+        "questionSchemaVersionMatch": (
+            catalog.get("questionSchemaVersion") == QUESTION_SCHEMA_VERSION
+        ),
         "knowledgeCountsMatch": sum(group["count"] for group in catalog["knowledgeGroups"]) == len(questions),
         "answersMatchOptions": all(
             set(question["answer"]).issubset({option["alias"] for option in question["options"]})
@@ -551,13 +701,15 @@ def main():
         raise ValueError("全部题目工作表为空")
     expected_headers = {
         "A": "全书序号", "C": "章节序号", "D": "章节", "E": "小节", "F": "知识点",
-        "H": "题目", "J": "A", "K": "B", "P": "答案", "Q": "答案解析", "R": "权限状态", "S": "题目ID",
+        "G": "题型", "H": "题目", "J": "A", "K": "B", "P": "答案", "Q": "答案解析", "R": "权限状态", "S": "题目ID",
     }
     header = question_rows[0]
     mismatches = [f"{column}列应为{label}" for column, label in expected_headers.items() if clean_text(header.get(column)) != label]
     if mismatches:
         raise ValueError("Excel 列结构不匹配: " + "；".join(mismatches))
 
+    question_types_match = validate_question_types(question_rows[1:])
+    validate_judgment_answers(question_rows[1:])
     status_counts = Counter(clean_text(row.get("R")) for row in question_rows[1:])
     visible_rows = [row for row in question_rows[1:] if clean_text(row.get("R")) == "可查看"]
     candidates = [build_candidate(row, config, version) for row in visible_rows]
@@ -578,7 +730,11 @@ def main():
         for index, candidate in enumerate(accepted_candidates, 1)
     ]
     catalog = catalog_document(questions, config, version, updated_at)
-    checks = validate_outputs(questions, catalog)
+    checks = validate_outputs(
+        questions,
+        catalog,
+        question_types_match=question_types_match,
+    )
 
     output_dir = (args.output_root / config["subjectId"] / version).resolve()
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -625,6 +781,10 @@ def main():
             "chapters": len(catalog["chapters"]),
             "sections": sum(len(chapter.get("sections", [])) for chapter in catalog["chapters"]),
             "knowledgeGroups": len(catalog["knowledgeGroups"]),
+            "questionTypes": dict(Counter(question["type"] for question in questions)),
+            "selectionModes": dict(
+                Counter(question["selectionMode"] for question in questions)
+            ),
         },
         "statusCounts": dict(status_counts),
         "rejectionReasons": dict(reason_counts),
@@ -639,7 +799,7 @@ def main():
     write_json(report_path, report)
 
     manifest = {
-        "schemaVersion": 1,
+        "schemaVersion": QUESTION_SCHEMA_VERSION,
         "subjectId": config["subjectId"],
         "version": version,
         "questionCount": len(questions),

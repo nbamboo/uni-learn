@@ -10,10 +10,17 @@ const MAX_QUESTION_IDS = 100
 const MAX_STATE_IDS = 2000
 const MAX_SMART_CANDIDATES = 100
 const MAX_CATALOG_SUMMARIES = 50
+const QUESTION_SCHEMA_VERSION = 2
 const SUBJECT_ID_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/
 const QUESTION_ID_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/
 const ANSWER_ALIASES = ['A', 'B', 'C', 'D', 'E', 'F']
 const PRACTICE_MODES = ['sequence', 'chapter', 'section', 'knowledge', 'search', 'smart']
+const QUESTION_SELECTION_MODES = Object.freeze({
+	single: 'single',
+	judgment: 'single',
+	multiple: 'multiple',
+	material: 'multiple'
+})
 
 const QUESTION_INTERNAL_FIELDS = {
 	_id: false,
@@ -184,13 +191,38 @@ function withoutInternalFields(document) {
 	return result
 }
 
+function requireV2Catalog(catalog) {
+	if (!catalog || catalog.questionSchemaVersion !== QUESTION_SCHEMA_VERSION) {
+		throw new QuestionBankError(
+			'QUESTION_BANK_SCHEMA_VERSION_UNSUPPORTED',
+			'当前题库不是题型 v2，请重新发布题库目录'
+		)
+	}
+	return catalog
+}
+
+function requireQuestionSchema(document, requireSelectionMode) {
+	const expectedSelectionMode = document && QUESTION_SELECTION_MODES[document.type]
+	if (!expectedSelectionMode
+		|| (requireSelectionMode && document.selectionMode !== expectedSelectionMode)) {
+		const questionId = document && (document.questionId || document._id) || 'unknown'
+		throw new QuestionBankError(
+			'QUESTION_BANK_INVALID_QUESTION_SCHEMA',
+			`题目${questionId}不符合题型 v2 结构`
+		)
+	}
+	return document
+}
+
 function toPublicQuestion(document) {
+	requireQuestionSchema(document, true)
 	const result = withoutInternalFields(document)
 	result.id = result.questionId
 	return result
 }
 
 function toSearchSummary(document) {
+	requireQuestionSchema(document, true)
 	return {
 		id: document.questionId,
 		questionId: document.questionId,
@@ -206,6 +238,7 @@ function toSearchSummary(document) {
 }
 
 function toPublicCatalog(document) {
+	requireV2Catalog(document)
 	const result = Object.assign({}, document)
 	delete result._id
 	result.id = result.subjectId
@@ -213,12 +246,14 @@ function toPublicCatalog(document) {
 }
 
 function toPublicCatalogSummary(document) {
+	requireV2Catalog(document)
 	return {
 		id: document.subjectId,
 		subjectId: document.subjectId,
 		name: document.name || '',
 		level: document.level || '',
 		activeVersion: document.activeVersion,
+		questionSchemaVersion: document.questionSchemaVersion,
 		questionCount: Math.max(0, Number(document.questionCount) || 0)
 	}
 }
@@ -301,7 +336,7 @@ async function getCatalogRecord(db, subjectId) {
 	if (!catalog.activeVersion) {
 		throw new QuestionBankError('QUESTION_BANK_VERSION_NOT_FOUND', '科目尚未发布题库版本')
 	}
-	return catalog
+	return requireV2Catalog(catalog)
 }
 
 async function queryQuestionPage(db, condition, cursor, pageSize, fields) {
@@ -414,6 +449,7 @@ function createQuestionBankService(db, options) {
 				name: true,
 				level: true,
 				activeVersion: true,
+				questionSchemaVersion: true,
 				questionCount: true
 			})
 			.limit(MAX_CATALOG_SUMMARIES)
@@ -505,6 +541,7 @@ function createQuestionBankService(db, options) {
 		if (!question || question.subjectId !== subjectId || question.version !== catalog.activeVersion || question.status !== 1) {
 			throw new QuestionBankError('QUESTION_BANK_QUESTION_NOT_FOUND', '题目不存在或尚未启用')
 		}
+		requireQuestionSchema(question, true)
 		const normalizedSelected = selected.slice().sort()
 		const normalizedAnswer = question.answer.slice().sort()
 		const correct = normalizedSelected.length === normalizedAnswer.length

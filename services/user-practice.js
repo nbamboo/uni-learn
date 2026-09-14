@@ -30,6 +30,12 @@ const PRACTICE_ENTRY_MODES = ['smart', 'chapter', 'section', 'knowledge', 'wrong
 const EXAM_DRAFT_MODES = ['chapter', 'section', 'knowledge', 'wrong', 'favorite', 'search', 'sequence']
 const MAX_EXAM_DRAFT_QUESTIONS = 5000
 const MAX_PERSISTED_SUMMARIES = 20
+const QUESTION_SELECTION_MODES = Object.freeze({
+	single: 'single',
+	judgment: 'single',
+	multiple: 'multiple',
+	material: 'multiple'
+})
 
 const snapshotCache = new Map()
 const summaryCache = new Map()
@@ -56,6 +62,36 @@ export class UserPracticeServiceError extends Error {
 		this.retryable = Boolean(options && options.retryable)
 		this.cause = options && options.cause
 	}
+}
+
+function requireQuestionSchema(question, requireSelectionMode) {
+	const expectedSelectionMode = question && QUESTION_SELECTION_MODES[question.type]
+	if (!expectedSelectionMode
+		|| (requireSelectionMode && question.selectionMode !== expectedSelectionMode)) {
+		const questionId = question && (question.questionId || question.id) || 'unknown'
+		throw new UserPracticeServiceError(
+			'QUESTION_BANK_INVALID_QUESTION_SCHEMA',
+			`题目${questionId}不符合题型 v2 结构`
+		)
+	}
+	return question
+}
+
+function requireSmartQuestionResult(result) {
+	if (!result || !Array.isArray(result.items)) {
+		throw new UserPracticeServiceError(
+			'QUESTION_BANK_INVALID_RESPONSE',
+			'智能练习题目列表格式不正确'
+		)
+	}
+	result.items.forEach(question => requireQuestionSchema(question, true))
+	return result
+}
+
+function requireRecordQuestionTypes(result) {
+	if (!result || !Array.isArray(result.items)) return result
+	result.items.forEach(item => requireQuestionSchema(item && item.question, false))
+	return result
 }
 
 function storageAvailable() {
@@ -1982,12 +2018,12 @@ export async function getPracticeRecords(params) {
 	const cacheKey = `${subjectId}|${type}|${page}|${pageSize}`
 	if (!input.forceRefresh && pendingPracticeEventCount() === 0) {
 		const cached = getCached(recordsCache, cacheKey)
-		if (cached) return cached
+		if (cached) return requireRecordQuestionTypes(cached)
 	}
 	await flushPracticeEvents({ includeProgress: false })
 	if (!input.forceRefresh) {
 		const cached = getCached(recordsCache, cacheKey)
-		if (cached) return cached
+		if (cached) return requireRecordQuestionTypes(cached)
 	}
 	const result = await executeCloudCall('getRecords', {
 		subjectId,
@@ -1995,6 +2031,7 @@ export async function getPracticeRecords(params) {
 		page,
 		pageSize
 	})
+	requireRecordQuestionTypes(result)
 	return setCached(recordsCache, cacheKey, result, RECORDS_CACHE_TTL)
 }
 
@@ -2014,7 +2051,7 @@ export async function getSmartPracticeQuestions(options) {
 	const cacheKey = `${subjectId}|${pageSize}|${seed}|${JSON.stringify(smartPractice)}`
 	if (!input.forceRefresh && pendingPracticeEventCount() === 0) {
 		const cached = getCached(smartCache, cacheKey)
-		if (cached) return cached
+		if (cached) return requireSmartQuestionResult(cached)
 	}
 	await flushPracticeEvents({ includeProgress: false })
 	const result = await executeCloudCall('getSmartPractice', {
@@ -2023,6 +2060,7 @@ export async function getSmartPracticeQuestions(options) {
 		seed,
 		smartPractice
 	})
+	requireSmartQuestionResult(result)
 	return setCached(smartCache, cacheKey, result, SMART_CACHE_TTL)
 }
 

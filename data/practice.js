@@ -1,4 +1,3 @@
-import { chapters, subjectQuestionCounts } from './question-bank/catalog.js'
 import {
 	createPracticeEventId,
 	queuePracticeAnswer,
@@ -151,14 +150,6 @@ export function selectSubject(subjectId) {
 	savePracticeState(state)
 }
 
-export function getChaptersBySubject(subjectId) {
-	return chapters.filter(item => item.subjectId === subjectId)
-}
-
-export function getSubjectQuestionCount(subjectId) {
-	return subjectQuestionCounts[subjectId] || 0
-}
-
 export function getSubjectStats(subjectId) {
 	const state = getPracticeState()
 	let attempted = 0
@@ -173,10 +164,8 @@ export function getSubjectStats(subjectId) {
 		if (answer.correct) correct += 1
 		else wrong += 1
 	})
-	const total = getSubjectQuestionCount(subjectId)
-
 	return {
-		total,
+		total: 0,
 		attempted,
 		correct,
 		wrong,
@@ -185,7 +174,7 @@ export function getSubjectStats(subjectId) {
 			return savedSubjectId === subjectId || (!savedSubjectId && subjectId === DEFAULT_SUBJECT_ID && id.indexOf('ipf-') === 0)
 		}).length,
 		accuracy: attempted ? Math.round(correct / attempted * 100) : 0,
-		completion: total ? Math.round(attempted / total * 100) : 0
+		completion: 0
 	}
 }
 
@@ -294,10 +283,9 @@ export function recordExamSubmissionAnswer(question, selected) {
 
 export function getChapterProgress(subjectId, chapterId, questionCount) {
 	const state = getPracticeState()
-	const chapter = chapters.find(item => item.subjectId === subjectId && item.id === String(chapterId))
 	const total = Number.isInteger(questionCount) && questionCount >= 0
 		? questionCount
-		: (chapter ? chapter.count : 0)
+		: 0
 	const attempted = Object.keys(state.answers).filter(questionId => {
 		const answer = state.answers[questionId]
 		const practiceModes = Array.isArray(answer.practiceModes) ? answer.practiceModes : []

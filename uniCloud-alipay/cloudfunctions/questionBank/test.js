@@ -201,6 +201,7 @@ function loadDatabase() {
 async function run() {
 	const collections = loadDatabase()
 	const questions = collections.question_bank_questions
+	const sourceCatalog = collections.question_bank_catalogs[0]
 	const db = createFakeDatabase(collections)
 	const service = createQuestionBankService(db, {
 		now: () => new Date('2026-08-27T00:00:00.000Z')
@@ -209,26 +210,30 @@ async function run() {
 
 	const catalog = await service.execute({ action: 'getCatalog', subjectId })
 	assert.equal(catalog.id, subjectId)
-	assert.equal(catalog.questionCount, 822)
-	assert.equal(catalog.chapters.length, 8)
-	assert.equal(catalog.knowledgeGroups.length, 122)
+	assert.equal(catalog.questionSchemaVersion, 2)
+	assert.equal(catalog.questionCount, questions.length)
+	assert.equal(catalog.chapters.length, sourceCatalog.chapters.length)
+	assert.equal(catalog.knowledgeGroups.length, sourceCatalog.knowledgeGroups.length)
 	const catalogSummaries = await service.execute({ action: 'getCatalogSummaries' })
 	assert.equal(catalogSummaries.items.length, 1)
 	assert.deepEqual(catalogSummaries.items[0], {
 		id: subjectId,
 		subjectId,
-		name: '初级个人理财',
-		level: '初级',
+		name: sourceCatalog.name,
+		level: sourceCatalog.level,
 		activeVersion: catalog.activeVersion,
-		questionCount: 822
+		questionSchemaVersion: 2,
+		questionCount: questions.length
 	})
 
 	const firstPage = await service.execute({
 		action: 'getPracticePage', subjectId, mode: 'sequence', pageSize: 7
 	})
-	assert.equal(firstPage.total, 822)
+	assert.equal(firstPage.total, questions.length)
 	assert.equal(firstPage.items.length, 7)
 	assert.equal(firstPage.items[0].id, questions[0].questionId)
+	assert.equal(firstPage.items[0].type, questions[0].type)
+	assert.equal(firstPage.items[0].selectionMode, questions[0].selectionMode)
 	assert.ok(firstPage.items[0].answer.length)
 	assert.equal(firstPage.nextCursor, 7)
 	assert.equal(db.metrics.count, 1)
@@ -261,37 +266,44 @@ async function run() {
 	assert.ok(sectionPage.items.every(item => item.chapterId === repeatedSection.chapterId))
 	assert.ok(sectionPage.items.every(item => item.section === repeatedSection.section))
 
+	const knowledgeQuestion = questions[0]
 	const knowledgePage = await service.execute({
 		action: 'getPracticePage',
 		subjectId,
 		mode: 'knowledge',
-		chapterId: '1',
-		knowledge: '银行个人理财业务分类',
+		chapterId: knowledgeQuestion.chapterId,
+		knowledge: knowledgeQuestion.knowledge,
 		pageSize: 50
 	})
 	assert.equal(knowledgePage.total, questions.filter(item => (
-		item.chapterId === '1' && item.knowledge === '银行个人理财业务分类'
+		item.chapterId === knowledgeQuestion.chapterId && item.knowledge === knowledgeQuestion.knowledge
 	)).length)
-	assert.ok(knowledgePage.items.every(item => item.chapterId === '1'))
-	assert.ok(knowledgePage.items.every(item => item.knowledge === '银行个人理财业务分类'))
+	assert.ok(knowledgePage.items.every(item => item.chapterId === knowledgeQuestion.chapterId))
+	assert.ok(knowledgePage.items.every(item => item.knowledge === knowledgeQuestion.knowledge))
 
+	const searchKeyword = questions[0].title.slice(0, 16)
 	const searchPage = await service.execute({
-		action: 'searchQuestions', subjectId, keyword: '客户等级最高', pageSize: 10
+		action: 'searchQuestions', subjectId, keyword: searchKeyword, pageSize: 10
 	})
 	assert.ok(searchPage.total > 0)
+	assert.ok(searchPage.items[0].type)
 	assert.equal(searchPage.items[0].answer, undefined)
 	assert.equal(searchPage.items[0].options, undefined)
 
 	const requestedIds = [questions[20].questionId, questions[0].questionId, 'ipf-missing']
 	const byIds = await service.execute({ action: 'getQuestionsByIds', subjectId, questionIds: requestedIds })
 	assert.deepEqual(byIds.items.map(item => item.id), requestedIds.slice(0, 2))
+	assert.ok(byIds.items.every(item => item.type && item.selectionMode))
 	assert.deepEqual(byIds.missingQuestionIds, ['ipf-missing'])
 
-	const firstQuestion = questions[0]
+	const firstQuestion = questions.find(question => question.options.some(option => (
+		question.answer.indexOf(option.alias) === -1
+	)))
 	const correctResult = await service.execute({
 		action: 'checkAnswer', subjectId, questionId: firstQuestion.questionId, selected: firstQuestion.answer
 	})
 	assert.equal(correctResult.correct, true)
+	assert.equal(correctResult.type, firstQuestion.type)
 	const incorrectAlias = firstQuestion.options.map(option => option.alias)
 		.find(alias => firstQuestion.answer.indexOf(alias) === -1)
 	const incorrectResult = await service.execute({
@@ -299,7 +311,8 @@ async function run() {
 	})
 	assert.equal(incorrectResult.correct, false)
 
-	const answeredQuestionIds = questions.slice(0, 820).map(question => question.questionId)
+	const answeredQuestionIds = questions.slice(0, Math.max(0, questions.length - 2))
+		.map(question => question.questionId)
 	const wrongQuestionIds = questions.slice(0, 5).map(question => question.questionId)
 	const smartPage = await service.execute({
 		action: 'getPracticePage',
@@ -310,7 +323,7 @@ async function run() {
 		answeredQuestionIds,
 		wrongQuestionIds
 	})
-	assert.equal(smartPage.stateCounts.sampled, 100)
+	assert.equal(smartPage.stateCounts.sampled, Math.min(100, questions.length))
 	assert.equal(smartPage.stateCounts.wrong, 5)
 	assert.ok(smartPage.stateCounts.fresh + smartPage.stateCounts.mastered <= 100)
 	assert.equal(smartPage.items.length, 10)
@@ -319,7 +332,7 @@ async function run() {
 		pageSize: 10, seed: 'fixed-test-seed', answeredQuestionIds, wrongQuestionIds,
 		smartPractice: { strategy: 'custom', questionCount: 20, custom: { fresh: 0, wrong: 50, mastered: 50 } } })
 	assert.equal(ratioPage.items.length, 10)
-	assert.equal(ratioPage.stateCounts.sampled, 100)
+	assert.equal(ratioPage.stateCounts.sampled, Math.min(100, questions.length))
 	assert.equal(ratioPage.items.filter(item => wrongQuestionIds.includes(item.id)).length, 5)
 	assert.equal(new Set(ratioPage.items.map(item => item.id)).size, 10)
 	await assert.rejects(service.execute({ action: 'getPracticePage', subjectId, mode: 'smart',
@@ -343,6 +356,78 @@ async function run() {
 	await assert.rejects(
 		service.execute({ action: 'unknownAction', subjectId }),
 		error => error instanceof QuestionBankError && error.errCode === 'QUESTION_BANK_UNSUPPORTED_ACTION'
+	)
+
+	const fixtureCatalog = Object.assign({}, sourceCatalog, {
+		questionCount: 4,
+		chapters: [{ id: '1', subjectId, name: '第一章', count: 4, sections: [] }],
+		knowledgeGroups: []
+	})
+	const fixtureTypes = [
+		{ questionId: 'fixture-single', type: 'single', selectionMode: 'single', answer: ['A'] },
+		{ questionId: 'fixture-judgment', type: 'judgment', selectionMode: 'single', answer: ['B'] },
+		{ questionId: 'fixture-multiple', type: 'multiple', selectionMode: 'multiple', answer: ['A', 'B'] },
+		{ questionId: 'fixture-material', type: 'material', selectionMode: 'multiple', answer: ['A'] }
+	]
+	const fixtureQuestions = fixtureTypes.map((fixture, index) => Object.assign({}, questions[0], fixture, {
+		_id: `${fixtureCatalog.activeVersion}:${fixture.questionId}`,
+		chapterId: '1',
+		chapter: '第一章',
+		section: '第一节',
+		knowledge: '题型 v2',
+		title: `${fixture.type} 题目`,
+		options: [
+			{ alias: 'A', text: '选项 A' },
+			{ alias: 'B', text: '选项 B' },
+			{ alias: 'C', text: '选项 C' }
+		],
+		sortOrder: index + 1
+	}))
+	const fixtureService = createQuestionBankService(createFakeDatabase({
+		question_bank_catalogs: [fixtureCatalog],
+		question_bank_questions: fixtureQuestions
+	}))
+	const fixturePage = await fixtureService.execute({
+		action: 'getPracticePage', subjectId, mode: 'sequence', pageSize: 10
+	})
+	assert.deepEqual(fixturePage.items.map(item => [item.type, item.selectionMode]), [
+		['single', 'single'],
+		['judgment', 'single'],
+		['multiple', 'multiple'],
+		['material', 'multiple']
+	])
+	const fixtureSearch = await fixtureService.execute({
+		action: 'searchQuestions', subjectId, keyword: 'material', pageSize: 10
+	})
+	assert.equal(fixtureSearch.items[0].type, 'material')
+	const judgmentResult = await fixtureService.execute({
+		action: 'checkAnswer', subjectId, questionId: 'fixture-judgment', selected: ['B']
+	})
+	assert.equal(judgmentResult.correct, true)
+	const materialResult = await fixtureService.execute({
+		action: 'checkAnswer', subjectId, questionId: 'fixture-material', selected: ['A', 'B']
+	})
+	assert.equal(materialResult.correct, false)
+
+	const oldCatalogService = createQuestionBankService(createFakeDatabase({
+		question_bank_catalogs: [Object.assign({}, fixtureCatalog, { questionSchemaVersion: 1 })],
+		question_bank_questions: fixtureQuestions
+	}))
+	await assert.rejects(
+		oldCatalogService.execute({ action: 'getCatalog', subjectId }),
+		error => error.errCode === 'QUESTION_BANK_SCHEMA_VERSION_UNSUPPORTED'
+	)
+	const invalidQuestion = Object.assign({}, fixtureQuestions[0])
+	delete invalidQuestion.selectionMode
+	const invalidQuestionService = createQuestionBankService(createFakeDatabase({
+		question_bank_catalogs: [Object.assign({}, fixtureCatalog, { questionCount: 1 })],
+		question_bank_questions: [invalidQuestion]
+	}))
+	await assert.rejects(
+		invalidQuestionService.execute({
+			action: 'getPracticePage', subjectId, mode: 'sequence', pageSize: 10
+		}),
+		error => error.errCode === 'QUESTION_BANK_INVALID_QUESTION_SCHEMA'
 	)
 
 	const sameNameCatalog = Object.assign({}, collections.question_bank_catalogs[0], {

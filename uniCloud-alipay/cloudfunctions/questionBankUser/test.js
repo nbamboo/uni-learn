@@ -783,8 +783,11 @@ async function run() {
 		pageSize: 20,
 		seed: 'bounded-smart-test'
 	}, userId)
-	assert.equal(smartPractice.total, 822)
+	const subjectQuestionCount = Array.from(environment.collections.question_bank_questions.values())
+		.filter(item => item.subjectId === subjectId).length
+	assert.equal(smartPractice.total, subjectQuestionCount)
 	assert.equal(smartPractice.items.length, 20)
+	assert.ok(smartPractice.items.every(item => item.type && item.selectionMode))
 	assert.ok(smartPractice.stateCounts.sampled <= 100)
 	const ratioEnvironment = createDatabase(loadSeed(), new Date(currentTime))
 	const ratioService = createQuestionBankUserService(ratioEnvironment.db, { now: () => new Date(currentTime) })
@@ -1050,6 +1053,8 @@ async function run() {
 	assert.equal(environment.reads.question_bank_user_stats, statsReadsBeforeFavoriteRecords + 1)
 	assert.equal(favoriteRecords.items[0].recordId, `favorite-${question.questionId}`)
 	assert.equal(favoriteRecords.items[0].question.id, question.questionId)
+	assert.equal(favoriteRecords.items[0].question.type, question.type)
+	assert.equal(favoriteRecords.items[0].question.selectionMode, undefined)
 
 	environment.collections.question_bank_memberships.set('user-other-member', {
 		_id: 'user-other-member',
@@ -1189,6 +1194,32 @@ async function run() {
 	assert.equal(environment.collections['uni-id-log'].has('log-one'), true)
 	assert.equal(environment.collections['uni-id-log'].has('log-two'), true)
 	assert.ok(environment.collections.question_bank_questions.size > 0)
+
+	const oldCatalogSeed = loadSeed()
+	oldCatalogSeed.question_bank_catalogs[0].questionSchemaVersion = 1
+	const oldCatalogEnvironment = createDatabase(oldCatalogSeed, currentTime)
+	const oldCatalogService = createQuestionBankUserService(oldCatalogEnvironment.db, {
+		now: () => new Date(currentTime)
+	})
+	await assert.rejects(
+		oldCatalogService.execute({
+			action: 'getSmartPractice', subjectId, pageSize: 20
+		}, userId),
+		error => error.errCode === 'QUESTION_BANK_SCHEMA_VERSION_UNSUPPORTED'
+	)
+
+	const invalidQuestionSeed = loadSeed()
+	invalidQuestionSeed.question_bank_questions.forEach(item => delete item.selectionMode)
+	const invalidQuestionEnvironment = createDatabase(invalidQuestionSeed, currentTime)
+	const invalidQuestionService = createQuestionBankUserService(invalidQuestionEnvironment.db, {
+		now: () => new Date(currentTime)
+	})
+	await assert.rejects(
+		invalidQuestionService.execute({
+			action: 'getSmartPractice', subjectId, pageSize: 20, seed: 'invalid-v2-question'
+		}, userId),
+		error => error.errCode === 'QUESTION_BANK_INVALID_QUESTION_SCHEMA'
+	)
 
 	console.log('questionBankUser tests passed')
 }

@@ -99,7 +99,7 @@
 				>
 					<view class="question-shell">
 							<view class="question-header">
-								<view class="type-badge">{{ slide.question.type === 'multiple' ? '多选题' : '单选题' }}</view>
+								<view class="type-badge">{{ questionTypeLabel(slide.question.type) }}</view>
 								<view class="question-count"><text>{{ slide.index + 1 }}</text>/{{ questionList.length }}</view>
 							</view>
 
@@ -247,6 +247,7 @@
 
 <script>
 	import { buildPracticeQuestionSet, buildPracticeQuestions } from '@/data/practice-questions.js'
+	import { getQuestionTypeLabel } from '@/data/question-types.js'
 	import {
 		getPracticeState,
 		isCorrectAnswer,
@@ -426,6 +427,9 @@
 			}
 		},
 		methods: {
+			questionTypeLabel(type) {
+				return getQuestionTypeLabel(type)
+			},
 			async initializePractice() {
 				await this.loadMembershipState({
 					forceRefresh: this.membership.isMember
@@ -919,7 +923,7 @@
 			chooseOption(alias) {
 				if (this.submitted || this.answerMode === 'review'
 					|| (this.answerMode === 'exam' && this.examSubmitted)) return
-				if (this.currentQuestion.type === 'multiple') {
+				if (this.currentQuestion.selectionMode === 'multiple') {
 					const selected = this.selectedAnswers.slice()
 					const index = selected.indexOf(alias)
 					if (index > -1) selected.splice(index, 1)
@@ -929,9 +933,9 @@
 					this.selectedAnswers = [alias]
 				}
 				this.saveCurrentDraft()
-				if (this.answerMode === 'practice' && this.currentQuestion.type !== 'multiple') {
+				if (this.answerMode === 'practice' && this.currentQuestion.selectionMode === 'single') {
 					this.submitAnswer()
-				} else if (this.examInProgress && this.currentQuestion.type !== 'multiple') {
+				} else if (this.examInProgress && this.currentQuestion.selectionMode === 'single') {
 					this.advanceAfterExamSelection()
 				}
 			},
@@ -963,7 +967,7 @@
 			},
 			canConfirmSlide(slide) {
 				return slide.offset === 0
-					&& slide.question.type === 'multiple'
+					&& slide.question.selectionMode === 'multiple'
 					&& ((this.answerMode === 'practice' && !slide.submitted)
 						|| this.examInProgress)
 			},
@@ -1070,7 +1074,7 @@
 				uni.setNavigationBarTitle({ title: '测试结果' })
 			},
 			isPartialExamAnswer(question, selected) {
-				if (!question || question.type !== 'multiple' || !selected.length) return false
+				if (!question || question.selectionMode !== 'multiple' || !selected.length) return false
 				return selected.length < question.answer.length
 					&& selected.every(alias => question.answer.indexOf(alias) > -1)
 			},

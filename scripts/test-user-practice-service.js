@@ -1075,7 +1075,10 @@ async function run() {
 								pageSize: request.data.pageSize,
 								total: 1,
 								hasMore: false,
-								items: [{ recordId: 'wrong-ipf-1', question: { id: 'ipf-1' } }]
+								items: [{
+									recordId: 'wrong-ipf-1',
+									question: { id: 'ipf-1', type: 'single' }
+								}]
 							}
 						}
 					}
@@ -1084,7 +1087,10 @@ async function run() {
 					return {
 						result: {
 							errCode: 0,
-							data: { subjectId: request.data.subjectId, items: [{ id: 'ipf-1' }] }
+							data: {
+								subjectId: request.data.subjectId,
+								items: [{ id: 'ipf-1', type: 'single', selectionMode: 'single' }]
+							}
 						}
 					}
 				}

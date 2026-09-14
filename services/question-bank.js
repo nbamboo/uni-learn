@@ -17,11 +17,18 @@ const MAX_PAGE_SIZE = 50
 const MAX_BATCH_SIZE = 100
 const MAX_QUESTION_IDS = 5000
 const MAX_PRACTICE_PAGES = 100
+const QUESTION_SCHEMA_VERSION = 2
 const DEFAULT_RETRY_COUNT = 1
 const RETRY_DELAY = 120
 const PRACTICE_MODES = ['sequence', 'chapter', 'section', 'knowledge', 'search', 'smart']
 const ANSWER_ALIASES = ['A', 'B', 'C', 'D', 'E', 'F']
 const ID_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/
+const QUESTION_SELECTION_MODES = Object.freeze({
+	single: 'single',
+	judgment: 'single',
+	multiple: 'multiple',
+	material: 'multiple'
+})
 
 const catalogMemoryCache = new Map()
 const pageMemoryCache = new Map()
@@ -41,6 +48,40 @@ export class QuestionBankServiceError extends Error {
 		this.retryable = Boolean(options && options.retryable)
 		this.cause = options && options.cause
 	}
+}
+
+function requireV2Catalog(catalog) {
+	if (!catalog || catalog.questionSchemaVersion !== QUESTION_SCHEMA_VERSION) {
+		throw new QuestionBankServiceError(
+			'QUESTION_BANK_SCHEMA_VERSION_UNSUPPORTED',
+			'当前题库不是题型 v2，请更新题库数据'
+		)
+	}
+	return catalog
+}
+
+function requireQuestionSchema(question, requireSelectionMode) {
+	const expectedSelectionMode = question && QUESTION_SELECTION_MODES[question.type]
+	if (!expectedSelectionMode
+		|| (requireSelectionMode && question.selectionMode !== expectedSelectionMode)) {
+		const questionId = question && (question.questionId || question.id) || 'unknown'
+		throw new QuestionBankServiceError(
+			'QUESTION_BANK_INVALID_QUESTION_SCHEMA',
+			`题目${questionId}不符合题型 v2 结构`
+		)
+	}
+	return question
+}
+
+function requireQuestionItems(items, requireSelectionMode) {
+	if (!Array.isArray(items)) {
+		throw new QuestionBankServiceError(
+			'QUESTION_BANK_INVALID_RESPONSE',
+			'题库服务返回的题目列表格式不正确'
+		)
+	}
+	items.forEach(question => requireQuestionSchema(question, requireSelectionMode))
+	return items
 }
 
 function invalidArgument(message) {
@@ -250,21 +291,22 @@ function savePersistedCatalogs() {
 
 function getCachedCatalog(subjectId) {
 	const memory = getBoundedCache(catalogMemoryCache, subjectId)
-	if (memory) return memory
+	if (memory) return requireV2Catalog(memory)
 	loadPersistedCatalogs()
 	const entry = persistedCatalogs[subjectId]
 	if (!entry || entry.expiresAt <= Date.now() || !entry.data) return null
 	setBoundedCache(catalogMemoryCache, subjectId, entry.data, entry.expiresAt - Date.now(), 20)
-	return cloneValue(entry.data)
+	return requireV2Catalog(cloneValue(entry.data))
 }
 
 function getStoredCatalog(subjectId) {
 	loadPersistedCatalogs()
 	const entry = persistedCatalogs[subjectId]
-	return entry && entry.data ? cloneValue(entry.data) : null
+	return entry && entry.data ? requireV2Catalog(cloneValue(entry.data)) : null
 }
 
 function setCachedCatalog(subjectId, catalog) {
+	requireV2Catalog(catalog)
 	setBoundedCache(catalogMemoryCache, subjectId, catalog, CATALOG_CACHE_TTL, 20)
 	loadPersistedCatalogs()
 	persistedCatalogs[subjectId] = {
@@ -424,6 +466,7 @@ function getPersistedChapter(subjectId, version, chapterId, expectedTotal) {
 			saveChapterCacheIndex(index)
 			return null
 		}
+		requireQuestionItems(saved.items, true)
 		metadata.lastAccessedAt = now
 		index.entries[cacheId] = metadata
 		saveChapterCacheIndex(index)
@@ -431,6 +474,7 @@ function getPersistedChapter(subjectId, version, chapterId, expectedTotal) {
 	} catch (error) {
 		removeChapterCacheEntry(index, cacheId)
 		saveChapterCacheIndex(index)
+		if (error instanceof QuestionBankServiceError) throw error
 		return null
 	}
 }
@@ -550,6 +594,7 @@ function getPersistedQuestionsByIds(catalog, questionIds) {
 
 function setPersistedChapter(subjectId, version, chapterId, data) {
 	if (!storageAvailable() || !version || !Array.isArray(data && data.items)) return false
+	requireQuestionItems(data.items, true)
 	const total = Number(data.total)
 	if (!Number.isInteger(total) || total < 0 || total !== data.items.length) return false
 	const now = Date.now()
@@ -878,6 +923,7 @@ async function syncCatalogVersion(subjectId, expectedVersion, returnedVersion) {
 
 function cacheQuestions(subjectId, version, items) {
 	if (!Array.isArray(items)) return
+	requireQuestionItems(items, true)
 	items.forEach(question => {
 		const questionId = question && (question.questionId || question.id)
 		if (!questionId) return
@@ -957,7 +1003,7 @@ export async function getQuestionCatalog(subjectId, options) {
 		const cached = getCachedCatalog(normalizedSubjectId)
 		if (cached) return cached
 	}
-	const previous = getCachedCatalog(normalizedSubjectId)
+	const previous = config.forceRefresh ? null : getCachedCatalog(normalizedSubjectId)
 	const catalog = await callQuestionBank('getCatalog', {
 		subjectId: normalizedSubjectId
 	}, config)
@@ -967,6 +1013,7 @@ export async function getQuestionCatalog(subjectId, options) {
 			'题库目录缺少有效版本'
 		)
 	}
+	requireV2Catalog(catalog)
 	if (previous && previous.activeVersion !== catalog.activeVersion) {
 		clearSubjectMemory(normalizedSubjectId)
 	}
@@ -986,6 +1033,7 @@ export async function getCatalogSummaries(options) {
 	const items = data && Array.isArray(data.items)
 		? data.items.filter(item => item && item.subjectId && item.activeVersion)
 		: []
+	items.forEach(requireV2Catalog)
 	catalogSummariesCache = {
 		items: cloneValue(items),
 		expiresAt: Date.now() + CATALOG_CACHE_TTL
@@ -1020,7 +1068,10 @@ export async function getPracticePage(params, options) {
 	const key = pageCacheKey(subjectId, cacheVersion, 'getPracticePage', payload)
 	if (!config.forceRefresh) {
 		const cached = getBoundedCache(pageMemoryCache, key)
-		if (cached) return cached
+		if (cached) {
+			requireQuestionItems(cached.items, true)
+			return cached
+		}
 		const localPage = storedLocalPage || buildLocalPracticePage(catalog, mode, payload)
 		if (localPage) {
 			setBoundedCache(pageMemoryCache, key, localPage, PAGE_CACHE_TTL, MAX_PAGE_CACHE_ENTRIES)
@@ -1028,6 +1079,7 @@ export async function getPracticePage(params, options) {
 		}
 	}
 	const data = await callQuestionBank('getPracticePage', payload, config)
+	requireQuestionItems(data && data.items, true)
 	const returnedVersion = data && data.version
 	const version = returnedVersion || (versionFromResponse ? '' : expectedVersion)
 	if (!version) {
@@ -1210,7 +1262,10 @@ export async function searchQuestionBank(params, options) {
 	const key = pageCacheKey(subjectId, catalog.activeVersion, 'searchQuestions', payload)
 	if (!config.forceRefresh) {
 		const cached = getBoundedCache(pageMemoryCache, key)
-		if (cached) return cached
+		if (cached) {
+			requireQuestionItems(cached.items, false)
+			return cached
+		}
 		const subjectItems = getPersistedSubjectQuestions(catalog)
 		if (subjectItems) {
 			const matches = subjectItems.filter(question => questionMatchesKeyword(question, payload.keyword))
@@ -1243,6 +1298,7 @@ export async function searchQuestionBank(params, options) {
 		}
 	}
 	const data = await callQuestionBank('searchQuestions', payload, config)
+	requireQuestionItems(data && data.items, false)
 	const version = data && data.version || catalog.activeVersion
 	await syncCatalogVersion(subjectId, catalog.activeVersion, version)
 	setBoundedCache(
@@ -1350,13 +1406,14 @@ export async function checkQuestionAnswer(params, options) {
 	const config = options || {}
 	if (!config.forceRefresh) {
 		const cached = getBoundedCache(answerMemoryCache, key)
-		if (cached) return cached
+		if (cached) return requireQuestionSchema(cached, false)
 	}
 	const data = await callQuestionBank('checkAnswer', {
 		subjectId,
 		questionId,
 		selected
 	}, config)
+	requireQuestionSchema(data, false)
 	setBoundedCache(answerMemoryCache, key, data, ANSWER_CACHE_TTL, MAX_ANSWER_CACHE_ENTRIES)
 	return cloneValue(data)
 }

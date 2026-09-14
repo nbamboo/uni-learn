@@ -23,6 +23,7 @@ function loadComponent(environment, relativePath) {
 }
 
 function createQuestion(id, type, answer) {
+	const selectionMode = type === 'single' || type === 'judgment' ? 'single' : 'multiple'
 	return {
 		id,
 		questionId: id,
@@ -31,6 +32,7 @@ function createQuestion(id, type, answer) {
 		chapter: '第一章',
 		knowledge: '测试知识点',
 		type,
+		selectionMode,
 		title: `题目${id}`,
 		options: ['A', 'B', 'C'].map(alias => ({ alias, text: `选项${alias}` })),
 		answer,
@@ -95,6 +97,12 @@ async function run() {
 	}
 	let membershipResponse = activeMembership
 	const environment = {
+		getQuestionTypeLabel: type => ({
+			single: '单选题',
+			judgment: '判断题',
+			multiple: '多选题',
+			material: '材料题'
+		})[type],
 		FinanceCalculator: {},
 		MyUnit: {},
 		wx: {
@@ -440,6 +448,13 @@ async function run() {
 	assert.equal(practice.sessionAnswers[single.id].correct, true)
 	assert.equal(practice.visibleSlides[1].revealed, true)
 	assert.match(practice.answerNumberClass(0), /(?:^|\s)answered(?:\s|$)/)
+	assert.equal(practice.questionTypeLabel(single.type), '单选题')
+	const judgment = createQuestion('judgment-1', 'judgment', ['B'])
+	const judgmentPractice = createContext('practice', [judgment])
+	judgmentPractice.loadQuestion(0)
+	judgmentPractice.chooseOption('B')
+	assert.equal(judgmentPractice.sessionAnswers[judgment.id].correct, true)
+	assert.equal(judgmentPractice.questionTypeLabel(judgment.type), '判断题')
 	const freshSession = createContext('practice', [single])
 	freshSession.sessionAnswers[single.id] = { selected: ['A'], correct: true }
 	freshSession.resetSessionAnswers()
@@ -454,6 +469,36 @@ async function run() {
 	assert.equal(multiplePractice.sessionAnswers[multiple.id], undefined)
 	multiplePractice.confirmCurrentAnswer()
 	assert.equal(multiplePractice.sessionAnswers[multiple.id].correct, true)
+	assert.equal(multiplePractice.questionTypeLabel(multiple.type), '多选题')
+
+	const material = createQuestion('material-1', 'material', ['A'])
+	const materialPractice = createContext('practice', [material])
+	materialPractice.loadQuestion(0)
+	const callsBeforeMaterialConfirm = recordCalls.length
+	materialPractice.chooseOption('A')
+	assert.equal(materialPractice.sessionAnswers[material.id], undefined)
+	assert.equal(materialPractice.canConfirmSlide(getCurrentSlide(materialPractice)), true)
+	materialPractice.confirmCurrentAnswer()
+	assert.equal(recordCalls.length, callsBeforeMaterialConfirm + 1)
+	assert.equal(materialPractice.sessionAnswers[material.id].correct, true)
+	assert.equal(materialPractice.questionTypeLabel(material.type), '材料题')
+
+	const callsBeforeV2ExamInteraction = recordCalls.length
+	const judgmentExam = createContext('exam', [judgment, single])
+	judgmentExam.loadQuestion(0)
+	judgmentExam.chooseOption('B')
+	assert.equal(judgmentExam.swiperCurrent, 2)
+	const materialExam = createContext('exam', [material, single])
+	materialExam.loadQuestion(0)
+	materialExam.chooseOption('A')
+	assert.equal(materialExam.swiperCurrent, 1)
+	assert.equal(materialExam.canConfirmSlide(getCurrentSlide(materialExam)), true)
+	materialExam.confirmCurrentAnswer()
+	assert.equal(materialExam.swiperCurrent, 2)
+	assert.equal(recordCalls.length, callsBeforeV2ExamInteraction)
+	const multiAnswerMaterial = createQuestion('material-2', 'material', ['A', 'B'])
+	assert.equal(materialExam.isPartialExamAnswer(multiAnswerMaterial, ['A']), true)
+	assert.equal(materialExam.isPartialExamAnswer(multiAnswerMaterial, ['A', 'C']), false)
 
 	const following = createQuestion('single-2', 'single', ['B'])
 	const incompletePractice = createContext('practice', [single, multiple, following])

@@ -40,7 +40,7 @@
 						<text class="result-title">{{ question.title }}</text>
 						<view class="result-meta">
 							<text>{{ question.knowledge }}</text>
-							<text>{{ question.type === 'multiple' ? '多选题' : '单选题' }}</text>
+							<text>{{ questionTypeLabel(question.type) }}</text>
 						</view>
 					</view>
 					<uni-icons type="right" size="17" color="#a4a9b0"></uni-icons>
@@ -76,6 +76,7 @@
 <script>
 	import { getKnowledgeGroups } from '@/data/practice-questions.js'
 	import { getSubjectById } from '@/data/practice.js'
+	import { getQuestionTypeLabel } from '@/data/question-types.js'
 	import { searchQuestionBank } from '@/services/question-bank.js'
 	import { getCachedMembership, getMembership } from '@/services/membership.js'
 	import {
@@ -146,6 +147,9 @@
 			if (this.searchTimer) clearTimeout(this.searchTimer)
 		},
 		methods: {
+			questionTypeLabel(type) {
+				return getQuestionTypeLabel(type)
+			},
 			applyNightMode(preferences) {
 				this.nightMode = Boolean(preferences && preferences.nightMode)
 				uni.setNavigationBarColor({

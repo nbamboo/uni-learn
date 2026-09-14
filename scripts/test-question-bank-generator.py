@@ -13,6 +13,116 @@ SPEC.loader.exec_module(GENERATOR)
 
 
 class SectionOrderingTests(unittest.TestCase):
+    def test_question_type_rules_follow_material_options_and_answers(self):
+        rows = [
+            {"H": "[材料]\n题目", "J": "甲", "K": "乙", "L": "丙", "P": "A,C", "G": "4"},
+            {"H": "判断", "J": "对", "K": "错", "P": "A", "G": "2"},
+            {"H": "多选", "J": "甲", "K": "乙", "L": "丙", "P": "A，C", "G": "3"},
+            {"H": "单选", "J": "甲", "K": "乙", "L": "丙", "P": "A", "G": "1"},
+            {"H": "权限不足/收费题", "P": "", "G": "3"},
+        ]
+
+        self.assertTrue(GENERATOR.validate_question_types(rows))
+        self.assertTrue(GENERATOR.validate_judgment_answers(rows))
+
+    def test_judgment_answer_validation_rejects_source_boolean_values(self):
+        rows = [
+            {
+                "__row__": 12,
+                "G": "2",
+                "H": "判断题",
+                "J": "对",
+                "K": "错",
+                "P": "1",
+                "S": "12345",
+            }
+        ]
+
+        with self.assertRaisesRegex(ValueError, "判断题答案必须为 A/B.*题目ID 12345"):
+            GENERATOR.validate_judgment_answers(rows)
+
+    def test_question_type_validation_rejects_wrong_excel_row(self):
+        rows = [
+            {
+                "__row__": 61,
+                "G": "1",
+                "H": "普通多选题",
+                "J": "甲",
+                "K": "乙",
+                "L": "丙",
+                "P": "A,C",
+                "S": "12345",
+            }
+        ]
+
+        with self.assertRaisesRegex(ValueError, "第 61 行.*题目ID 12345.*应为 3"):
+            GENERATOR.validate_question_types(rows)
+
+    def test_json_type_and_selection_mode_come_from_excel_type(self):
+        cases = [
+            ("single", "single", ["A"]),
+            ("judgment", "single", ["A"]),
+            ("multiple", "multiple", ["A", "C"]),
+            ("material", "multiple", ["A"]),
+        ]
+        for question_type, selection_mode, answers in cases:
+            with self.subTest(question_type=question_type):
+                candidate = {
+                    "fields": {
+                        "version": "2026-09-13-v1",
+                        "questionId": "ipf-1",
+                        "subjectId": "junior-personal-finance",
+                        "chapterId": "1",
+                        "chapter": "第一章",
+                        "section": "第一节",
+                        "knowledge": "知识点",
+                        "type": question_type,
+                        "selectionMode": selection_mode,
+                        "title": "题目",
+                        "options": [
+                            {"alias": "A", "text": "甲"},
+                            {"alias": "B", "text": "乙"},
+                            {"alias": "C", "text": "丙"},
+                        ],
+                        "answer": answers,
+                        "explanation": "解析",
+                    }
+                }
+
+                document = GENERATOR.question_document(
+                    candidate,
+                    1,
+                    {"$date": "2026-09-13T00:00:00.000Z"},
+                )
+
+                self.assertEqual(document["type"], question_type)
+                self.assertEqual(document["selectionMode"], selection_mode)
+
+    def test_material_candidate_is_always_multiple_selection_mode(self):
+        row = {
+            "A": "1",
+            "C": "1",
+            "D": "第一章",
+            "E": "第一节",
+            "F": "知识点",
+            "G": "4",
+            "H": "[材料]\n材料正文\n\n[题目]\n题干",
+            "J": "甲",
+            "K": "乙",
+            "P": "A",
+            "Q": "解析",
+            "S": "12345",
+        }
+
+        candidate = GENERATOR.build_candidate(
+            row,
+            GENERATOR.SUBJECT_CONFIGS["银行从业初级个人理财"],
+            "2026-09-13-v1",
+        )
+
+        self.assertEqual(candidate["fields"]["type"], "material")
+        self.assertEqual(candidate["fields"]["selectionMode"], "multiple")
+
     def test_sorts_section_and_part_ordinals_naturally(self):
         sections = [
             ("第三部分 电话沟通技巧", {"firstSeen": 0}),
@@ -85,12 +195,15 @@ class SectionOrderingTests(unittest.TestCase):
                 "sortOrder": index,
                 "options": [{"alias": "A", "text": "选项"}],
                 "answer": ["A"],
+                "type": "single",
+                "selectionMode": "single",
                 "title": "题目",
                 "explanation": "解析",
             }
             for index, section in enumerate(["第一节", "第二节", "第一节"], 1)
         ]
         catalog = {
+            "questionSchemaVersion": 2,
             "questionCount": 3,
             "chapters": [
                 {

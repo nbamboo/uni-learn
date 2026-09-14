@@ -23,6 +23,7 @@ const MAX_SNAPSHOT_QUESTION_IDS = 100
 const MAX_SMART_CANDIDATES = 100
 const DEFAULT_PAGE_SIZE = 20
 const MAX_PAGE_SIZE = 50
+const QUESTION_SCHEMA_VERSION = 2
 const SUBJECT_ID_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/
 const QUESTION_ID_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/
 const EVENT_ID_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/
@@ -32,6 +33,12 @@ const PROGRESS_MODES = ['chapter', 'section', 'knowledge']
 const ANSWER_MODES = ['exam', 'practice', 'review']
 const PRACTICE_ENTRY_MODES = ['smart', 'chapter', 'section', 'knowledge', 'wrong', 'favorite', 'search', 'sequence']
 const EXAM_DRAFT_MODES = ['chapter', 'section', 'knowledge', 'wrong', 'favorite', 'search', 'sequence']
+const QUESTION_SELECTION_MODES = Object.freeze({
+	single: 'single',
+	judgment: 'single',
+	multiple: 'multiple',
+	material: 'multiple'
+})
 const MEMBER_SYNC_ACTIONS = new Set([
 	'syncEvents',
 	'getSummary',
@@ -57,6 +64,29 @@ class QuestionBankUserError extends Error {
 		this.name = 'QuestionBankUserError'
 		this.errCode = errCode
 	}
+}
+
+function requireV2Catalog(catalog) {
+	if (!catalog || catalog.questionSchemaVersion !== QUESTION_SCHEMA_VERSION) {
+		throw new QuestionBankUserError(
+			'QUESTION_BANK_SCHEMA_VERSION_UNSUPPORTED',
+			'当前题库不是题型 v2，请重新发布题库目录'
+		)
+	}
+	return catalog
+}
+
+function requireQuestionSchema(document, requireSelectionMode) {
+	const expectedSelectionMode = document && QUESTION_SELECTION_MODES[document.type]
+	if (!expectedSelectionMode
+		|| (requireSelectionMode && document.selectionMode !== expectedSelectionMode)) {
+		const questionId = document && (document.questionId || document._id) || 'unknown'
+		throw new QuestionBankUserError(
+			'QUESTION_BANK_INVALID_QUESTION_SCHEMA',
+			`题目${questionId}不符合题型 v2 结构`
+		)
+	}
+	return document
 }
 
 function invalidArgument(message) {
@@ -753,7 +783,10 @@ async function loadFullQuestionsByIds(db, catalog, questionIds) {
 		.limit(questionIds.length)
 		.get()
 	const byId = new Map()
-	getRows(response).forEach(question => byId.set(question.questionId, question))
+	getRows(response).forEach(question => {
+		requireQuestionSchema(question, true)
+		byId.set(question.questionId, question)
+	})
 	return questionIds.map(questionId => byId.get(questionId)).filter(Boolean)
 }
 
@@ -947,7 +980,7 @@ async function loadCatalog(db, subjectId) {
 	if (!catalog || catalog.status !== 1 || !catalog.activeVersion) {
 		throw new QuestionBankUserError('QUESTION_BANK_SUBJECT_NOT_FOUND', '科目题库不存在或尚未启用')
 	}
-	return catalog
+	return requireV2Catalog(catalog)
 }
 
 async function loadQuestionsForEvents(db, events) {
@@ -974,11 +1007,14 @@ async function loadQuestionsForEvents(db, events) {
 				chapterId: true,
 				section: true,
 				knowledge: true,
+				type: true,
+				selectionMode: true,
 				answer: true
 			})
 			.limit(questionIds.length)
 			.get()
 		getRows(response).forEach(question => {
+			requireQuestionSchema(question, true)
 			questions.set(`${subjectId}|${question.questionId}`, question)
 		})
 		questionIds.forEach(questionId => {
@@ -1038,6 +1074,7 @@ async function loadQuestionSummaries(db, subjectId, questionIds) {
 			section: true,
 			knowledge: true,
 			type: true,
+			selectionMode: true,
 			title: true,
 			sortOrder: true
 		})
@@ -1045,9 +1082,11 @@ async function loadQuestionSummaries(db, subjectId, questionIds) {
 		.get()
 	const result = new Map()
 	getRows(response).forEach(question => {
-		result.set(question.questionId, Object.assign({}, question, {
-			id: question.questionId
-		}))
+		requireQuestionSchema(question, true)
+		const summary = Object.assign({}, question, { id: question.questionId })
+		delete summary._id
+		delete summary.selectionMode
+		result.set(question.questionId, summary)
 	})
 	return result
 }
