@@ -210,7 +210,7 @@ async function run() {
 
 	const catalog = await service.execute({ action: 'getCatalog', subjectId })
 	assert.equal(catalog.id, subjectId)
-	assert.equal(catalog.questionSchemaVersion, 2)
+	assert.equal(catalog.questionSchemaVersion, 3)
 	assert.equal(catalog.questionCount, questions.length)
 	assert.equal(catalog.chapters.length, sourceCatalog.chapters.length)
 	assert.equal(catalog.knowledgeGroups.length, sourceCatalog.knowledgeGroups.length)
@@ -222,7 +222,7 @@ async function run() {
 		name: sourceCatalog.name,
 		level: sourceCatalog.level,
 		activeVersion: catalog.activeVersion,
-		questionSchemaVersion: 2,
+		questionSchemaVersion: 3,
 		questionCount: questions.length
 	})
 
@@ -323,16 +323,19 @@ async function run() {
 		answeredQuestionIds,
 		wrongQuestionIds
 	})
-	assert.equal(smartPage.stateCounts.sampled, Math.min(100, questions.length))
+	assert.equal(smartPage.stateCounts.sampled, questions.length)
 	assert.equal(smartPage.stateCounts.wrong, 5)
-	assert.ok(smartPage.stateCounts.fresh + smartPage.stateCounts.mastered <= 100)
+	assert.ok(smartPage.stateCounts.fresh + smartPage.stateCounts.mastered <= questions.length)
 	assert.equal(smartPage.items.length, 10)
+	assert.equal(smartPage.requestedQuestionCount, 10)
+	assert.equal(smartPage.actualQuestionCount, smartPage.items.length)
+	assert.equal(smartPage.overflowQuestionCount, 0)
 	assert.ok(smartPage.items.some(item => wrongQuestionIds.indexOf(item.id) > -1))
 	const ratioPage = await service.execute({ action: 'getPracticePage', subjectId, mode: 'smart',
 		pageSize: 10, seed: 'fixed-test-seed', answeredQuestionIds, wrongQuestionIds,
 		smartPractice: { strategy: 'custom', questionCount: 20, custom: { fresh: 0, wrong: 50, mastered: 50 } } })
 	assert.equal(ratioPage.items.length, 10)
-	assert.equal(ratioPage.stateCounts.sampled, Math.min(100, questions.length))
+	assert.equal(ratioPage.stateCounts.sampled, questions.length)
 	assert.equal(ratioPage.items.filter(item => wrongQuestionIds.includes(item.id)).length, 5)
 	assert.equal(new Set(ratioPage.items.map(item => item.id)).size, 10)
 	await assert.rejects(service.execute({ action: 'getPracticePage', subjectId, mode: 'smart',
@@ -369,12 +372,13 @@ async function run() {
 		{ questionId: 'fixture-multiple', type: 'multiple', selectionMode: 'multiple', answer: ['A', 'B'] },
 		{ questionId: 'fixture-material', type: 'material', selectionMode: 'multiple', answer: ['A'] }
 	]
-	const fixtureQuestions = fixtureTypes.map((fixture, index) => Object.assign({}, questions[0], fixture, {
+	const fixtureQuestions = fixtureTypes.map((fixture, index) => {
+		const question = Object.assign({}, questions[0], fixture, {
 		_id: `${fixtureCatalog.activeVersion}:${fixture.questionId}`,
 		chapterId: '1',
 		chapter: '第一章',
 		section: '第一节',
-		knowledge: '题型 v2',
+		knowledge: '题型 schema v3',
 		title: `${fixture.type} 题目`,
 		options: [
 			{ alias: 'A', text: '选项 A' },
@@ -382,7 +386,17 @@ async function run() {
 			{ alias: 'C', text: '选项 C' }
 		],
 		sortOrder: index + 1
-	}))
+		})
+		;['materialGroupId', 'materialText', 'materialQuestionIndex', 'materialQuestionCount']
+			.forEach(field => delete question[field])
+		if (fixture.type === 'material') Object.assign(question, {
+			materialGroupId: 'fixture-material-group',
+			materialText: '材料正文',
+			materialQuestionIndex: 1,
+			materialQuestionCount: 1
+		})
+		return question
+	})
 	const fixtureService = createQuestionBankService(createFakeDatabase({
 		question_bank_catalogs: [fixtureCatalog],
 		question_bank_questions: fixtureQuestions
@@ -409,8 +423,98 @@ async function run() {
 	})
 	assert.equal(materialResult.correct, false)
 
+	const smartMaterialQuestions = []
+	for (let index = 1; index <= 18; index += 1) {
+		const question = Object.assign({}, questions[0], {
+			_id: `${fixtureCatalog.activeVersion}:smart-single-${index}`,
+			questionId: `smart-single-${index}`,
+			type: 'single',
+			selectionMode: 'single',
+			title: `智能练习单题 ${index}`,
+			sortOrder: index
+		})
+		;['materialGroupId', 'materialText', 'materialQuestionIndex', 'materialQuestionCount']
+			.forEach(field => delete question[field])
+		smartMaterialQuestions.push(question)
+	}
+	const materialGroupQuestionIds = []
+	for (let index = 1; index <= 4; index += 1) {
+		const questionId = `smart-material-${index}`
+		materialGroupQuestionIds.push(questionId)
+		const question = Object.assign({}, questions[0], {
+			_id: `${fixtureCatalog.activeVersion}:${questionId}`,
+			questionId,
+			type: 'material',
+			selectionMode: 'multiple',
+			title: `材料子题 ${index}`,
+			materialGroupId: 'smart-material-group',
+			materialText: '四道子题共享的材料正文',
+			materialQuestionIndex: index,
+			materialQuestionCount: 4,
+			sortOrder: 18 + index
+		})
+		smartMaterialQuestions.push(question)
+	}
+	const smartMaterialCatalog = Object.assign({}, fixtureCatalog, { questionCount: 22 })
+	const smartMaterialService = createQuestionBankService(createFakeDatabase({
+		question_bank_catalogs: [smartMaterialCatalog],
+		question_bank_questions: smartMaterialQuestions
+	}))
+	const smartMaterialPage = await smartMaterialService.execute({
+		action: 'getPracticePage',
+		subjectId,
+		mode: 'smart',
+		pageSize: 20,
+		seed: 'material-overflow-cloud-test',
+		answeredQuestionIds: materialGroupQuestionIds,
+		wrongQuestionIds: [],
+		smartPractice: {
+			strategy: 'custom',
+			questionCount: 20,
+			custom: { fresh: 100, wrong: 0, mastered: 0 }
+		}
+	})
+	assert.equal(smartMaterialPage.requestedQuestionCount, 20)
+	assert.equal(smartMaterialPage.actualQuestionCount, 22)
+	assert.equal(smartMaterialPage.overflowQuestionCount, 2)
+	assert.equal(smartMaterialPage.stateCounts.mastered, 4)
+	const selectedMaterialQuestions = smartMaterialPage.items
+		.filter(item => item.materialGroupId === 'smart-material-group')
+	assert.deepEqual(
+		selectedMaterialQuestions.map(item => item.materialQuestionIndex),
+		[1, 2, 3, 4]
+	)
+	const materialStart = smartMaterialPage.items.findIndex(
+		item => item.materialGroupId === 'smart-material-group'
+	)
+	assert.deepEqual(
+		smartMaterialPage.items.slice(materialStart, materialStart + 4).map(item => item.id),
+		materialGroupQuestionIds
+	)
+	const wrongMaterialPage = await smartMaterialService.execute({
+		action: 'getPracticePage',
+		subjectId,
+		mode: 'smart',
+		pageSize: 20,
+		seed: 'material-wrong-group-test',
+		answeredQuestionIds: materialGroupQuestionIds,
+		wrongQuestionIds: [materialGroupQuestionIds[2]],
+		smartPractice: {
+			strategy: 'custom',
+			questionCount: 20,
+			custom: { fresh: 0, wrong: 100, mastered: 0 }
+		}
+	})
+	assert.equal(wrongMaterialPage.stateCounts.wrong, 4)
+	assert.deepEqual(
+		wrongMaterialPage.items
+			.filter(item => item.materialGroupId === 'smart-material-group')
+			.map(item => item.materialQuestionIndex),
+		[1, 2, 3, 4]
+	)
+
 	const oldCatalogService = createQuestionBankService(createFakeDatabase({
-		question_bank_catalogs: [Object.assign({}, fixtureCatalog, { questionSchemaVersion: 1 })],
+		question_bank_catalogs: [Object.assign({}, fixtureCatalog, { questionSchemaVersion: 2 })],
 		question_bank_questions: fixtureQuestions
 	}))
 	await assert.rejects(
@@ -425,6 +529,19 @@ async function run() {
 	}))
 	await assert.rejects(
 		invalidQuestionService.execute({
+			action: 'getPracticePage', subjectId, mode: 'sequence', pageSize: 10
+		}),
+		error => error.errCode === 'QUESTION_BANK_INVALID_QUESTION_SCHEMA'
+	)
+	const invalidNonMaterial = Object.assign({}, fixtureQuestions[0], {
+		materialGroupId: 'invalid-material-group'
+	})
+	const invalidNonMaterialService = createQuestionBankService(createFakeDatabase({
+		question_bank_catalogs: [Object.assign({}, fixtureCatalog, { questionCount: 1 })],
+		question_bank_questions: [invalidNonMaterial]
+	}))
+	await assert.rejects(
+		invalidNonMaterialService.execute({
 			action: 'getPracticePage', subjectId, mode: 'sequence', pageSize: 10
 		}),
 		error => error.errCode === 'QUESTION_BANK_INVALID_QUESTION_SCHEMA'

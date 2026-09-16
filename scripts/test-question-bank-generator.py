@@ -13,9 +13,60 @@ SPEC.loader.exec_module(GENERATOR)
 
 
 class SectionOrderingTests(unittest.TestCase):
+    def test_catalog_contains_smart_practice_units(self):
+        base = {
+            "subjectId": "junior-personal-finance",
+            "chapterId": "1",
+            "chapter": "第一章",
+            "section": "第一节",
+            "knowledge": "知识点",
+        }
+        questions = [
+            {**base, "questionId": "ipf-1", "type": "single", "sortOrder": 1},
+            {
+                **base,
+                "questionId": "ipf-2",
+                "type": "material",
+                "materialGroupId": "ipf-material-1",
+                "sortOrder": 2,
+            },
+            {
+                **base,
+                "questionId": "ipf-3",
+                "type": "material",
+                "materialGroupId": "ipf-material-1",
+                "sortOrder": 3,
+            },
+        ]
+
+        catalog = GENERATOR.catalog_document(
+            questions,
+            GENERATOR.SUBJECT_CONFIGS["银行从业初级个人理财"],
+            "2026-09-16-v1",
+            {"$date": "2026-09-16T00:00:00.000Z"},
+        )
+
+        self.assertEqual(
+            catalog["smartPracticeUnits"],
+            [
+                {
+                    "unitId": "question:ipf-1",
+                    "questionIds": ["ipf-1"],
+                    "questionCount": 1,
+                    "sortOrder": 1,
+                },
+                {
+                    "unitId": "material:ipf-material-1",
+                    "questionIds": ["ipf-2", "ipf-3"],
+                    "questionCount": 2,
+                    "sortOrder": 2,
+                },
+            ],
+        )
+
     def test_question_type_rules_follow_material_options_and_answers(self):
         rows = [
-            {"H": "[材料]\n题目", "J": "甲", "K": "乙", "L": "丙", "P": "A,C", "G": "4"},
+            {"H": "题目", "J": "甲", "K": "乙", "L": "丙", "P": "A,C", "G": "4", "X": "材料"},
             {"H": "判断", "J": "对", "K": "错", "P": "A", "G": "2"},
             {"H": "多选", "J": "甲", "K": "乙", "L": "丙", "P": "A，C", "G": "3"},
             {"H": "单选", "J": "甲", "K": "乙", "L": "丙", "P": "A", "G": "1"},
@@ -67,8 +118,7 @@ class SectionOrderingTests(unittest.TestCase):
         ]
         for question_type, selection_mode, answers in cases:
             with self.subTest(question_type=question_type):
-                candidate = {
-                    "fields": {
+                fields = {
                         "version": "2026-09-13-v1",
                         "questionId": "ipf-1",
                         "subjectId": "junior-personal-finance",
@@ -86,8 +136,15 @@ class SectionOrderingTests(unittest.TestCase):
                         ],
                         "answer": answers,
                         "explanation": "解析",
-                    }
                 }
+                if question_type == "material":
+                    fields.update({
+                        "materialGroupId": "ipf-10",
+                        "materialText": "根据材料，回答下列问题",
+                        "materialQuestionIndex": 1,
+                        "materialQuestionCount": 1,
+                    })
+                candidate = {"fields": fields}
 
                 document = GENERATOR.question_document(
                     candidate,
@@ -106,12 +163,16 @@ class SectionOrderingTests(unittest.TestCase):
             "E": "第一节",
             "F": "知识点",
             "G": "4",
-            "H": "[材料]\n材料正文\n\n[题目]\n题干",
+            "H": "题干",
             "J": "甲",
             "K": "乙",
             "P": "A",
             "Q": "解析",
             "S": "12345",
+            "U": "12340",
+            "V": "1",
+            "W": "1",
+            "X": "根据材料，回答下列问题\n材料正文",
         }
 
         candidate = GENERATOR.build_candidate(
@@ -122,6 +183,50 @@ class SectionOrderingTests(unittest.TestCase):
 
         self.assertEqual(candidate["fields"]["type"], "material")
         self.assertEqual(candidate["fields"]["selectionMode"], "multiple")
+        self.assertEqual(candidate["fields"]["materialGroupId"], "ipf-12340")
+
+    def test_material_rows_reject_source_question_ordinals(self):
+        row = {
+            "__row__": 2,
+            "C": "1",
+            "D": "第一章",
+            "E": "第一节",
+            "G": "4",
+            "H": "题干",
+            "R": "可查看",
+            "S": "12345",
+            "U": "12340",
+            "V": "1",
+            "W": "1",
+            "X": "根据材料，回答190-193题",
+        }
+
+        with self.assertRaisesRegex(ValueError, "材料提示仍包含来源题号"):
+            GENERATOR.validate_material_rows([row])
+
+    def test_published_material_group_is_renumbered_after_rejection(self):
+        def candidate(question_id, source_index):
+            return {
+                "sourceMaterialQuestionIndex": source_index,
+                "fields": {
+                    "type": "material",
+                    "materialGroupId": "ipf-10",
+                    "materialText": "材料",
+                    "questionId": question_id,
+                },
+            }
+
+        candidates = [candidate("ipf-1", 1), candidate("ipf-3", 3)]
+        GENERATOR.normalize_published_material_groups(candidates)
+
+        self.assertEqual(
+            [item["fields"]["materialQuestionIndex"] for item in candidates],
+            [1, 2],
+        )
+        self.assertEqual(
+            [item["fields"]["materialQuestionCount"] for item in candidates],
+            [2, 2],
+        )
 
     def test_sorts_section_and_part_ordinals_naturally(self):
         sections = [
@@ -203,7 +308,7 @@ class SectionOrderingTests(unittest.TestCase):
             for index, section in enumerate(["第一节", "第二节", "第一节"], 1)
         ]
         catalog = {
-            "questionSchemaVersion": 2,
+            "questionSchemaVersion": 3,
             "questionCount": 3,
             "chapters": [
                 {

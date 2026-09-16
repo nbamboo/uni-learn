@@ -23,7 +23,17 @@ SUBJECT_ID_PATTERN = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
 QUESTION_ID_PATTERN = SUBJECT_ID_PATTERN
 EMPTY_QUESTION_PATTERN = re.compile(r"\[题目\]\s*$")
 MATERIAL_MARKER = "[材料]"
-QUESTION_SCHEMA_VERSION = 2
+SOURCE_QUESTION_ORDINAL_PATTERN = re.compile(
+    r"回答\s*(?:第\s*)?[0-9０-９]+\s*"
+    r"(?:[-—–~～至到]\s*[0-9０-９]+)?\s*题"
+)
+MATERIAL_FIELD_NAMES = (
+    "materialGroupId",
+    "materialText",
+    "materialQuestionIndex",
+    "materialQuestionCount",
+)
+QUESTION_SCHEMA_VERSION = 3
 QUESTION_TYPE_NAMES = {
     1: "single",
     2: "judgment",
@@ -125,6 +135,7 @@ FIELD_LIMITS = {
     "knowledge": 128,
     "title": 2048,
     "explanation": 10000,
+    "materialText": 10000,
 }
 
 
@@ -220,15 +231,28 @@ def parsed_question_type(value):
     return int(float(text))
 
 
+def parsed_positive_integer(value):
+    text = clean_text(str(value)) if value is not None else ""
+    if not re.fullmatch(r"[1-9][0-9]*(?:\.0+)?", text):
+        return None
+    return int(float(text))
+
+
+def material_instruction_contains_source_ordinal(value):
+    first_line = next((line.strip() for line in clean_text(value).splitlines() if line.strip()), "")
+    return SOURCE_QUESTION_ORDINAL_PATTERN.search(first_line) is not None
+
+
 def expected_question_type(row):
     title = clean_text(row.get("H"))
+    material_text = clean_text(row.get("X"))
     options = [
         clean_text(row.get(column))
         for _alias, column in OPTION_COLUMNS
         if clean_text(row.get(column))
     ]
     answers = normalized_answers(row)
-    if MATERIAL_MARKER in title:
+    if material_text or MATERIAL_MARKER in title:
         return 4
     if len(options) == 2:
         return 2
@@ -263,6 +287,83 @@ def validate_question_types(rows):
         )
         remainder = f"；另有 {len(mismatches) - 10} 行" if len(mismatches) > 10 else ""
         raise ValueError(f"Excel 题型校验失败：{preview}{remainder}")
+    return True
+
+
+def validate_material_rows(rows):
+    mismatches = []
+    groups = OrderedDict()
+    material_columns = ("U", "V", "W", "X")
+    for position, row in enumerate(rows):
+        question_type = parsed_question_type(row.get("G"))
+        values = [clean_text(str(row.get(column, ""))) for column in material_columns]
+        has_any_material_value = any(values)
+        is_visible = clean_text(row.get("R")) == "可查看"
+        if question_type != 4:
+            if has_any_material_value:
+                mismatches.append((row, "非材料题不得包含材料字段"))
+            continue
+        if not has_any_material_value and not is_visible:
+            continue
+
+        source_group_id = clean_text(row.get("U"))
+        source_index = parsed_positive_integer(row.get("V"))
+        source_count = parsed_positive_integer(row.get("W"))
+        material_text = clean_text(row.get("X"))
+        if (
+            not source_group_id
+            or not source_group_id.isdigit()
+            or source_index is None
+            or source_count is None
+            or source_index > source_count
+            or not material_text
+        ):
+            mismatches.append((row, "材料字段不完整或格式无效"))
+            continue
+        if MATERIAL_MARKER in clean_text(row.get("H")):
+            mismatches.append((row, "题干不得再包含[材料]标记"))
+            continue
+        if material_instruction_contains_source_ordinal(material_text):
+            mismatches.append((row, "材料提示仍包含来源题号"))
+            continue
+        groups.setdefault(source_group_id, []).append(
+            {
+                "row": row,
+                "position": position,
+                "index": source_index,
+                "count": source_count,
+                "materialText": material_text,
+                "scope": (
+                    clean_text(row.get("C")),
+                    clean_text(row.get("D")),
+                    clean_text(row.get("E")),
+                ),
+            }
+        )
+
+    for group_id, items in groups.items():
+        counts = {item["count"] for item in items}
+        texts = {item["materialText"] for item in items}
+        scopes = {item["scope"] for item in items}
+        indices = [item["index"] for item in items]
+        positions = [item["position"] for item in items]
+        expected_count = next(iter(counts)) if len(counts) == 1 else None
+        if (
+            expected_count != len(items)
+            or indices != list(range(1, len(items) + 1))
+            or len(texts) != 1
+            or len(scopes) != 1
+            or positions != list(range(min(positions), min(positions) + len(positions)))
+        ):
+            mismatches.append((items[0]["row"], f"材料组 {group_id} 结构不一致"))
+
+    if mismatches:
+        preview = "；".join(
+            f"第 {row.get('__row__')} 行（题目ID {clean_text(row.get('S')) or '缺少题目ID'}）：{reason}"
+            for row, reason in mismatches[:10]
+        )
+        remainder = f"；另有 {len(mismatches) - 10} 行" if len(mismatches) > 10 else ""
+        raise ValueError(f"Excel 材料题校验失败：{preview}{remainder}")
     return True
 
 
@@ -312,7 +413,7 @@ def date_value(version):
 
 def find_images(row):
     result = []
-    for column in ("H", "I", "J", "K", "L", "M", "N", "O", "Q"):
+    for column in ("H", "I", "J", "K", "L", "M", "N", "O", "Q", "X"):
         for match in IMAGE_PATTERN.finditer(row.get(column, "") or ""):
             result.append({"column": column, "url": match.group(1)})
     return result
@@ -329,6 +430,12 @@ def build_candidate(row, config, version):
 
     source_id = clean_text(row.get("S"))
     question_id = f"{config['questionPrefix']}-{source_id}" if source_id else ""
+    source_material_group_id = clean_text(row.get("U"))
+    material_group_id = (
+        f"{config['questionPrefix']}-{source_material_group_id}"
+        if source_material_group_id
+        else ""
+    )
     fields = {
         "questionId": question_id,
         "subjectId": config["subjectId"],
@@ -344,6 +451,13 @@ def build_candidate(row, config, version):
         "answer": answers,
         "explanation": clean_text(row.get("Q")) or "暂无解析",
     }
+    if question_type_code == 4:
+        fields.update(
+            {
+                "materialGroupId": material_group_id,
+                "materialText": clean_text(row.get("X")),
+            }
+        )
     reasons = []
     if question_type_code not in QUESTION_TYPE_NAMES:
         reasons.append("invalid_question_type")
@@ -354,7 +468,11 @@ def build_candidate(row, config, version):
         reasons.append("missing_actual_question")
     for key in ("questionId", "chapterId", "chapter", "section", "knowledge", "title"):
         if not fields[key]:
-            reasons.append(f"missing_{key}")
+            reasons.append(
+                "missing_actual_question"
+                if key == "title" and question_type_code == 4
+                else f"missing_{key}"
+            )
     if len(options) < 2:
         reasons.append("options_lt_2")
     if len(options) > 6:
@@ -367,7 +485,7 @@ def build_candidate(row, config, version):
     if len(answers) != len(set(answers)):
         reasons.append("duplicate_answer_alias")
     for key, limit in FIELD_LIMITS.items():
-        if len(fields[key]) > limit:
+        if len(fields.get(key, "")) > limit:
             reasons.append(f"{key}_too_long")
     if any(len(option["text"]) > 2048 for option in options):
         reasons.append("option_text_too_long")
@@ -375,21 +493,39 @@ def build_candidate(row, config, version):
         reasons.append("invalid_subject_id")
     if fields["questionId"] and not QUESTION_ID_PATTERN.fullmatch(fields["questionId"]):
         reasons.append("invalid_question_id")
+    if material_group_id and not QUESTION_ID_PATTERN.fullmatch(material_group_id):
+        reasons.append("invalid_material_group_id")
 
     return {
         "excelRow": row.get("__row__"),
         "sourceOrder": clean_text(row.get("A")),
         "sourceQuestionId": source_id,
         "sourceUrl": clean_text(row.get("T")),
+        "sourceMaterialGroupId": source_material_group_id,
+        "sourceMaterialQuestionIndex": parsed_positive_integer(row.get("V")),
+        "sourceMaterialQuestionCount": parsed_positive_integer(row.get("W")),
         "fields": fields,
         "images": images,
         "reasons": list(dict.fromkeys(reasons)),
     }
 
 
+def normalize_published_material_groups(candidates):
+    groups = OrderedDict()
+    for candidate in candidates:
+        if candidate["fields"]["type"] == "material":
+            groups.setdefault(candidate["fields"]["materialGroupId"], []).append(candidate)
+    for items in groups.values():
+        items.sort(key=lambda item: item["sourceMaterialQuestionIndex"])
+        for index, candidate in enumerate(items, 1):
+            candidate["fields"]["materialQuestionIndex"] = index
+            candidate["fields"]["materialQuestionCount"] = len(items)
+    return candidates
+
+
 def question_document(candidate, sort_order, updated_at):
     fields = candidate["fields"]
-    return {
+    document = {
         "_id": f"{fields['version']}:{fields['questionId']}",
         "questionId": fields["questionId"],
         "subjectId": fields["subjectId"],
@@ -408,6 +544,16 @@ def question_document(candidate, sort_order, updated_at):
         "status": 1,
         "updatedAt": updated_at,
     }
+    if fields["type"] == "material":
+        document.update(
+            {
+                "materialGroupId": fields["materialGroupId"],
+                "materialText": fields["materialText"],
+                "materialQuestionIndex": fields["materialQuestionIndex"],
+                "materialQuestionCount": fields["materialQuestionCount"],
+            }
+        )
+    return document
 
 
 def chinese_ordinal_value(value):
@@ -535,6 +681,31 @@ def catalog_document(questions, config, version, updated_at):
         chapter["sections"] = sections
         catalog_chapters.append(chapter)
 
+    smart_units = []
+    material_units = {}
+    for question in questions:
+        if question["type"] != "material":
+            smart_units.append({
+                "unitId": f"question:{question['questionId']}",
+                "questionIds": [question["questionId"]],
+                "questionCount": 1,
+                "sortOrder": question["sortOrder"],
+            })
+            continue
+        group_id = question["materialGroupId"]
+        unit = material_units.get(group_id)
+        if unit is None:
+            unit = {
+                "unitId": f"material:{group_id}",
+                "questionIds": [],
+                "questionCount": 0,
+                "sortOrder": question["sortOrder"],
+            }
+            material_units[group_id] = unit
+            smart_units.append(unit)
+        unit["questionIds"].append(question["questionId"])
+        unit["questionCount"] += 1
+
     return {
         "_id": config["subjectId"],
         "subjectId": config["subjectId"],
@@ -546,6 +717,7 @@ def catalog_document(questions, config, version, updated_at):
         "questionCount": len(questions),
         "chapters": catalog_chapters,
         "knowledgeGroups": list(knowledge_groups.values()),
+        "smartPracticeUnits": smart_units,
         "updatedAt": updated_at,
     }
 
@@ -566,6 +738,70 @@ def file_metadata(path):
         "name": path.name,
         "bytes": len(data),
         "sha256": hashlib.sha256(data).hexdigest(),
+    }
+
+
+def material_output_checks(questions):
+    material_positions = OrderedDict()
+    fields_match = True
+    no_source_ordinals = True
+    for position, question in enumerate(questions):
+        is_material = question.get("type") == "material"
+        present_fields = [name in question for name in MATERIAL_FIELD_NAMES]
+        if is_material:
+            group_id = question.get("materialGroupId")
+            material_text = question.get("materialText")
+            question_index = question.get("materialQuestionIndex")
+            question_count = question.get("materialQuestionCount")
+            valid = (
+                all(present_fields)
+                and isinstance(group_id, str)
+                and QUESTION_ID_PATTERN.fullmatch(group_id) is not None
+                and isinstance(material_text, str)
+                and bool(material_text.strip())
+                and len(material_text) <= FIELD_LIMITS["materialText"]
+                and type(question_index) is int
+                and type(question_count) is int
+                and 1 <= question_index <= question_count
+                and MATERIAL_MARKER not in question.get("title", "")
+            )
+            fields_match = fields_match and valid
+            no_source_ordinals = no_source_ordinals and not (
+                isinstance(material_text, str)
+                and material_instruction_contains_source_ordinal(material_text)
+            )
+            if valid:
+                material_positions.setdefault(group_id, []).append((position, question))
+        else:
+            fields_match = fields_match and not any(present_fields)
+
+    groups_match = True
+    groups_contiguous = True
+    for items in material_positions.values():
+        positions = [position for position, _question in items]
+        group_questions = [question for _position, question in items]
+        count = len(group_questions)
+        groups_match = groups_match and (
+            [question["materialQuestionIndex"] for question in group_questions]
+            == list(range(1, count + 1))
+            and all(question["materialQuestionCount"] == count for question in group_questions)
+            and len({question["materialText"] for question in group_questions}) == 1
+            and len(
+                {
+                    (question["chapterId"], question["chapter"], question["section"])
+                    for question in group_questions
+                }
+            )
+            == 1
+        )
+        groups_contiguous = groups_contiguous and positions == list(
+            range(min(positions), min(positions) + count)
+        )
+    return {
+        "materialFieldsMatch": fields_match,
+        "materialGroupsMatch": groups_match,
+        "materialGroupsContiguous": groups_contiguous,
+        "noSourceQuestionOrdinalReferences": no_source_ordinals,
     }
 
 
@@ -622,10 +858,12 @@ def validate_outputs(questions, catalog, *, question_types_match=True):
         or (
             question["type"] == "material"
             and question["selectionMode"] == "multiple"
-            and MATERIAL_MARKER in question["title"]
+            and MATERIAL_MARKER not in question["title"]
+            and all(name in question for name in MATERIAL_FIELD_NAMES)
         )
         for question in questions
     )
+    material_checks = material_output_checks(questions)
     checks = {
         "uniqueQuestionIds": len(ids) == len(set(ids)),
         "uniqueDocumentIds": len(document_ids) == len(set(document_ids)),
@@ -657,6 +895,14 @@ def validate_outputs(questions, catalog, *, question_types_match=True):
             catalog.get("questionSchemaVersion") == QUESTION_SCHEMA_VERSION
         ),
         "knowledgeCountsMatch": sum(group["count"] for group in catalog["knowledgeGroups"]) == len(questions),
+        "smartPracticeIndexMatches": (
+            sum(unit["questionCount"] for unit in catalog.get("smartPracticeUnits", [])) == len(questions)
+            and [
+                question_id
+                for unit in catalog.get("smartPracticeUnits", [])
+                for question_id in unit["questionIds"]
+            ] == ids
+        ),
         "answersMatchOptions": all(
             set(question["answer"]).issubset({option["alias"] for option in question["options"]})
             for question in questions
@@ -664,9 +910,11 @@ def validate_outputs(questions, catalog, *, question_types_match=True):
         "noImageMarkers": all(
             "[图片:" not in question["title"]
             and "[图片:" not in question["explanation"]
+            and "[图片:" not in question.get("materialText", "")
             and all("[图片:" not in option["text"] for option in question["options"])
             for question in questions
         ),
+        **material_checks,
     }
     if not all(checks.values()):
         failed = ", ".join(name for name, passed in checks.items() if not passed)
@@ -702,6 +950,7 @@ def main():
     expected_headers = {
         "A": "全书序号", "C": "章节序号", "D": "章节", "E": "小节", "F": "知识点",
         "G": "题型", "H": "题目", "J": "A", "K": "B", "P": "答案", "Q": "答案解析", "R": "权限状态", "S": "题目ID",
+        "U": "材料组ID", "V": "材料内序号", "W": "材料题数", "X": "材料正文",
     }
     header = question_rows[0]
     mismatches = [f"{column}列应为{label}" for column, label in expected_headers.items() if clean_text(header.get(column)) != label]
@@ -710,6 +959,7 @@ def main():
 
     question_types_match = validate_question_types(question_rows[1:])
     validate_judgment_answers(question_rows[1:])
+    validate_material_rows(question_rows[1:])
     status_counts = Counter(clean_text(row.get("R")) for row in question_rows[1:])
     visible_rows = [row for row in question_rows[1:] if clean_text(row.get("R")) == "可查看"]
     candidates = [build_candidate(row, config, version) for row in visible_rows]
@@ -723,6 +973,7 @@ def main():
     accepted_candidates = order_candidates_by_scope(
         [candidate for candidate in candidates if not candidate["reasons"]]
     )
+    normalize_published_material_groups(accepted_candidates)
     rejected_candidates = [candidate for candidate in candidates if candidate["reasons"]]
     updated_at = date_value(version)
     questions = [
@@ -759,6 +1010,13 @@ def main():
             "reasons": candidate["reasons"],
             "images": candidate["images"],
             "sourceUrl": candidate["sourceUrl"],
+            "materialGroupId": (
+                candidate["fields"].get("materialGroupId")
+                if candidate["fields"]["type"] == "material"
+                else ""
+            ),
+            "sourceMaterialQuestionIndex": candidate["sourceMaterialQuestionIndex"],
+            "sourceMaterialQuestionCount": candidate["sourceMaterialQuestionCount"],
         }
         for candidate in rejected_candidates
     ])
@@ -766,6 +1024,20 @@ def main():
     reason_counts = Counter(reason for candidate in rejected_candidates for reason in candidate["reasons"])
     title_counts = Counter(candidate["fields"]["title"] for candidate in accepted_candidates)
     duplicate_title_groups = sum(1 for count in title_counts.values() if count > 1)
+    visible_material_groups = Counter(
+        candidate["fields"].get("materialGroupId")
+        for candidate in candidates
+        if candidate["fields"]["type"] == "material"
+    )
+    accepted_material_groups = Counter(
+        candidate["fields"].get("materialGroupId")
+        for candidate in accepted_candidates
+        if candidate["fields"]["type"] == "material"
+    )
+    partial_material_groups = sum(
+        0 < accepted_material_groups[group_id] < source_count
+        for group_id, source_count in visible_material_groups.items()
+    )
     report = {
         "status": "passed_with_rejections" if rejected_candidates else "passed",
         "input": str(workbook_path),
@@ -785,6 +1057,8 @@ def main():
             "selectionModes": dict(
                 Counter(question["selectionMode"] for question in questions)
             ),
+            "materialGroups": len(accepted_material_groups),
+            "partialSourceMaterialGroups": partial_material_groups,
         },
         "statusCounts": dict(status_counts),
         "rejectionReasons": dict(reason_counts),

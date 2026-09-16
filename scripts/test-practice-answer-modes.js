@@ -24,7 +24,7 @@ function loadComponent(environment, relativePath) {
 
 function createQuestion(id, type, answer) {
 	const selectionMode = type === 'single' || type === 'judgment' ? 'single' : 'multiple'
-	return {
+	const question = {
 		id,
 		questionId: id,
 		subjectId: 'junior-personal-finance',
@@ -38,6 +38,13 @@ function createQuestion(id, type, answer) {
 		answer,
 		explanation: '测试解析'
 	}
+	if (type === 'material') Object.assign(question, {
+		materialGroupId: `${id}-group`,
+		materialText: '这是一段独立展示的材料正文。',
+		materialQuestionIndex: 1,
+		materialQuestionCount: 1
+	})
+	return question
 }
 
 async function run() {
@@ -97,6 +104,9 @@ async function run() {
 	}
 	let membershipResponse = activeMembership
 	const environment = {
+		getQuestionTypeDisplayLabel: question => question.type === 'material'
+			? `材料题，第 ${question.materialQuestionIndex}/${question.materialQuestionCount} 小题`
+			: ({ single: '单选题', judgment: '判断题', multiple: '多选题' })[question.type],
 		getQuestionTypeLabel: type => ({
 			single: '单选题',
 			judgment: '判断题',
@@ -194,10 +204,21 @@ async function run() {
 			getLocalPracticePreferences: () => preferenceResponse,
 			getPracticePreferences: async () => preferenceResponse,
 			getCachedPracticeSummary: () => null,
-		getCachedMembership: () => membershipResponse,
-		getMembership: async () => membershipResponse,
+			getEffectiveAnswerMode: (answerMode, isMember) => (
+				!isMember && answerMode === 'review' ? 'practice' : answerMode
+			),
+			getEffectiveSmartPractice: (value, isMember) => (
+				!isMember && value.questionCount > 30
+					? Object.assign({}, value, { questionCount: 30, custom: Object.assign({}, value.custom) })
+					: value
+			),
+			FREE_SMART_QUESTION_COUNT_MAX: 30,
+			getCachedMembership: () => membershipResponse,
+			getMembership: async () => membershipResponse,
+			cacheMembershipSnapshot: value => value,
+			showMembershipUpsell: async () => true,
 		updatePracticePreferences: async preferences => {
-			preferenceResponse = Object.assign({}, preferences, { updatedAt: Date.now() })
+			preferenceResponse = Object.assign({}, preferenceResponse, preferences, { updatedAt: Date.now() })
 			return preferenceResponse
 		},
 		getChapterPracticePosition: () => {
@@ -219,7 +240,21 @@ async function run() {
 			return { questionId: 'saved-section-question' }
 		},
 		getLocalPracticeRoundSnapshot: () => localRoundSnapshot,
+		getLocalExamDraft: () => currentExamDraft,
 		getPracticeRound: async () => practiceRoundResponse,
+		getPracticeBootstrap: async input => {
+			snapshotCalls += 1
+			return {
+				membership: membershipResponse,
+				preferences: preferenceResponse,
+				practiceRound: preferenceResponse.answerMode === 'practice'
+					&& ['chapter', 'section'].indexOf(input.mode) > -1
+					? practiceRoundResponse
+					: null,
+				examDraft: preferenceResponse.answerMode === 'exam' ? currentExamDraft : null,
+				snapshot: { favoriteQuestionIds: [] }
+			}
+		},
 		examDraftHasProgress: draft => Boolean(draft && draft.hasProgress !== false && (
 			Number(draft.answered) > 0
 			|| draft.answers && Object.keys(draft.answers).length > 0
@@ -448,13 +483,13 @@ async function run() {
 	assert.equal(practice.sessionAnswers[single.id].correct, true)
 	assert.equal(practice.visibleSlides[1].revealed, true)
 	assert.match(practice.answerNumberClass(0), /(?:^|\s)answered(?:\s|$)/)
-	assert.equal(practice.questionTypeLabel(single.type), '单选题')
+	assert.equal(practice.questionTypeLabel(single), '单选题')
 	const judgment = createQuestion('judgment-1', 'judgment', ['B'])
 	const judgmentPractice = createContext('practice', [judgment])
 	judgmentPractice.loadQuestion(0)
 	judgmentPractice.chooseOption('B')
 	assert.equal(judgmentPractice.sessionAnswers[judgment.id].correct, true)
-	assert.equal(judgmentPractice.questionTypeLabel(judgment.type), '判断题')
+	assert.equal(judgmentPractice.questionTypeLabel(judgment), '判断题')
 	const freshSession = createContext('practice', [single])
 	freshSession.sessionAnswers[single.id] = { selected: ['A'], correct: true }
 	freshSession.resetSessionAnswers()
@@ -469,7 +504,7 @@ async function run() {
 	assert.equal(multiplePractice.sessionAnswers[multiple.id], undefined)
 	multiplePractice.confirmCurrentAnswer()
 	assert.equal(multiplePractice.sessionAnswers[multiple.id].correct, true)
-	assert.equal(multiplePractice.questionTypeLabel(multiple.type), '多选题')
+	assert.equal(multiplePractice.questionTypeLabel(multiple), '多选题')
 
 	const material = createQuestion('material-1', 'material', ['A'])
 	const materialPractice = createContext('practice', [material])
@@ -481,9 +516,9 @@ async function run() {
 	materialPractice.confirmCurrentAnswer()
 	assert.equal(recordCalls.length, callsBeforeMaterialConfirm + 1)
 	assert.equal(materialPractice.sessionAnswers[material.id].correct, true)
-	assert.equal(materialPractice.questionTypeLabel(material.type), '材料题')
+	assert.equal(materialPractice.questionTypeLabel(material), '材料题，第 1/1 小题')
 
-	const callsBeforeV2ExamInteraction = recordCalls.length
+	const callsBeforeV3ExamInteraction = recordCalls.length
 	const judgmentExam = createContext('exam', [judgment, single])
 	judgmentExam.loadQuestion(0)
 	judgmentExam.chooseOption('B')
@@ -495,7 +530,7 @@ async function run() {
 	assert.equal(materialExam.canConfirmSlide(getCurrentSlide(materialExam)), true)
 	materialExam.confirmCurrentAnswer()
 	assert.equal(materialExam.swiperCurrent, 2)
-	assert.equal(recordCalls.length, callsBeforeV2ExamInteraction)
+	assert.equal(recordCalls.length, callsBeforeV3ExamInteraction)
 	const multiAnswerMaterial = createQuestion('material-2', 'material', ['A', 'B'])
 	assert.equal(materialExam.isPartialExamAnswer(multiAnswerMaterial, ['A']), true)
 	assert.equal(materialExam.isPartialExamAnswer(multiAnswerMaterial, ['A', 'C']), false)
@@ -606,6 +641,55 @@ async function run() {
 	assert.deepEqual(Array.from(resumedExam.draftAnswers[single.id]), ['A'])
 	assert.equal(resumedExam.currentQuestion.id, following.id)
 	assert.equal(resumedExam.visibleSlides[1].revealed, false)
+	preferenceResponse = { answerMode: 'practice', nightMode: false }
+	currentExamDraft = null
+
+	// 实际题量可因完整材料组溢出；草稿、断点恢复、进度和结算均使用22道子题。
+	const overflowExamQuestions = Array.from({ length: 18 }, (_, index) => (
+		createQuestion(`overflow-single-${index + 1}`, 'single', ['A'])
+	))
+	for (let index = 1; index <= 4; index += 1) {
+		const child = createQuestion(`overflow-material-${index}`, 'material', ['A'])
+		Object.assign(child, {
+			materialGroupId: 'overflow-material-group',
+			materialText: '完整材料组必须一起保存在草稿中。',
+			materialQuestionIndex: index,
+			materialQuestionCount: 4
+		})
+		overflowExamQuestions.push(child)
+	}
+	allPracticeQuestions = overflowExamQuestions
+	preferenceResponse = { answerMode: 'exam', nightMode: false }
+	const overflowExamPage = createContext('exam', [])
+	overflowExamPage.mode = 'chapter'
+	overflowExamPage.practiceConfig = {
+		subjectId: 'junior-personal-finance',
+		chapterId: '1',
+		section: '',
+		knowledge: '',
+		keyword: '',
+		startId: '',
+		startNumber: 0,
+		examAction: ''
+	}
+	await overflowExamPage.loadQuestions()
+	assert.equal(overflowExamPage.questionList.length, 22)
+	assert.equal(overflowExamPage.examDraft.questionIds.length, 22)
+	overflowExamPage.loadQuestion(21)
+	assert.equal(overflowExamPage.progressPercent, 100)
+	currentExamDraft.positionQuestionId = overflowExamQuestions[21].id
+	const resumedOverflowExam = createContext('exam', [])
+	resumedOverflowExam.mode = 'chapter'
+	resumedOverflowExam.practiceConfig = Object.assign({}, overflowExamPage.practiceConfig, {
+		examAction: 'continue'
+	})
+	await resumedOverflowExam.loadQuestions()
+	assert.equal(resumedOverflowExam.questionList.length, 22)
+	assert.equal(resumedOverflowExam.currentQuestion.id, overflowExamQuestions[21].id)
+	resumedOverflowExam.finalizeExam()
+	assert.equal(resumedOverflowExam.examResult.totalCount, 22)
+	examDraftCompletes = 0
+	allPracticeQuestions = []
 	preferenceResponse = { answerMode: 'practice', nightMode: false }
 	currentExamDraft = null
 
@@ -1189,7 +1273,7 @@ async function run() {
 			recordsLoadCalls += 1
 		}
 	})
-	recordsComponent.onShow.call(recordsTheme)
+	await recordsComponent.onShow.call(recordsTheme)
 	assert.equal(recordsTheme.nightMode, true)
 	assert.equal(recordsLoadCalls, 1)
 	const freeRecords = Object.assign(recordsComponent.data(), recordsComponent.methods, {
@@ -1306,6 +1390,12 @@ async function run() {
 	assert.equal(home.subjectCatalogStatusText('junior-law'), '1250题')
 	assert.equal(home.subjectCatalogStatusText('junior-personal-finance'), '822题')
 	assert.equal(home.subjectCatalogStatusText('junior-risk'), '待导入')
+	await home.openSubjectPicker()
+	assert.equal(catalogSummaryCalls, 2)
+	const catalogCallsBeforeSubjectChange = catalogCalls
+	await home.changeSubject('junior-law')
+	assert.equal(catalogCalls, catalogCallsBeforeSubjectChange + 1)
+	home.currentSubjectId = 'junior-personal-finance'
 	await home.refreshNightMode()
 	assert.equal(home.nightMode, true)
 	assert.deepEqual(JSON.parse(JSON.stringify(tabBarStyles.slice(-1)[0])), {
@@ -1353,11 +1443,14 @@ async function run() {
 	await freeSettings.selectAnswerMode('exam')
 	assert.equal(freeSettings.answerMode, 'exam')
 	await freeSettings.selectAnswerMode('review')
-	assert.equal(freeSettings.answerMode, 'review')
+	assert.equal(freeSettings.answerMode, 'exam')
 
 	const pagesConfig = JSON.parse(fs.readFileSync(path.resolve(__dirname, '../pages.json'), 'utf8'))
 	assert.equal(pagesConfig.pages.some(page => page.path === 'pages/privacy/privacy'), false)
 	const aboutPageSource = fs.readFileSync(path.resolve(__dirname, '../pages/about/about.vue'), 'utf8')
+	const practicePageSource = fs.readFileSync(path.resolve(__dirname, '../practice-pages/practice/practice.vue'), 'utf8')
+	assert.doesNotMatch(practicePageSource, /loadMembershipState\(\{\s*forceRefresh:/)
+	assert.doesNotMatch(practicePageSource, /forceRefresh:\s*this\.membership\.isMember/)
 	const membershipEntry = aboutPageSource.match(/<uni-list-item[\s\S]*?title="会员中心"[\s\S]*?\/>/)
 	assert.ok(membershipEntry, '个人中心应包含会员中心入口')
 	assert.match(membershipEntry[0], /\bto="\/pages\/membership\/membership"/)
@@ -1378,7 +1471,7 @@ async function run() {
 	assert.match(settingsPageSource, /class="smart-question-count-control"/)
 	assert.doesNotMatch(settingsPageSource, />每组题量</)
 	assert.match(settingsPageSource, /PREFERENCES_SYNC_DEBOUNCE_MS = 800/)
-	assert.match(settingsPageSource, /updatePracticePreferences\(next, \{ deferSync: true \}\)/)
+	assert.match(settingsPageSource, /updatePracticePreferences\(changes, \{ deferSync: true \}\)/)
 	assert.match(settingsPageSource, /onHide\(\)[\s\S]*flushPendingPreferences\(\{ notify: false \}\)/)
 	assert.match(settingsPageSource, /onUnload\(\)[\s\S]*flushPendingPreferences\(\{ notify: false \}\)/)
 	assert.match(settingsPageSource, /smartPractice\.questionCount <= smartQuestionCountMin/)

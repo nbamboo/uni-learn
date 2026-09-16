@@ -81,6 +81,7 @@
 	import { getCachedMembership, getMembership } from '@/services/membership.js'
 	import {
 		examDraftHasProgress,
+		getEffectiveAnswerMode,
 		getExamDraftScope,
 		getExamDraftSummaries,
 		getLocalPracticePreferences,
@@ -90,9 +91,10 @@
 	export default {
 		data() {
 			const preferences = getLocalPracticePreferences()
+			const membership = getCachedMembership()
 			return {
 				nightMode: Boolean(preferences.nightMode),
-				membership: getCachedMembership(),
+				membership,
 				membershipLoaded: false,
 				subjectId: '',
 				keyword: '',
@@ -105,7 +107,7 @@
 				loadingMore: false,
 				searchTimer: null,
 				searchRequestId: 0,
-				answerMode: preferences.answerMode,
+				answerMode: getEffectiveAnswerMode(preferences.answerMode, membership.isMember),
 				examProgress: {},
 				entryActionPending: false
 			}
@@ -139,8 +141,9 @@
 			await membershipTask
 		},
 		onShow() {
-			this.applyNightMode(getLocalPracticePreferences())
-			this.answerMode = getLocalPracticePreferences().answerMode
+			const preferences = getLocalPracticePreferences()
+			this.applyNightMode(preferences)
+			this.answerMode = getEffectiveAnswerMode(preferences.answerMode, getCachedMembership().isMember)
 			if (this.keyword.trim()) this.refreshExamProgress(this.keyword.trim())
 		},
 		onUnload() {
@@ -280,29 +283,29 @@
 <style lang="scss">
 	page { background: #f5f6f8; color: #292d32; }
 	.search-page { min-height: 100vh; padding: 24rpx; box-sizing: border-box; background: #f5f6f8; }
-	.search-bar { display: flex; align-items: center; height: 84rpx; padding: 0 22rpx; border: 2rpx solid #008cff; border-radius: 8rpx; box-sizing: border-box; background: #ffffff; }
-	.search-bar input { flex: 1; height: 100%; margin-left: 14rpx; color: #292d32; font-size: 28rpx; }
+	.search-bar { display: flex; align-items: center; height: 84rpx; padding: 0 22rpx; border: 2rpx solid #008cff; border-radius: 14rpx; box-sizing: border-box; background: #ffffff; }
+	.search-bar input { flex: 1; height: 100%; margin-left: 14rpx; color: #292d32; font-size: 30rpx; }
 	.search-placeholder { color: #8d949d; }
 	.clear-button { padding: 12rpx 0 12rpx 16rpx; }
 	.section-heading, .result-heading { display: flex; align-items: center; justify-content: space-between; padding: 30rpx 4rpx 18rpx; }
-	.result-counts { display: flex; align-items: center; gap: 18rpx; color: #7a8088; font-size: 22rpx; }
+	.result-counts { display: flex; align-items: center; gap: 18rpx; color: #7a8088; font-size: 24rpx; }
 	.exam-progress-copy { color: #008cff; }
-	.section-heading text:first-child, .result-heading text:first-child { font-size: 31rpx; font-weight: 600; }
-	.section-heading text:last-child, .result-heading text:last-child { color: #838991; font-size: 23rpx; }
+	.section-heading text:first-child, .result-heading text:first-child { font-size: 32rpx; font-weight: 600; }
+	.section-heading text:last-child, .result-heading text:last-child { color: #838991; font-size: 24rpx; }
 	.keyword-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14rpx; }
-	.keyword-chip { display: flex; align-items: center; justify-content: space-between; min-height: 76rpx; padding: 12rpx 18rpx; border: 1rpx solid #e2e5e9; border-radius: 8rpx; box-sizing: border-box; background: #ffffff; }
-	.keyword-chip text:first-child { max-width: 75%; overflow: hidden; font-size: 25rpx; text-overflow: ellipsis; white-space: nowrap; }
-	.keyword-chip text:last-child { color: #008cff; font-size: 20rpx; }
-	.result-item { display: flex; align-items: center; min-height: 126rpx; margin-bottom: 14rpx; padding: 20rpx; border-radius: 8rpx; box-sizing: border-box; background: #ffffff; }
-	.result-index { display: flex; align-items: center; justify-content: center; width: 48rpx; height: 48rpx; flex: 0 0 48rpx; margin-right: 18rpx; border-radius: 8rpx; background: #eaf5ff; color: #008cff; font-size: 23rpx; }
+	.keyword-chip { display: flex; align-items: center; justify-content: space-between; min-height: 88rpx; padding: 14rpx 18rpx; border: 1rpx solid #e2e5e9; border-radius: 12rpx; box-sizing: border-box; background: #ffffff; }
+	.keyword-chip text:first-child { max-width: 75%; overflow: hidden; font-size: 28rpx; text-overflow: ellipsis; white-space: nowrap; }
+	.keyword-chip text:last-child { color: #008cff; font-size: 24rpx; }
+	.result-item { display: flex; align-items: center; min-height: 144rpx; margin-bottom: 14rpx; padding: 22rpx 20rpx; border: 1rpx solid #edf1f5; border-radius: 14rpx; box-sizing: border-box; background: #ffffff; }
+	.result-index { display: flex; align-items: center; justify-content: center; width: 48rpx; height: 48rpx; flex: 0 0 48rpx; margin-right: 18rpx; border-radius: 8rpx; background: #eaf5ff; color: #008cff; font-size: 24rpx; }
 	.result-content { display: flex; flex: 1; flex-direction: column; min-width: 0; margin-right: 14rpx; }
-	.result-title { display: -webkit-box; overflow: hidden; font-size: 27rpx; line-height: 1.5; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
-	.result-meta { display: flex; align-items: center; justify-content: space-between; margin-top: 10rpx; color: #90969e; font-size: 21rpx; }
+	.result-title { display: -webkit-box; overflow: hidden; font-size: 30rpx; line-height: 1.5; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
+	.result-meta { display: flex; align-items: center; justify-content: space-between; margin-top: 14rpx; color: #90969e; font-size: 24rpx; }
 	.result-meta text:first-child { max-width: 72%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 	.empty-state { display: flex; align-items: center; flex-direction: column; padding-top: 180rpx; }
 	.loading-state { display: flex; align-items: center; justify-content: center; min-height: 45vh; }
-	.empty-title { margin-top: 22rpx; font-size: 30rpx; font-weight: 600; }
-	.empty-caption { margin-top: 10rpx; color: #8d939b; font-size: 25rpx; }
+	.empty-title { margin-top: 22rpx; font-size: 32rpx; font-weight: 600; }
+	.empty-caption { margin-top: 10rpx; color: #8d939b; font-size: 24rpx; }
 	.search-ad-container { margin-top: 28rpx; overflow: hidden; border-radius: 8rpx; }
 
 	.search-page.night-mode { background: #12171d; color: #e6e9ed; }

@@ -119,6 +119,7 @@
 	import { getCatalog } from '@/services/question-bank.js'
 	import {
 		examDraftHasProgress,
+		getEffectiveAnswerMode,
 		getChapterPracticePosition,
 		getExamDraftScope,
 		getExamDraftSummaries,
@@ -142,8 +143,9 @@
 	export default {
 		data() {
 			const localPreferences = getLocalPracticePreferences()
+			const membership = getCachedMembership()
 			return {
-				membership: getCachedMembership(),
+				membership,
 				membershipLoaded: false,
 				subjectId: '',
 				view: 'chapter',
@@ -153,7 +155,7 @@
 				loadError: '',
 				catalogName: '',
 				expandedChapterId: '',
-				answerMode: localPreferences.answerMode,
+				answerMode: getEffectiveAnswerMode(localPreferences.answerMode, membership.isMember),
 				nightMode: Boolean(localPreferences.nightMode),
 				pageActive: false,
 				hiddenKnowledgeAdPositions: {},
@@ -193,7 +195,10 @@
 		onShow() {
 			const localPreferences = getLocalPracticePreferences()
 			const previousAnswerMode = this.answerMode
-			this.answerMode = localPreferences.answerMode
+			this.answerMode = getEffectiveAnswerMode(
+				localPreferences.answerMode,
+				getCachedMembership().isMember
+			)
 			this.nightMode = Boolean(localPreferences.nightMode)
 			this.applyNavigationTheme()
 			if (previousAnswerMode !== this.answerMode && this.items.length) {

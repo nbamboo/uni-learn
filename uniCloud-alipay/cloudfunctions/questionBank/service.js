@@ -1,6 +1,11 @@
 'use strict'
 
-const { validateSmartPractice, selectSmartPracticeIds } = require('./smart-practice.js')
+const {
+	validateSmartPractice,
+	buildSmartPracticeUnits,
+	classifySmartPracticeUnits,
+	selectSmartPracticeUnits
+} = require('./smart-practice.js')
 
 const CATALOG_COLLECTION = 'question_bank_catalogs'
 const QUESTION_COLLECTION = 'question_bank_questions'
@@ -8,9 +13,9 @@ const DEFAULT_PAGE_SIZE = 20
 const MAX_PAGE_SIZE = 50
 const MAX_QUESTION_IDS = 100
 const MAX_STATE_IDS = 2000
-const MAX_SMART_CANDIDATES = 100
+const SMART_METADATA_PAGE_SIZE = 500
 const MAX_CATALOG_SUMMARIES = 50
-const QUESTION_SCHEMA_VERSION = 2
+const QUESTION_SCHEMA_VERSION = 3
 const SUBJECT_ID_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/
 const QUESTION_ID_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/
 const ANSWER_ALIASES = ['A', 'B', 'C', 'D', 'E', 'F']
@@ -191,11 +196,11 @@ function withoutInternalFields(document) {
 	return result
 }
 
-function requireV2Catalog(catalog) {
+function requireV3Catalog(catalog) {
 	if (!catalog || catalog.questionSchemaVersion !== QUESTION_SCHEMA_VERSION) {
 		throw new QuestionBankError(
 			'QUESTION_BANK_SCHEMA_VERSION_UNSUPPORTED',
-			'当前题库不是题型 v2，请重新发布题库目录'
+			'当前题库不是题型 schema v3，请重新发布题库目录'
 		)
 	}
 	return catalog
@@ -203,12 +208,32 @@ function requireV2Catalog(catalog) {
 
 function requireQuestionSchema(document, requireSelectionMode) {
 	const expectedSelectionMode = document && QUESTION_SELECTION_MODES[document.type]
+	const materialFields = [
+		'materialGroupId', 'materialText', 'materialQuestionIndex', 'materialQuestionCount'
+	]
+	const hasMaterialField = Boolean(document)
+		&& materialFields.some(field => Object.prototype.hasOwnProperty.call(document, field))
+	const validMaterial = document && document.type === 'material'
+		&& typeof document.materialGroupId === 'string'
+		&& document.materialGroupId.length <= 64
+		&& QUESTION_ID_PATTERN.test(document.materialGroupId)
+		&& typeof document.materialText === 'string' && Boolean(document.materialText.trim())
+		&& document.materialText.length <= 10000
+		&& Number.isInteger(document.materialQuestionIndex)
+		&& Number.isInteger(document.materialQuestionCount)
+		&& document.materialQuestionIndex >= 1
+		&& document.materialQuestionCount >= document.materialQuestionIndex
+		&& typeof document.title === 'string' && Boolean(document.title.trim())
+		&& document.title.indexOf('[材料]') === -1
 	if (!expectedSelectionMode
-		|| (requireSelectionMode && document.selectionMode !== expectedSelectionMode)) {
+		|| (requireSelectionMode && document.selectionMode !== expectedSelectionMode)
+		|| (document && document.type === 'material'
+			&& (requireSelectionMode || hasMaterialField) && !validMaterial)
+		|| (document && document.type !== 'material' && hasMaterialField)) {
 		const questionId = document && (document.questionId || document._id) || 'unknown'
 		throw new QuestionBankError(
 			'QUESTION_BANK_INVALID_QUESTION_SCHEMA',
-			`题目${questionId}不符合题型 v2 结构`
+			`题目${questionId}不符合题型 schema v3 结构`
 		)
 	}
 	return document
@@ -238,15 +263,16 @@ function toSearchSummary(document) {
 }
 
 function toPublicCatalog(document) {
-	requireV2Catalog(document)
+	requireV3Catalog(document)
 	const result = Object.assign({}, document)
 	delete result._id
+	delete result.smartPracticeUnits
 	result.id = result.subjectId
 	return result
 }
 
 function toPublicCatalogSummary(document) {
-	requireV2Catalog(document)
+	requireV3Catalog(document)
 	return {
 		id: document.subjectId,
 		subjectId: document.subjectId,
@@ -336,7 +362,7 @@ async function getCatalogRecord(db, subjectId) {
 	if (!catalog.activeVersion) {
 		throw new QuestionBankError('QUESTION_BANK_VERSION_NOT_FOUND', '科目尚未发布题库版本')
 	}
-	return requireV2Catalog(catalog)
+	return requireV3Catalog(catalog)
 }
 
 async function queryQuestionPage(db, condition, cursor, pageSize, fields) {
@@ -402,26 +428,35 @@ function createRandom(seed) {
 	}
 }
 
-async function getSampledQuestionReferences(db, catalog, pageSize, random) {
-	const questionCount = Math.max(0, Number(catalog.questionCount) || 0)
-	if (!questionCount) return []
-	const candidateCount = Math.min(
-		questionCount,
-		Math.max(pageSize * 5, Math.min(100, questionCount)),
-		MAX_SMART_CANDIDATES
-	)
-	const sortOrders = new Set()
-	while (sortOrders.size < candidateCount) {
-		sortOrders.add(1 + Math.floor(random() * questionCount))
+async function loadSmartQuestionReferences(db, catalog) {
+	const result = []
+	for (let offset = 0; ; offset += SMART_METADATA_PAGE_SIZE) {
+		const response = await db.collection(QUESTION_COLLECTION)
+			.where(buildBaseCondition(catalog))
+			.field({
+				questionId: true,
+				chapterId: true,
+				chapter: true,
+				section: true,
+				type: true,
+				selectionMode: true,
+				title: true,
+				sortOrder: true,
+				materialGroupId: true,
+				materialText: true,
+				materialQuestionIndex: true,
+				materialQuestionCount: true
+			})
+			.orderBy('sortOrder', 'asc')
+			.skip(offset)
+			.limit(SMART_METADATA_PAGE_SIZE)
+			.get()
+		const rows = getRows(response)
+		rows.forEach(question => requireQuestionSchema(question, true))
+		result.push(...rows)
+		if (rows.length < SMART_METADATA_PAGE_SIZE) break
 	}
-	const response = await db.collection(QUESTION_COLLECTION)
-		.where(Object.assign({}, buildBaseCondition(catalog), {
-			sortOrder: db.command.in(Array.from(sortOrders))
-		}))
-		.field({ questionId: true, sortOrder: true })
-		.limit(candidateCount)
-		.get()
-	return getRows(response)
+	return result
 }
 
 function dateSeed(now) {
@@ -579,39 +614,61 @@ function createQuestionBankService(db, options) {
 			maxLength: 128
 		})
 		const random = createRandom(hashSeed(seed))
-		const references = await getSampledQuestionReferences(db, catalog, pageSize, random)
+		const indexedUnits = Array.isArray(catalog.smartPracticeUnits)
+			&& catalog.smartPracticeUnits.length
+			? catalog.smartPracticeUnits
+			: null
+		const references = indexedUnits ? null : await loadSmartQuestionReferences(db, catalog)
 		const answered = new Set(answeredQuestionIds)
 		const wrong = new Set(wrongQuestionIds)
-		const groups = { fresh: [], wrong: [], mastered: [] }
-		references.forEach(reference => {
-			if (wrong.has(reference.questionId)) groups.wrong.push(reference)
-			else if (answered.has(reference.questionId)) groups.mastered.push(reference)
-			else groups.fresh.push(reference)
-		})
-		const sampledIds = new Set(references.map(reference => reference.questionId))
-		const sampledWrongIds = groups.wrong.map(reference => reference.questionId)
-		const externalWrongIds = wrongQuestionIds.filter(questionId => !sampledIds.has(questionId))
-		const selectedIds = selectSmartPracticeIds({
-			fresh: groups.fresh.map(item => item.questionId),
-			wrong: sampledWrongIds.concat(externalWrongIds),
-			mastered: groups.mastered.map(item => item.questionId)
-		}, pageSize, smartPractice, random)
-		const documents = await getQuestionsByIdsInternal(db, catalog, selectedIds)
+		let units
+		try { units = indexedUnits || buildSmartPracticeUnits(references) }
+		catch (error) {
+			throw new QuestionBankError(
+				'QUESTION_BANK_INVALID_QUESTION_SCHEMA',
+				error && error.message || '材料题分组结构无效'
+			)
+		}
+		if (!indexedUnits && units.length) {
+			const catalogDocument = db.collection(CATALOG_COLLECTION).doc(catalog._id || catalog.subjectId)
+			if (catalogDocument && typeof catalogDocument.update === 'function') {
+				try { await catalogDocument.update({ smartPracticeUnits: units }) }
+				catch (error) {
+					// Index backfill failure must not block this smart-practice request.
+				}
+			}
+		}
+		const groups = classifySmartPracticeUnits(units, answered, wrong)
+		const selection = selectSmartPracticeUnits(groups, pageSize, smartPractice, random)
+		const documents = await getQuestionsByIdsInternal(db, catalog, selection.questionIds)
+		if (documents.length !== selection.questionIds.length) {
+			throw new QuestionBankError(
+				'QUESTION_BANK_INVALID_QUESTION_SCHEMA',
+				'智能练习材料组存在缺失的启用子题'
+			)
+		}
+		const stateQuestionCount = key => groups[key].reduce(
+			(total, unit) => total + unit.questionCount,
+			0
+		)
 		return {
 			subjectId,
 			version: catalog.activeVersion,
 			mode: 'smart',
 			seed,
-			total: Number(catalog.questionCount) || references.length,
+			total: Number(catalog.questionCount) || (references ? references.length : 0),
 			pageSize,
+			requestedQuestionCount: selection.requestedQuestionCount,
+			actualQuestionCount: documents.length,
+			overflowQuestionCount: Math.max(0, documents.length - selection.requestedQuestionCount),
 			cursor: 0,
 			nextCursor: null,
 			hasMore: false,
 			stateCounts: {
-				fresh: groups.fresh.length,
-				wrong: wrongQuestionIds.length,
-				mastered: groups.mastered.length,
-				sampled: references.length
+				fresh: stateQuestionCount('fresh'),
+				wrong: stateQuestionCount('wrong'),
+				mastered: stateQuestionCount('mastered'),
+				sampled: Number(catalog.questionCount) || (references ? references.length : 0)
 			},
 			items: documents.map(toPublicQuestion)
 		}

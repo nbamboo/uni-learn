@@ -336,7 +336,7 @@ async function testBatchScheduling() {
 		knowledge: '批量同步',
 		answer: ['A']
 	}
-	for (let index = 0; index < 9; index += 1) {
+	for (let index = 0; index < 49; index += 1) {
 		service.queuePracticeAnswer(question, ['A'], {
 			eventId: `batch-answer-${index}`,
 			correct: true,
@@ -344,18 +344,18 @@ async function testBatchScheduling() {
 		})
 	}
 	assert.equal(calls.length, 0)
-	assert.equal(timers.filter(item => !item.cleared).slice(-1)[0].delay, 15 * 1000)
+	assert.equal(timers.filter(item => !item.cleared).slice(-1)[0].delay, 120 * 1000)
 	service.queuePracticeAnswer(question, ['A'], {
-		eventId: 'batch-answer-nine',
+		eventId: 'batch-answer-fifty',
 		correct: true,
-		occurredAt: Date.now() + 9
+		occurredAt: Date.now() + 49
 	})
 	const immediateTimer = timers.filter(item => !item.cleared).slice(-1)[0]
 	assert.equal(immediateTimer.delay, 0)
 	immediateTimer.handler()
 	await service.flushPracticeEvents({ includeProgress: false })
 	assert.equal(calls.length, 1)
-	assert.equal(calls[0].data.events.length, 10)
+	assert.equal(calls[0].data.events.length, 50)
 	assert.equal(service.pendingPracticeEventCount(), 0)
 }
 
@@ -549,24 +549,12 @@ async function testNonMemberLocalOnly() {
 		chapterId: '1'
 	})
 	assert.equal(progress, null)
-	const localWrongRecords = await service.getPracticeRecords({
-		subjectId,
-		type: 'wrong',
-		page: 1,
-		pageSize: 20
-	})
-	assert.equal(localWrongRecords._localOnly, true)
-	assert.equal(localWrongRecords.total, 1)
-	assert.equal(localWrongRecords.items[0].question.id, question.id)
-	const localFavoriteRecords = await service.getPracticeRecords({
-		subjectId,
-		type: 'favorite',
-		page: 1,
-		pageSize: 20
-	})
-	assert.equal(localFavoriteRecords._localOnly, true)
-	assert.equal(localFavoriteRecords.total, 1)
-	assert.equal(localFavoriteRecords.items[0].question.id, question.id)
+	for (const type of ['wrong', 'favorite']) {
+		await assert.rejects(
+			service.getPracticeRecords({ subjectId, type, page: 1, pageSize: 20 }),
+			error => error && error.errCode === 'QUESTION_BANK_MEMBERSHIP_REQUIRED'
+		)
+	}
 	await assert.rejects(
 		service.getSmartPracticeQuestions({ subjectId, pageSize: 20 }),
 		error => error && error.errCode === 'QUESTION_BANK_LOCAL_SMART_REQUIRED'
@@ -1089,6 +1077,9 @@ async function run() {
 							errCode: 0,
 							data: {
 								subjectId: request.data.subjectId,
+								requestedQuestionCount: request.data.pageSize,
+								actualQuestionCount: 1,
+								overflowQuestionCount: 0,
 								items: [{ id: 'ipf-1', type: 'single', selectionMode: 'single' }]
 							}
 						}
@@ -1348,15 +1339,15 @@ async function run() {
 	assert.equal(calls.filter(item => item.data.action === 'getRecords').length, 2)
 	await service.getSmartPracticeQuestions({ subjectId: question.subjectId, pageSize: 20 })
 	await service.getSmartPracticeQuestions({ subjectId: question.subjectId, pageSize: 20 })
-	assert.equal(calls.filter(item => item.data.action === 'getSmartPractice').length, 1)
+	assert.equal(calls.filter(item => item.data.action === 'getSmartPractice').length, 2)
 	const preferenceReadsBeforeRatios = calls.filter(item => item.data.action === 'getPreferences').length
 	await service.updatePracticePreferences({ smartPractice: { strategy: 'wrong', questionCount: 30, custom: { fresh: 25, wrong: 65, mastered: 10 } } })
 	await service.getSmartPracticeQuestions({ subjectId: question.subjectId })
 	await service.getSmartPracticeQuestions({ subjectId: question.subjectId })
 	const smartCalls = calls.filter(item => item.data.action === 'getSmartPractice')
-	assert.equal(smartCalls.length, 2)
-	assert.equal(smartCalls[1].data.smartPractice.strategy, 'wrong')
-	assert.equal(smartCalls[1].data.pageSize, 30)
+	assert.equal(smartCalls.length, 4)
+	assert.equal(smartCalls[2].data.smartPractice.strategy, 'wrong')
+	assert.equal(smartCalls[2].data.pageSize, 30)
 	assert.equal(calls.filter(item => item.data.action === 'getPreferences').length, preferenceReadsBeforeRatios)
 	const profile = await service.getPracticeUserProfile()
 	const cachedProfile = await service.getPracticeUserProfile()

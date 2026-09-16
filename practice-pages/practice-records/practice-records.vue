@@ -76,12 +76,18 @@
 	import { getQuestionsByIds } from '@/services/question-bank.js'
 	import {
 		examDraftHasProgress,
+		getEffectiveAnswerMode,
 		getExamDraftScope,
 		getExamDraftSummaries,
 		getLocalPracticePreferences,
 		getPracticeRecords,
 		resetExamDraft
 	} from '@/services/user-practice.js'
+	import {
+		getCachedMembership,
+		getMembership,
+		showMembershipUpsell
+	} from '@/services/membership.js'
 
 	function formatRecordTime(timestamp) {
 		const date = new Date(timestamp)
@@ -92,7 +98,10 @@
 	export default {
 		data() {
 			const localPreferences = getLocalPracticePreferences()
+			const membership = getCachedMembership()
 			return {
+				membership,
+				membershipCheckPending: false,
 				subjectId: '',
 				activeView: 'wrong',
 				records: [],
@@ -103,7 +112,7 @@
 				loadingMore: false,
 				loadError: '',
 				requestId: 0,
-				answerMode: localPreferences.answerMode,
+				answerMode: getEffectiveAnswerMode(localPreferences.answerMode, membership.isMember),
 				examProgress: {},
 				entryActionPending: false,
 				nightMode: Boolean(localPreferences.nightMode),
@@ -126,15 +135,40 @@
 			this.activeView = this.tabs.some(item => item.key === options.view) ? options.view : 'wrong'
 			this.applyNavigationTheme()
 		},
-		onShow() {
+		async onShow() {
 			const preferences = getLocalPracticePreferences()
 			this.nightMode = Boolean(preferences.nightMode)
-			this.answerMode = preferences.answerMode
 			this.applyNavigationTheme()
+			if (!await this.ensureMembershipAccess()) return
+			this.answerMode = getEffectiveAnswerMode(preferences.answerMode, true)
 			this.loadRecords()
 			this.refreshExamProgress()
 		},
 		methods: {
+			async ensureMembershipAccess() {
+				if (this.membershipCheckPending) return false
+				this.membershipCheckPending = true
+				try {
+					try {
+						this.membership = await getMembership()
+					} catch (error) {
+						this.membership = getCachedMembership()
+					}
+					if (this.membership.isMember) return true
+					const openedMembership = await showMembershipUpsell(
+						'开通会员后即可使用错题集和收藏夹，集中复习需要巩固的题目。',
+						{ replace: true }
+					)
+					if (!openedMembership) {
+						uni.navigateBack({
+							fail: () => uni.switchTab({ url: '/pages/exam/exam' })
+						})
+					}
+					return false
+				} finally {
+					this.membershipCheckPending = false
+				}
+			},
 			applyNavigationTheme() {
 				uni.setNavigationBarColor({
 					frontColor: this.nightMode ? '#ffffff' : '#000000',
@@ -264,24 +298,24 @@
 	.records-page { min-height: 100vh; padding-bottom: 40rpx; }
 	.records-header { padding: 28rpx 24rpx 22rpx; background: #ffffff; }
 	.subject-info { display: flex; flex-direction: column; padding: 0 6rpx; }
-	.subject-label { color: #9aa1aa; font-size: 21rpx; line-height: 1.2; }
-	.subject-name { margin-top: 8rpx; color: #292d32; font-size: 30rpx; font-weight: 600; line-height: 1.35; }
+	.subject-label { color: #9aa1aa; font-size: 24rpx; line-height: 1.2; }
+	.subject-name { margin-top: 8rpx; color: #292d32; font-size: 32rpx; font-weight: 600; line-height: 1.35; }
 	.record-tabs { display: flex; height: 72rpx; margin-top: 24rpx; padding: 6rpx; border-radius: 14rpx; box-sizing: border-box; background: #f1f3f6; }
-	.record-tab { display: flex; align-items: center; justify-content: center; flex: 1; border-radius: 10rpx; color: #68707a; font-size: 26rpx; transition: color 0.16s ease, background-color 0.16s ease; }
+	.record-tab { display: flex; align-items: center; justify-content: center; flex: 1; border-radius: 10rpx; color: #68707a; font-size: 30rpx; transition: color 0.16s ease, background-color 0.16s ease; }
 	.record-tab.active { background: #ffffff; color: #008cff; font-weight: 600; box-shadow: 0 2rpx 8rpx rgba(35, 54, 72, 0.08); }
-	.records-summary { display: flex; align-items: center; justify-content: space-between; min-height: 112rpx; margin: 18rpx 24rpx 0; padding: 22rpx 24rpx; border: 1rpx solid #e0edf7; border-radius: 14rpx; box-sizing: border-box; background: #ffffff; box-shadow: 0 4rpx 14rpx rgba(29, 47, 63, 0.035); }
-	.exam-progress-copy { margin-left: auto; margin-right: 18rpx; color: #008cff; font-size: 22rpx; }
+	.records-summary { display: flex; align-items: center; justify-content: space-between; min-height: 120rpx; margin: 18rpx 24rpx 0; padding: 22rpx 24rpx; border: 1rpx solid #e0edf7; border-radius: 14rpx; box-sizing: border-box; background: #ffffff; box-shadow: 0 4rpx 14rpx rgba(29, 47, 63, 0.035); }
+	.exam-progress-copy { margin-left: auto; margin-right: 18rpx; color: #008cff; font-size: 24rpx; }
 	.summary-count { display: flex; align-items: baseline; min-width: 0; }
-	.summary-value { color: #008cff; font-size: 42rpx; font-weight: 700; line-height: 1; }
-	.summary-label { margin-left: 10rpx; color: #68717c; font-size: 23rpx; }
-	.records-summary button { display: flex; align-items: center; justify-content: center; height: 62rpx; margin: 0 0 0 24rpx; padding: 0 26rpx; border: 0; border-radius: 31rpx; box-sizing: border-box; background: #008cff; color: #ffffff; font-size: 24rpx; font-weight: 500; line-height: 1; }
+	.summary-value { color: #008cff; font-size: 40rpx; font-weight: 700; line-height: 1; }
+	.summary-label { margin-left: 10rpx; color: #68717c; font-size: 26rpx; }
+	.records-summary button { display: flex; align-items: center; justify-content: center; height: 68rpx; margin: 0 0 0 24rpx; padding: 0 28rpx; border: 0; border-radius: 34rpx; box-sizing: border-box; background: #008cff; color: #ffffff; font-size: 28rpx; font-weight: 500; line-height: 1; }
 	.records-summary button::after, .empty-state button::after { border: 0; }
 	.record-list { padding: 16rpx 24rpx 0; }
-	.record-item { display: flex; align-items: flex-start; min-height: 126rpx; margin-bottom: 14rpx; padding: 22rpx 20rpx; border: 1rpx solid #edf1f5; border-radius: 14rpx; box-sizing: border-box; background: #ffffff; }
-	.record-index { display: flex; align-items: center; justify-content: center; width: 48rpx; height: 48rpx; flex: 0 0 48rpx; margin: 2rpx 18rpx 0 0; border-radius: 10rpx; background: #f0f2f5; color: #707680; font-size: 23rpx; }
+	.record-item { display: flex; align-items: flex-start; min-height: 144rpx; margin-bottom: 14rpx; padding: 22rpx 20rpx; border: 1rpx solid #edf1f5; border-radius: 14rpx; box-sizing: border-box; background: #ffffff; }
+	.record-index { display: flex; align-items: center; justify-content: center; width: 48rpx; height: 48rpx; flex: 0 0 48rpx; margin: 2rpx 18rpx 0 0; border-radius: 10rpx; background: #f0f2f5; color: #707680; font-size: 24rpx; }
 	.record-content { display: flex; flex: 1; flex-direction: column; min-width: 0; }
-	.record-title { display: -webkit-box; overflow: hidden; font-size: 27rpx; line-height: 1.5; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
-	.record-meta { display: flex; align-items: center; justify-content: space-between; margin-top: 11rpx; color: #92979f; font-size: 21rpx; }
+	.record-title { display: -webkit-box; overflow: hidden; font-size: 30rpx; line-height: 1.5; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
+	.record-meta { display: flex; align-items: center; justify-content: space-between; margin-top: 14rpx; color: #92979f; font-size: 24rpx; }
 	.record-meta text:first-child { max-width: 70%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 	.record-status { display: flex; align-items: center; justify-content: center; width: 46rpx; height: 46rpx; flex: 0 0 46rpx; margin: 2rpx 0 0 16rpx; border-radius: 50%; }
 	.record-status.correct { background: #eff9f4; }
@@ -290,9 +324,9 @@
 	.empty-state { display: flex; align-items: center; flex-direction: column; padding: 150rpx 52rpx; text-align: center; }
 	.loading-state { display: flex; align-items: center; justify-content: center; min-height: 45vh; }
 	.empty-icon { display: flex; align-items: center; justify-content: center; width: 100rpx; height: 100rpx; border-radius: 8rpx; background: #eceff2; }
-	.empty-title { margin-top: 26rpx; font-size: 31rpx; font-weight: 600; }
-	.empty-caption { margin-top: 12rpx; color: #8a9098; font-size: 25rpx; line-height: 1.6; }
-	.empty-state button { height: 76rpx; margin-top: 30rpx; padding: 0 42rpx; border-radius: 40rpx; background: #008cff; color: #ffffff; font-size: 27rpx; line-height: 76rpx; }
+	.empty-title { margin-top: 26rpx; font-size: 32rpx; font-weight: 600; }
+	.empty-caption { margin-top: 12rpx; color: #8a9098; font-size: 24rpx; line-height: 1.6; }
+	.empty-state button { height: 76rpx; margin-top: 30rpx; padding: 0 42rpx; border-radius: 40rpx; background: #008cff; color: #ffffff; font-size: 28rpx; line-height: 76rpx; }
 	.error-state { color: #bd3f3f; }
 	.records-page.night-mode { background: #12171d; color: #e6e9ed; }
 	.night-mode .records-header { background: #171c22; }

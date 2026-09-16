@@ -2,6 +2,20 @@
   "bsonType": "object",
   "description": "题库题目数据，支持按科目、版本、章节和知识点查询",
   "required": ["_id", "questionId", "subjectId", "version", "chapterId", "chapter", "section", "knowledge", "type", "selectionMode", "title", "options", "answer", "explanation", "sortOrder", "status", "updatedAt"],
+  "fieldRules": [
+    {
+      "rule": "(type == 'single' || type == 'judgment') && selectionMode == 'single' || (type == 'multiple' || type == 'material') && selectionMode == 'multiple'",
+      "errorMessage": "题型与选项交互模式不匹配"
+    },
+    {
+      "rule": "type != 'material' || materialGroupId != null && materialText != null && materialQuestionIndex != null && materialQuestionCount != null && materialQuestionIndex <= materialQuestionCount",
+      "errorMessage": "材料题必须包含完整且有效的材料组字段"
+    },
+    {
+      "rule": "type == 'material' || materialGroupId == null && materialText == null && materialQuestionIndex == null && materialQuestionCount == null",
+      "errorMessage": "非材料题不得包含材料组字段"
+    }
+  ],
   "permission": {"read": false, "create": false, "update": false, "delete": true, "count": false},
   "properties": {
     "_id": {"bsonType": "string", "title": "题目版本ID", "description": "由题库版本和稳定题目ID组成，例如 2026-08-21:ipf-3199419", "minLength": 3, "maxLength": 128, "trim": "both"},
@@ -14,7 +28,11 @@
     "knowledge": {"bsonType": "string", "title": "知识点", "minLength": 1, "maxLength": 128, "trim": "both"},
     "type": {"bsonType": "string", "title": "题型", "enum": ["single", "judgment", "multiple", "material"]},
     "selectionMode": {"bsonType": "string", "title": "选项交互模式", "description": "single 和 judgment 使用单选交互，multiple 和 material 使用多选确认交互", "enum": ["single", "multiple"]},
-    "title": {"bsonType": "string", "title": "题干", "minLength": 1, "maxLength": 2048, "trim": "both"},
+    "materialGroupId": {"bsonType": "string", "title": "材料组ID", "description": "仅材料题使用，同一材料的全部启用子题共享此ID", "minLength": 1, "maxLength": 64, "trim": "both", "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"},
+    "materialText": {"bsonType": "string", "title": "材料正文", "description": "仅材料题使用，不包含当前子题题干", "minLength": 1, "maxLength": 10000, "trim": "both"},
+    "materialQuestionIndex": {"bsonType": "int", "title": "材料内子题序号", "description": "仅材料题使用，从1开始", "minimum": 1},
+    "materialQuestionCount": {"bsonType": "int", "title": "材料组子题数", "description": "仅材料题使用", "minimum": 1},
+    "title": {"bsonType": "string", "title": "题干", "description": "材料题仅保存当前子题题干，材料正文保存在 materialText", "minLength": 1, "maxLength": 2048, "trim": "both"},
     "options": {"bsonType": "array", "arrayType": "object", "title": "选项", "minLength": 2, "maxLength": 6, "items": {"bsonType": "object", "required": ["alias", "text"], "properties": {"alias": {"bsonType": "string", "title": "选项标识", "enum": ["A", "B", "C", "D", "E", "F"]}, "text": {"bsonType": "string", "title": "选项内容", "minLength": 1, "maxLength": 2048, "trim": "both"}}}},
     "answer": {"bsonType": "array", "arrayType": "string", "title": "正确答案", "minLength": 1, "maxLength": 6, "items": {"bsonType": "string", "enum": ["A", "B", "C", "D", "E", "F"]}},
     "explanation": {"bsonType": "string", "title": "答案解析", "minLength": 1, "maxLength": 10000, "trim": "both"},

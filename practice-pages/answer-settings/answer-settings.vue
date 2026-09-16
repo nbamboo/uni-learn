@@ -7,6 +7,7 @@
 					<view v-for="item in answerModes" :key="item.key" class="mode-segment"
 						:class="{ selected: answerMode === item.key }" @tap="selectAnswerMode(item.key)">
 						<text>{{ item.name }}</text>
+						<text class="mode-member-badge" v-if="item.key === 'review' && !membership.isMember">会员</text>
 					</view>
 				</view>
 				<text class="mode-active-desc">{{ selectedAnswerMode.desc }}</text>
@@ -109,13 +110,17 @@
 	} from '@/data/practice.js'
 	import {
 		clearCurrentSubjectPracticeData,
+		FREE_SMART_QUESTION_COUNT_MAX,
+		getEffectiveAnswerMode,
+		getEffectiveSmartPractice,
 		getLocalPracticePreferences,
 		getPracticePreferences,
 		updatePracticePreferences
 	} from '@/services/user-practice.js'
 	import {
 		getCachedMembership,
-		getMembership
+		getMembership,
+		showMembershipUpsell
 	} from '@/services/membership.js'
 	const PREFERENCES_SYNC_DEBOUNCE_MS = 800
 
@@ -136,14 +141,21 @@
 		data() {
 			const localPreferences = getLocalPracticePreferences()
 			const practiceState = getPracticeState()
+			const cachedMembership = getCachedMembership()
+			const storedSmartPractice = normalizeSmartPractice(localPreferences.smartPractice)
 			return {
-				membership: getCachedMembership(),
+				membership: cachedMembership,
 				membershipLoaded: false,
 				preferenceSyncTimer: null,
 				preferenceSyncRequest: null,
-				answerMode: localPreferences.answerMode,
+				storedPreferences: {
+					answerMode: localPreferences.answerMode,
+					nightMode: Boolean(localPreferences.nightMode),
+					smartPractice: storedSmartPractice
+				},
+				answerMode: getEffectiveAnswerMode(localPreferences.answerMode, cachedMembership.isMember),
 				nightMode: Boolean(localPreferences.nightMode),
-				smartPractice: normalizeSmartPractice(localPreferences.smartPractice),
+				smartPractice: getEffectiveSmartPractice(storedSmartPractice, cachedMembership.isMember),
 				smartStrategies: [
 					{ key: 'fresh', name: '新题优先' },
 					{ key: 'balanced', name: '均衡练习' }, { key: 'wrong', name: '错题巩固' },
@@ -170,18 +182,18 @@
 						tone: 'blue'
 					},
 					{
-						key: 'review',
-						name: '背题模式',
-						desc: '进入题目后直接显示答案与解析',
-						icon: 'eye-filled',
-						color: '#008cff',
-						tone: 'blue'
-					},
-					{
 						key: 'exam',
 						name: '考试模式',
 						desc: '提交整套试卷后统一查看答案与解析',
 						icon: 'paperplane-filled',
+						color: '#008cff',
+						tone: 'blue'
+					},
+					{
+						key: 'review',
+						name: '背题模式',
+						desc: '进入题目后直接显示答案与解析',
+						icon: 'eye-filled',
 						color: '#008cff',
 						tone: 'blue'
 					}
@@ -206,7 +218,13 @@
 		async onLoad() {
 			this.applyPreferences(getLocalPracticePreferences())
 			await this.refreshMembership()
+			this.applyPreferences(getLocalPracticePreferences())
 			await this.loadPreferences({ forceRefresh: true })
+		},
+		async onShow() {
+			if (!this.membershipLoaded) return
+			await this.refreshMembership({ forceRefresh: true })
+			this.applyPreferences(getLocalPracticePreferences())
 		},
 		onHide() {
 			this.flushPendingPreferences({ notify: false })
@@ -258,10 +276,22 @@
 				}
 			},
 			applyPreferences(preferences) {
-				this.answerMode = preferences.answerMode
-				this.nightMode = Boolean(preferences.nightMode)
-				this.smartPractice = normalizeSmartPractice(preferences.smartPractice)
+				const stored = {
+					answerMode: preferences.answerMode,
+					nightMode: Boolean(preferences.nightMode),
+					smartPractice: normalizeSmartPractice(preferences.smartPractice)
+				}
+				this.storedPreferences = stored
+				this.answerMode = getEffectiveAnswerMode(stored.answerMode, this.membership.isMember)
+				this.nightMode = stored.nightMode
+				this.smartPractice = getEffectiveSmartPractice(stored.smartPractice, this.membership.isMember)
 				this.applyNavigationTheme()
+			},
+			nextStoredSmartPractice(changes) {
+				const stored = normalizeSmartPractice(this.storedPreferences.smartPractice)
+				const next = Object.assign({}, stored, changes || {})
+				next.custom = Object.assign({}, changes && changes.custom || stored.custom)
+				return next
 			},
 			applyNavigationTheme() {
 				uni.setNavigationBarColor({
@@ -331,17 +361,26 @@
 			},
 			selectSmartStrategy(strategy) {
 				if (this.saving || strategy === this.smartPractice.strategy) return
-				return this.persistPreferences({ smartPractice: Object.assign({}, this.smartPractice, { strategy }) })
+				return this.persistPreferences({
+					smartPractice: this.nextStoredSmartPractice({ strategy })
+				})
 			},
-			adjustSmartQuestionCount(delta) {
+			async adjustSmartQuestionCount(delta) {
 				if (this.saving) return
 				const questionCount = Math.max(
 					this.smartQuestionCountMin,
 					Math.min(this.smartQuestionCountMax, this.smartPractice.questionCount + delta)
 				)
 				if (questionCount === this.smartPractice.questionCount) return
+				if (questionCount > FREE_SMART_QUESTION_COUNT_MAX) {
+					if (!this.membershipLoaded) await this.refreshMembership()
+					if (!this.membership.isMember) {
+						await showMembershipUpsell('非会员每组最多设置30题，开通会员后最高可设置50题。')
+						return
+					}
+				}
 				return this.persistPreferences({
-					smartPractice: Object.assign({}, this.smartPractice, { questionCount })
+					smartPractice: this.nextStoredSmartPractice({ questionCount })
 				})
 			},
 			smartRatioAtMaximum(key) {
@@ -355,27 +394,30 @@
 				custom.wrong = Math.min(custom.wrong, 100 - custom.fresh)
 				custom.mastered = 100 - custom.fresh - custom.wrong
 				return this.persistPreferences({
-					smartPractice: Object.assign({}, this.smartPractice, { strategy: 'custom', custom })
+					smartPractice: this.nextStoredSmartPractice({ strategy: 'custom', custom })
 				})
 			},
 			async selectAnswerMode(answerMode) {
 				if (this.saving || answerMode === this.answerMode) return
-				this.persistPreferences({ answerMode })
+				if (answerMode === 'review') {
+					if (!this.membershipLoaded) await this.refreshMembership()
+					if (!this.membership.isMember) {
+						await showMembershipUpsell('开通会员后即可使用背题模式，进入题目后直接查看答案与解析。')
+						return
+					}
+				}
+				return this.persistPreferences({ answerMode })
 			},
 			toggleNightMode() {
 				if (this.saving) return
 				this.persistPreferences({ nightMode: !this.nightMode })
 			},
 			async persistPreferences(changes) {
-				const next = Object.assign({
-					answerMode: this.answerMode,
-					nightMode: this.nightMode,
-					smartPractice: this.smartPractice
-				}, changes)
+				const next = Object.assign({}, this.storedPreferences, changes)
 				this.applyPreferences(next)
 				this.syncError = ''
 				try {
-					const saved = await updatePracticePreferences(next, { deferSync: true })
+					const saved = await updatePracticePreferences(changes, { deferSync: true })
 					this.applyPreferences(saved)
 					if (saved._syncPending) this.schedulePreferenceSync()
 					else this.clearPreferenceSyncTimer()
@@ -404,50 +446,51 @@
 <style lang="scss">
 	page { background: #f5f6f8; color: #262a30; }
 	.settings-page { min-height: 100vh; padding: 24rpx 24rpx calc(38rpx + env(safe-area-inset-bottom)); box-sizing: border-box; }
-	.settings-section { margin-bottom: 24rpx; }
-	.section-heading { display: flex; flex-direction: column; margin: 0 4rpx 12rpx; }
-	.section-title { font-size: 29rpx; font-weight: 600; }
-	.section-desc { margin-top: 4rpx; color: #7c8692; font-size: 21rpx; }
+	.settings-section { margin-bottom: 28rpx; }
+	.section-heading { display: flex; flex-direction: column; margin: 0 4rpx 16rpx; }
+	.section-title { font-size: 31rpx; font-weight: 600; }
+	.section-desc { margin-top: 4rpx; color: #7c8692; font-size: 23rpx; }
 	.settings-card, .smart-card { border: 1rpx solid #edf0f3; border-radius: 16rpx; box-sizing: border-box; background: #ffffff; box-shadow: 0 4rpx 14rpx rgba(31, 45, 61, 0.04); }
 	.settings-card.is-saving, .night-option.is-saving { opacity: 0.72; }
 
-	.mode-card { padding: 14rpx; }
+	.mode-card { padding: 16rpx; }
 	.mode-segments { display: flex; padding: 5rpx; border-radius: 12rpx; background: #f1f4f7; }
-	.mode-segment { display: flex; align-items: center; justify-content: center; height: 64rpx; flex: 1; border-radius: 9rpx; color: #69737f; font-size: 24rpx; font-weight: 600; }
+	.mode-segment { display: flex; align-items: center; justify-content: center; height: 68rpx; flex: 1; border-radius: 9rpx; color: #69737f; font-size: 28rpx; font-weight: 600; }
 	.mode-segment.selected { color: #ffffff; background: #008cff; box-shadow: 0 4rpx 12rpx rgba(0, 140, 255, 0.2); }
-	.mode-active-desc { display: block; padding: 14rpx 10rpx 2rpx; color: #737d88; font-size: 21rpx; line-height: 1.45; }
+	.mode-member-badge { margin-left: 7rpx; padding: 2rpx 7rpx; border-radius: 8rpx; background: #30465f; color: #ffffff; font-size: 17rpx; font-weight: 500; line-height: 1.2; }
+	.mode-active-desc { display: block; padding: 18rpx 10rpx 6rpx 32rpx; color: #737d88; font-size: 23rpx; line-height: 1.45; }
 
-	.smart-card { padding: 18rpx 20rpx; }
+	.smart-card { padding: 20rpx; }
 	.strategy-segments { display: flex; padding: 5rpx; border-radius: 12rpx; background: #f1f4f7; }
 	.strategy-segments.is-saving { opacity: 0.72; }
-	.strategy-segment { display: flex; align-items: center; justify-content: center; height: 58rpx; flex: 1; min-width: 0; border-radius: 9rpx; color: #69737f; font-size: 24rpx; font-weight: 600; white-space: nowrap; }
+	.strategy-segment { display: flex; align-items: center; justify-content: center; height: 64rpx; flex: 1; min-width: 0; border-radius: 9rpx; color: #69737f; font-size: 28rpx; font-weight: 600; white-space: nowrap; }
 	.strategy-segment.selected { color: #ffffff; background: #008cff; box-shadow: 0 3rpx 10rpx rgba(0, 140, 255, 0.18); }
 	.smart-heading { flex-direction: row; align-items: center; justify-content: space-between; min-height: 52rpx; }
 	.smart-question-count-control { display: flex; align-items: center; gap: 6rpx; }
-	.smart-question-count-value { width: 76rpx; text-align: center; color: #008cff; font-size: 24rpx; font-weight: 600; }
-	.ratio-step.count-step { width: 46rpx; height: 46rpx; border-radius: 8rpx; font-size: 24rpx; }
+	.smart-question-count-value { width: 84rpx; text-align: center; color: #008cff; font-size: 29rpx; font-weight: 600; }
+	.ratio-step.count-step { width: 46rpx; height: 46rpx; border-radius: 8rpx; font-size: 27rpx; }
 	.ratio-step::after { border: none; }
 	.ratio-step[disabled] { opacity: 0.5; }
-	.ratio-summary { display: flex; align-items: center; justify-content: space-between; min-height: 62rpx; padding: 4rpx 2rpx 0; }
-	.ratio-summary-title { flex: 0 0 auto; color: #737d88; font-size: 21rpx; }
-	.ratio-summary-values { display: flex; align-items: center; justify-content: flex-end; min-width: 0; color: #008cff; font-size: 22rpx; font-weight: 600; white-space: nowrap; }
+	.ratio-summary { display: flex; align-items: center; justify-content: space-between; min-height: 70rpx; padding: 6rpx 2rpx 0; }
+	.ratio-summary-title { flex: 0 0 auto; margin-left: 28rpx; color: inherit; font-size: 27rpx; }
+	.ratio-summary-values { display: flex; align-items: center; justify-content: flex-end; min-width: 0; color: #008cff; font-size: 25rpx; font-weight: 600; white-space: nowrap; }
 	.ratio-summary-separator { padding: 0 9rpx; color: #aeb6bf; font-weight: 400; }
-	.custom-ratio-list { padding: 2rpx 5rpx 0; }
-	.smart-ratio-row { display: flex; align-items: center; min-height: 66rpx; gap: 10rpx; }
-	.smart-category { flex: 1; font-size: 22rpx; }
-	.smart-ratio-control { display: flex; align-items: center; gap: 7rpx; }
-	.smart-percent { width: 68rpx; text-align: center; color: #008cff; font-size: 24rpx; font-weight: 600; }
-	.ratio-step { display: flex; align-items: center; justify-content: center; width: 52rpx; height: 52rpx; padding: 0; margin: 0; border-radius: 9rpx; color: #008cff; background: #edf7ff; font-size: 26rpx; line-height: 1; }
-	.smart-count { width: 48rpx; text-align: right; color: #737d88; font-size: 21rpx; }
+	.custom-ratio-list { padding: 8rpx 5rpx 4rpx; }
+	.smart-ratio-row { display: flex; align-items: center; min-height: 76rpx; gap: 10rpx; }
+	.smart-category { flex: 1; margin-left: 25rpx; font-size: 27rpx; }
+	.smart-ratio-control { display: flex; align-items: center; gap: 10rpx; }
+	.smart-percent { width: 72rpx; text-align: center; color: #008cff; font-size: 29rpx; font-weight: 600; }
+	.ratio-step { display: flex; align-items: center; justify-content: center; width: 46rpx; height: 46rpx; padding: 0; margin: 0; border-radius: 8rpx; color: #008cff; background: #edf7ff; font-size: 27rpx; line-height: 1; }
+	.smart-count { width: 52rpx; margin-left: 4rpx; text-align: right; color: #737d88; font-size: 23rpx; }
 
 	.other-section { margin-bottom: 0; }
-	.other-card { padding: 0 18rpx; }
-	.setting-row { display: flex; align-items: center; min-height: 104rpx; }
+	.other-card { padding: 0 24rpx; }
+	.setting-row { display: flex; align-items: center; min-height: 116rpx; }
 	.setting-divider { height: 1rpx; margin-left: 72rpx; background: #edf0f4; }
 	.setting-icon { display: flex; align-items: center; justify-content: center; width: 56rpx; height: 56rpx; flex: 0 0 56rpx; margin-right: 16rpx; border-radius: 13rpx; background: #e4f3ff; }
 	.setting-copy { display: flex; flex: 1; flex-direction: column; min-width: 0; }
-	.setting-title { overflow: hidden; color: #30353c; font-size: 25rpx; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
-	.setting-desc { overflow: hidden; margin-top: 4rpx; color: #737d88; font-size: 21rpx; text-overflow: ellipsis; white-space: nowrap; }
+	.setting-title { overflow: hidden; color: #30353c; font-size: 28rpx; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
+	.setting-desc { overflow: hidden; margin-top: 6rpx; color: #737d88; font-size: 23rpx; text-overflow: ellipsis; white-space: nowrap; }
 	.night-option.is-saving, .clear-option.is-clearing { opacity: 0.64; }
 	.moon-shape { position: relative; width: 29rpx; height: 29rpx; overflow: hidden; border-radius: 50%; background: #008cff; }
 	.moon-cutout { position: absolute; top: -4rpx; right: -4rpx; width: 27rpx; height: 27rpx; border-radius: 50%; background: #e4f3ff; }
@@ -458,18 +501,19 @@
 	.switch-thumb { position: absolute; top: 4rpx; left: 4rpx; width: 34rpx; height: 34rpx; border-radius: 50%; background: #ffffff; box-shadow: 0 2rpx 7rpx rgba(31, 45, 61, 0.2); transition: left 0.2s ease; }
 	.switch-preview.active .switch-thumb { left: 38rpx; }
 
-	.sync-note { display: flex; align-items: center; justify-content: center; gap: 8rpx; margin-top: 18rpx; color: #a86218; font-size: 21rpx; }
+	.sync-note { display: flex; align-items: center; justify-content: center; gap: 8rpx; margin-top: 18rpx; color: #a86218; font-size: 23rpx; }
 	.settings-ad-container { display: block; width: 100%; margin-top: 28rpx; border-radius: 16rpx; box-sizing: border-box; background: #ffffff; }
 	.settings-ad { display: block; width: 100%; border-radius: 16rpx; }
 
 	.settings-page.night-mode { background: #12171d; color: #e6e9ed; }
 	.night-mode .settings-card, .night-mode .smart-card { border-color: #2a343e; background: #1b222a; box-shadow: 0 4rpx 14rpx rgba(0, 0, 0, 0.15); }
 	.night-mode .section-desc, .night-mode .mode-active-desc,
-	.night-mode .ratio-summary-title, .night-mode .smart-count,
+	.night-mode .smart-count,
 	.night-mode .setting-desc { color: #8f99a5; }
 	.night-mode .mode-segments { background: #242d37; }
 	.night-mode .mode-segment { color: #aeb8c4; }
 	.night-mode .mode-segment.selected { color: #ffffff; background: #168ee5; }
+	.night-mode .mode-member-badge { background: #49637f; }
 	.night-mode .strategy-segments { background: #242d37; }
 	.night-mode .strategy-segment { color: #aeb8c4; }
 	.night-mode .strategy-segment.selected { color: #ffffff; background: #168ee5; }

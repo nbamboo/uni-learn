@@ -443,6 +443,11 @@ async function run() {
 	}, userId)
 	assert.equal(formalRecords.total, 1)
 	assert.equal(formalRecords.items[0].question.questionId, formalWrongQuestion.questionId)
+	const formalRecordIds = await service.execute({
+		action: 'getRecords', subjectId, type: 'wrong', idsOnly: true
+	}, userId)
+	assert.deepEqual(formalRecordIds.questionIds, [formalWrongQuestion.questionId])
+	assert.equal(formalRecordIds.items, undefined)
 	const formalSnapshot = await service.execute({
 		action: 'getStateSnapshot',
 		subjectId,
@@ -454,6 +459,17 @@ async function run() {
 		action: 'getPracticeRound', subjectId, chapterId: formalCorrectQuestion.chapterId
 	}, userId)
 	assert.equal(formalRound.answers.length, 0)
+	const bootstrap = await service.execute({
+		action: 'getPracticeBootstrap',
+		subjectId,
+		mode: 'chapter',
+		chapterId: formalCorrectQuestion.chapterId,
+		questionIds: [formalCorrectQuestion.questionId, formalWrongQuestion.questionId]
+	}, userId)
+	assert.equal(bootstrap.membership.isMember, true)
+	assert.equal(bootstrap.preferences.answerMode, 'practice')
+	assert.equal(bootstrap.practiceRound.chapterId, formalCorrectQuestion.chapterId)
+	assert.deepEqual(bootstrap.snapshot.wrongQuestionIds, [formalWrongQuestion.questionId])
 	for (const collectionName of ['question_bank_user_states', 'question_bank_user_stats']) {
 		for (const [id, document] of environment.collections[collectionName]) {
 			if (document.userId === userId && document.subjectId === subjectId) {
@@ -500,7 +516,9 @@ async function run() {
 		'getPracticeRound',
 		'getExamDraft',
 		'getExamDraftSummaries',
+		'getPracticeBootstrap',
 		'getSmartPractice',
+		'getSmartPracticeState',
 		'getPreferences',
 		'updatePreferences',
 		'clearCurrentSubjectData'
@@ -787,12 +805,16 @@ async function run() {
 		.filter(item => item.subjectId === subjectId).length
 	assert.equal(smartPractice.total, subjectQuestionCount)
 	assert.equal(smartPractice.items.length, 20)
+	assert.equal(smartPractice.requestedQuestionCount, 20)
+	assert.equal(smartPractice.actualQuestionCount, 20)
+	assert.equal(smartPractice.overflowQuestionCount, 0)
 	assert.ok(smartPractice.items.every(item => item.type && item.selectionMode))
-	assert.ok(smartPractice.stateCounts.sampled <= 100)
+	assert.equal(smartPractice.stateCounts.sampled, subjectQuestionCount)
 	const ratioEnvironment = createDatabase(loadSeed(), new Date(currentTime))
 	const ratioService = createQuestionBankUserService(ratioEnvironment.db, { now: () => new Date(currentTime) })
 	const categoryById = new Map()
-	Array.from(ratioEnvironment.collections.question_bank_questions.values()).forEach((item, index) => {
+	const ratioQuestions = Array.from(ratioEnvironment.collections.question_bank_questions.values())
+	ratioQuestions.forEach((item, index) => {
 		const category = ['fresh', 'wrong', 'mastered'][index % 3]
 		categoryById.set(item.questionId, category)
 		if (category === 'fresh') return
@@ -801,15 +823,129 @@ async function run() {
 			attempted: true, lastCorrect: category === 'mastered', lastAnsweredAt: currentTime
 		})
 	})
+	const ratioCatalog = ratioEnvironment.collections.question_bank_catalogs.get(subjectId)
+	ratioCatalog.smartPracticeUnits = ratioQuestions
+		.slice()
+		.sort((left, right) => left.sortOrder - right.sortOrder)
+		.map(item => ({
+			unitId: `question:${item.questionId}`,
+			questionIds: [item.questionId],
+			questionCount: 1,
+			sortOrder: item.sortOrder
+		}))
 	const mixed = await ratioService.execute({ action: 'getSmartPractice', subjectId, pageSize: 20,
 		seed: 'ratio-test', smartPractice: { strategy: 'balanced', questionCount: 20, custom: { fresh: 60, wrong: 30, mastered: 10 } } }, userId)
 	assert.equal(mixed.items.length, 20)
-	assert.equal(mixed.stateCounts.sampled, 80)
+	assert.equal(mixed.stateCounts.sampled, subjectQuestionCount)
 	assert.deepEqual(['fresh', 'wrong', 'mastered'].map(key => mixed.items.filter(item => categoryById.get(item.id) === key).length), [12, 6, 2])
 	assert.equal(new Set(mixed.items.map(item => item.id)).size, 20)
-	assert.equal(ratioEnvironment.reads.question_bank_user_states, 2)
-	assert.equal(ratioEnvironment.reads.question_bank_questions, 2)
-	assert.equal(ratioEnvironment.reads.question_bank_user_preferences || 0, 0)
+	assert.equal(ratioEnvironment.reads.question_bank_user_states, 1)
+	assert.equal(ratioEnvironment.reads.question_bank_questions, 1)
+	const smartState = await ratioService.execute({
+		action: 'getSmartPracticeState', subjectId
+	}, userId)
+	assert.equal(
+		smartState.answeredQuestionIds.length,
+		Array.from(categoryById.values()).filter(category => category !== 'fresh').length
+	)
+	assert.equal(
+		smartState.wrongQuestionIds.length,
+		Array.from(categoryById.values()).filter(category => category === 'wrong').length
+	)
+	await ratioService.execute({ action: 'getSmartPractice', subjectId, pageSize: 20,
+		seed: 'ratio-test-second', smartPractice: { strategy: 'balanced', questionCount: 20, custom: { fresh: 60, wrong: 30, mastered: 10 } } }, userId)
+	assert.equal(ratioEnvironment.reads.question_bank_user_states, 1)
+	assert.equal(ratioEnvironment.reads.question_bank_user_preferences, 3)
+
+	const memberMaterialSeed = loadSeed()
+	const memberMaterialSubjectId = 'smart-material-fixture'
+	const memberMaterialVersion = '2026-09-14-v1'
+	memberMaterialSeed.question_bank_catalogs.push({
+		_id: memberMaterialSubjectId,
+		subjectId: memberMaterialSubjectId,
+		name: '材料题智能练习测试',
+		level: '初级',
+		status: 1,
+		activeVersion: memberMaterialVersion,
+		questionSchemaVersion: 3,
+		questionCount: 22,
+		chapters: [{ id: '1', subjectId: memberMaterialSubjectId, name: '第一章', count: 22 }],
+		knowledgeGroups: [],
+		updatedAt: currentTime
+	})
+	const baseQuestion = memberMaterialSeed.question_bank_questions[0]
+	for (let index = 1; index <= 18; index += 1) {
+		const questionId = `smf-single-${index}`
+		const question = Object.assign({}, baseQuestion, {
+			_id: `${memberMaterialVersion}:${questionId}`,
+			questionId,
+			subjectId: memberMaterialSubjectId,
+			version: memberMaterialVersion,
+			type: 'single',
+			selectionMode: 'single',
+			title: `会员智能练习单题 ${index}`,
+			sortOrder: index,
+			status: 1
+		})
+		;['materialGroupId', 'materialText', 'materialQuestionIndex', 'materialQuestionCount']
+			.forEach(field => delete question[field])
+		memberMaterialSeed.question_bank_questions.push(question)
+	}
+	const memberMaterialQuestionIds = []
+	for (let index = 1; index <= 4; index += 1) {
+		const questionId = `smf-material-${index}`
+		memberMaterialQuestionIds.push(questionId)
+		memberMaterialSeed.question_bank_questions.push(Object.assign({}, baseQuestion, {
+			_id: `${memberMaterialVersion}:${questionId}`,
+			questionId,
+			subjectId: memberMaterialSubjectId,
+			version: memberMaterialVersion,
+			type: 'material',
+			selectionMode: 'multiple',
+			title: `会员材料子题 ${index}`,
+			materialGroupId: 'smf-material-group',
+			materialText: '会员路径的材料正文',
+			materialQuestionIndex: index,
+			materialQuestionCount: 4,
+			sortOrder: 18 + index,
+			status: 1
+		}))
+	}
+	const memberMaterialEnvironment = createDatabase(memberMaterialSeed, new Date(currentTime))
+	memberMaterialQuestionIds.forEach((questionId, index) => {
+		memberMaterialEnvironment.collections.question_bank_user_states.set(`smf-state-${index}`, {
+			_id: `smf-state-${index}`,
+			questionId,
+			userId,
+			subjectId: memberMaterialSubjectId,
+			attempted: true,
+			lastCorrect: true,
+			lastAnsweredAt: currentTime
+		})
+	})
+	const memberMaterialService = createQuestionBankUserService(memberMaterialEnvironment.db, {
+		now: () => new Date(currentTime)
+	})
+	const memberMaterialResult = await memberMaterialService.execute({
+		action: 'getSmartPractice',
+		subjectId: memberMaterialSubjectId,
+		pageSize: 20,
+		seed: 'member-material-overflow-test',
+		smartPractice: {
+			strategy: 'custom',
+			questionCount: 20,
+			custom: { fresh: 100, wrong: 0, mastered: 0 }
+		}
+	}, userId)
+	assert.equal(memberMaterialResult.requestedQuestionCount, 20)
+	assert.equal(memberMaterialResult.actualQuestionCount, 22)
+	assert.equal(memberMaterialResult.overflowQuestionCount, 2)
+	assert.deepEqual(
+		memberMaterialResult.items
+			.filter(item => item.materialGroupId === 'smf-material-group')
+			.map(item => item.materialQuestionIndex),
+		[1, 2, 3, 4]
+	)
 	await assert.rejects(ratioService.execute({ action: 'getSmartPractice', subjectId,
 		smartPractice: { strategy: 'unknown' } }, userId), error => error.errCode === 'QUESTION_BANK_USER_INVALID_ARGUMENT')
 	await assert.rejects(ratioService.execute({ action: 'getSmartPractice', subjectId,
@@ -1123,7 +1259,7 @@ async function run() {
 	assert.equal(migratedSnapshot.sectionAttempts[`${question.chapterId}|${question.section}`] || 0, 0)
 	assert.equal(
 		environment.collections.question_bank_user_stats.get(`${migrationUserId}|${subjectId}`).stateAggregateVersion,
-		5
+		7
 	)
 	for (const collectionName of ['question_bank_user_states', 'question_bank_user_stats']) {
 		for (const [id, document] of environment.collections[collectionName]) {
@@ -1196,7 +1332,7 @@ async function run() {
 	assert.ok(environment.collections.question_bank_questions.size > 0)
 
 	const oldCatalogSeed = loadSeed()
-	oldCatalogSeed.question_bank_catalogs[0].questionSchemaVersion = 1
+	oldCatalogSeed.question_bank_catalogs[0].questionSchemaVersion = 2
 	const oldCatalogEnvironment = createDatabase(oldCatalogSeed, currentTime)
 	const oldCatalogService = createQuestionBankUserService(oldCatalogEnvironment.db, {
 		now: () => new Date(currentTime)
@@ -1216,7 +1352,7 @@ async function run() {
 	})
 	await assert.rejects(
 		invalidQuestionService.execute({
-			action: 'getSmartPractice', subjectId, pageSize: 20, seed: 'invalid-v2-question'
+			action: 'getSmartPractice', subjectId, pageSize: 20, seed: 'invalid-v3-question'
 		}, userId),
 		error => error.errCode === 'QUESTION_BANK_INVALID_QUESTION_SCHEMA'
 	)

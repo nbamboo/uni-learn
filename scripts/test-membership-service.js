@@ -9,7 +9,7 @@ function loadMembershipService(environment) {
 	const servicePath = path.resolve(__dirname, '../services/membership.js')
 	let source = fs.readFileSync(servicePath, 'utf8')
 	source = source
-		.replace(/^import .*?\n/, '')
+		.replace(/^import[\s\S]*?from\s+['"][^'"]+['"]\s*/, '')
 		.replace(/export default \{[\s\S]*?\}\s*$/, '')
 		.replace(/\bexport\s+(?=(?:class|async\s+function|function|const|let|var)\b)/g, '')
 	source += `\n;globalThis.__membershipService = {
@@ -39,6 +39,9 @@ async function run() {
 	const environment = {
 		ensurePracticeUser: async () => user,
 		getCurrentPracticeUser: () => user,
+		markPracticePreferencesRefreshRequired: () => {},
+		markPracticeRecordsRefreshRequired: () => {},
+		markPracticeSummaryRefreshRequired: () => {},
 		schedulePracticeSync: options => {
 			syncScheduleCalls += 1
 			assert.equal(options.immediate, true)
@@ -173,9 +176,25 @@ async function run() {
 	const revoked = await service.getMembership({ forceRefresh: true })
 	assert.equal(revoked.isMember, false)
 	assert.equal(revoked.entitlements.adFree, false)
-	assert.equal(revoked.entitlements.practiceRecords, true)
-	assert.equal(revoked.entitlements.advancedAnswerModes, true)
+	assert.equal(revoked.entitlements.practiceRecords, false)
+	assert.equal(revoked.entitlements.advancedAnswerModes, false)
 	assert.equal(service.getCachedMembership().isMember, false)
+
+	user.uid = 'second-member-user'
+	storage.set('uni-learn-membership-v1:second-member-user', Object.assign({}, cachedMembership, {
+		cachedAt: Date.now()
+	}))
+	cloudMembership = {
+		isMember: true,
+		status: 'active',
+		expiresAt: Date.now() + 30 * 24 * 60 * 60 * 1000
+	}
+	const callsBeforeAccountSwitch = membershipCalls
+	const switchedMembership = await service.getMembership()
+	assert.equal(switchedMembership.isMember, true)
+	assert.equal(membershipCalls, callsBeforeAccountSwitch + 1)
+	await service.getMembership()
+	assert.equal(membershipCalls, callsBeforeAccountSwitch + 1)
 
 	console.log('membership service tests passed')
 }

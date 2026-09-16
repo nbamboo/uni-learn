@@ -8,6 +8,9 @@
 		schedulePracticeSync
 	} from '@/services/user-practice.js'
 
+	const FOREGROUND_REFRESH_INTERVAL = 15 * 60 * 1000
+	let lastForegroundRefreshAt = 0
+
 	export default {
 		globalData: {
 			inputType: 'text'
@@ -25,9 +28,13 @@
 		},
 		onShow: function() {
 			console.log('App Show')
-			markPracticePreferencesRefreshRequired()
-			markPracticeRecordsRefreshRequired()
-			markPracticeSummaryRefreshRequired()
+			const currentTime = Date.now()
+			if (currentTime - lastForegroundRefreshAt >= FOREGROUND_REFRESH_INTERVAL) {
+				lastForegroundRefreshAt = currentTime
+				markPracticePreferencesRefreshRequired()
+				markPracticeRecordsRefreshRequired()
+				markPracticeSummaryRefreshRequired()
+			}
 			schedulePracticeSync({ localState: getPracticeState() })
 		},
 		onHide: function() {

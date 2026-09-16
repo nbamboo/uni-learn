@@ -221,5 +221,39 @@
       "MgoIsUnique": false,
       "MgoIsSparse": false
     }
+  },
+  {
+    "IndexName": "subject_version_material_status_index",
+    "MgoKeySchema": {
+      "MgoIndexKeys": [
+        {
+          "Name": "subjectId",
+          "Direction": "1",
+          "Type": "varchar"
+        },
+        {
+          "Name": "version",
+          "Direction": "1",
+          "Type": "varchar"
+        },
+        {
+          "Name": "materialGroupId",
+          "Direction": "1",
+          "Type": "varchar"
+        },
+        {
+          "Name": "status",
+          "Direction": "1",
+          "Type": "int"
+        },
+        {
+          "Name": "materialQuestionIndex",
+          "Direction": "1",
+          "Type": "int"
+        }
+      ],
+      "MgoIsUnique": false,
+      "MgoIsSparse": true
+    }
   }
 ]

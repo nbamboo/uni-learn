@@ -11,6 +11,7 @@ const PREFERENCES_STORAGE_KEY = 'uni-learn-practice-preferences-v1'
 const PRACTICE_STATE_STORAGE_KEY = 'uni-learn-practice-state-v1'
 const SUMMARY_STORAGE_KEY = 'uni-learn-practice-summary-v1'
 const MEMBERSHIP_STORAGE_KEY = 'uni-learn-membership-v1'
+const MEMBERSHIP_LAST_USER_ID_KEY = 'uni-learn-membership-last-user-id-v1'
 const MIGRATION_KEY_PREFIX = 'uni-learn-practice-cloud-migration-v1:'
 const UNI_ID_STORAGE_KEYS = ['uni_id_token', 'uni_id_token_expired', 'uniIdToken', 'uniIdTokenExpired']
 const SYNC_BATCH_SIZE = 50
@@ -18,18 +19,18 @@ const SNAPSHOT_CACHE_TTL = 2 * 60 * 1000
 const SUMMARY_CACHE_TTL = 10 * 60 * 1000
 const PROFILE_CACHE_TTL = 5 * 60 * 1000
 const RECORDS_CACHE_TTL = 10 * 60 * 1000
-const SMART_CACHE_TTL = 5 * 60 * 1000
 const PREFERENCES_CACHE_TTL = 6 * 60 * 60 * 1000
 const MEMBER_EXPIRY_GRACE_MS = 6 * 60 * 60 * 1000
 const MAX_SNAPSHOT_QUESTION_IDS = 100
-const SYNC_BATCH_TRIGGER = 10
-const SYNC_DELAY = 15 * 1000
+const SYNC_BATCH_TRIGGER = 50
+const SYNC_DELAY = 120 * 1000
 const RETRY_DELAY = 180
 const ANSWER_MODES = ['exam', 'practice', 'review']
 const PRACTICE_ENTRY_MODES = ['smart', 'chapter', 'section', 'knowledge', 'wrong', 'favorite', 'search', 'sequence']
 const EXAM_DRAFT_MODES = ['chapter', 'section', 'knowledge', 'wrong', 'favorite', 'search', 'sequence']
 const MAX_EXAM_DRAFT_QUESTIONS = 5000
 const MAX_PERSISTED_SUMMARIES = 20
+export const FREE_SMART_QUESTION_COUNT_MAX = 30
 const QUESTION_SELECTION_MODES = Object.freeze({
 	single: 'single',
 	judgment: 'single',
@@ -42,7 +43,6 @@ const summaryCache = new Map()
 const summaryRefreshRequiredKeys = new Set()
 const userProfileCache = new Map()
 const recordsCache = new Map()
-const smartCache = new Map()
 let loginRequest = null
 let preferencesRequest = null
 let flushRequest = null
@@ -66,12 +66,32 @@ export class UserPracticeServiceError extends Error {
 
 function requireQuestionSchema(question, requireSelectionMode) {
 	const expectedSelectionMode = question && QUESTION_SELECTION_MODES[question.type]
+	const materialFields = [
+		'materialGroupId', 'materialText', 'materialQuestionIndex', 'materialQuestionCount'
+	]
+	const hasMaterialField = Boolean(question)
+		&& materialFields.some(field => Object.prototype.hasOwnProperty.call(question, field))
+	const validMaterial = question && question.type === 'material'
+		&& typeof question.materialGroupId === 'string' && Boolean(question.materialGroupId.trim())
+		&& question.materialGroupId.length <= 64
+		&& /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(question.materialGroupId)
+		&& typeof question.materialText === 'string' && Boolean(question.materialText.trim())
+		&& question.materialText.length <= 10000
+		&& Number.isInteger(question.materialQuestionIndex)
+		&& Number.isInteger(question.materialQuestionCount)
+		&& question.materialQuestionIndex >= 1
+		&& question.materialQuestionCount >= question.materialQuestionIndex
+		&& typeof question.title === 'string' && Boolean(question.title.trim())
+		&& question.title.indexOf('[材料]') === -1
 	if (!expectedSelectionMode
-		|| (requireSelectionMode && question.selectionMode !== expectedSelectionMode)) {
+		|| (requireSelectionMode && question.selectionMode !== expectedSelectionMode)
+		|| (question && question.type === 'material'
+			&& (requireSelectionMode || hasMaterialField) && !validMaterial)
+		|| (question && question.type !== 'material' && hasMaterialField)) {
 		const questionId = question && (question.questionId || question.id) || 'unknown'
 		throw new UserPracticeServiceError(
 			'QUESTION_BANK_INVALID_QUESTION_SCHEMA',
-			`题目${questionId}不符合题型 v2 结构`
+			`题目${questionId}不符合题型 schema v3 结构`
 		)
 	}
 	return question
@@ -85,6 +105,18 @@ function requireSmartQuestionResult(result) {
 		)
 	}
 	result.items.forEach(question => requireQuestionSchema(question, true))
+	if (!Number.isInteger(result.requestedQuestionCount)
+		|| result.requestedQuestionCount < 0
+		|| result.actualQuestionCount !== result.items.length
+		|| result.overflowQuestionCount !== Math.max(
+			0,
+			result.actualQuestionCount - result.requestedQuestionCount
+		)) {
+		throw new UserPracticeServiceError(
+			'QUESTION_BANK_INVALID_RESPONSE',
+			'智能练习实际题量信息不正确'
+		)
+	}
 	return result
 }
 
@@ -293,11 +325,32 @@ function deactivateCachedMembership() {
 		expiresAt: 0,
 		entitlements: {
 			adFree: false,
-			practiceRecords: true,
-			advancedAnswerModes: true
+			practiceRecords: false,
+			advancedAnswerModes: false,
+			reviewMode: false,
+			smartPracticeOver30: false
 		},
 		cachedAt: Date.now()
 	}))
+}
+
+function cacheValidatedMembership(value) {
+	const expiresAt = Number(value && value.expiresAt) || 0
+	setStorage(userScopedStorageKey(MEMBERSHIP_STORAGE_KEY), {
+		isMember: true,
+		status: 'active',
+		expiresAt,
+		entitlements: Object.assign({
+			adFree: true,
+			practiceRecords: true,
+			advancedAnswerModes: true,
+			reviewMode: true,
+			smartPracticeOver30: true
+		}, value && value.entitlements || {}),
+		cachedAt: Date.now()
+	})
+	const user = getCurrentPracticeUser()
+	if (user.uid) setStorage(MEMBERSHIP_LAST_USER_ID_KEY, user.uid)
 }
 
 function normalizePracticePreferences(value) {
@@ -310,6 +363,27 @@ function normalizePracticePreferences(value) {
 		smartPractice: normalizeSmartPractice(source.smartPractice),
 		updatedAt: Number(source.updatedAt) || 0
 	}
+}
+
+function resolveMembershipFlag(isMember) {
+	return typeof isMember === 'boolean' ? isMember : practiceCloudSyncEnabled()
+}
+
+export function getEffectiveAnswerMode(answerMode, isMember) {
+	const normalized = ANSWER_MODES.indexOf(answerMode) > -1 ? answerMode : 'practice'
+	return !resolveMembershipFlag(isMember) && normalized === 'review'
+		? 'practice'
+		: normalized
+}
+
+export function getEffectiveSmartPractice(value, isMember) {
+	const normalized = normalizeSmartPractice(value)
+	if (resolveMembershipFlag(isMember)
+		|| normalized.questionCount <= FREE_SMART_QUESTION_COUNT_MAX) return normalized
+	return Object.assign({}, normalized, {
+		questionCount: FREE_SMART_QUESTION_COUNT_MAX,
+		custom: Object.assign({}, normalized.custom)
+	})
 }
 
 function preferencesStorageKey() {
@@ -1292,6 +1366,7 @@ function observePracticePreferencesUser() {
 		observedPreferencesUserId = userId
 		preferencesRequest = null
 		preferencesRefreshRequired = Boolean(userId)
+		recordsCache.clear()
 		markPracticeSummaryRefreshRequired()
 	}
 	return userId
@@ -1820,9 +1895,6 @@ export function invalidateUserPracticeCache(subjectId) {
 		Array.from(recordsCache.keys()).forEach(key => {
 			if (key.indexOf(`${subjectId}|`) === 0) recordsCache.delete(key)
 		})
-		Array.from(smartCache.keys()).forEach(key => {
-			if (key.indexOf(`${subjectId}|`) === 0) smartCache.delete(key)
-		})
 		Array.from(summaryCache.keys()).forEach(key => {
 			if (key.endsWith(`|${subjectId}`)) summaryCache.delete(key)
 		})
@@ -1831,7 +1903,6 @@ export function invalidateUserPracticeCache(subjectId) {
 	snapshotCache.clear()
 	summaryCache.clear()
 	recordsCache.clear()
-	smartCache.clear()
 }
 
 export function getCachedPracticeSummary(subjectId) {
@@ -1903,6 +1974,48 @@ export async function getPracticeStateSnapshot(subjectId, options) {
 		includeProgress
 	})
 	return setCached(snapshotCache, cacheKey, result, SNAPSHOT_CACHE_TTL)
+}
+
+export async function getPracticeBootstrap(options) {
+	const input = options || {}
+	const subjectId = typeof input.subjectId === 'string' ? input.subjectId.trim() : ''
+	const mode = PRACTICE_ENTRY_MODES.indexOf(input.mode) > -1 ? input.mode : ''
+	if (!subjectId || !mode) {
+		throw new UserPracticeServiceError(
+			'QUESTION_BANK_USER_CLIENT_ERROR',
+			'答题页初始化参数无效'
+		)
+	}
+	if (!practiceCloudSyncEnabled()) return null
+	await flushPracticeEvents({ includeProgress: false })
+	const questionIds = Array.isArray(input.questionIds)
+		? Array.from(new Set(input.questionIds.filter(Boolean))).slice(0, MAX_SNAPSHOT_QUESTION_IDS)
+		: []
+	const result = await executeCloudCall('getPracticeBootstrap', {
+		subjectId,
+		mode,
+		chapterId: input.chapterId,
+		section: input.section,
+		knowledge: input.knowledge,
+		keyword: input.keyword,
+		questionIds
+	})
+	if (result && result.preferences) {
+		savePreferencesEntry(result.preferences, false, Date.now())
+		preferencesRefreshRequired = false
+	}
+	if (result && result.practiceRound) {
+		cacheCloudPracticeRound(result.practiceRound, mode === 'section' ? input.section : '')
+	}
+	if (result && result.examDraft) {
+		if (result.examDraft.active) saveLocalExamDraft(result.examDraft)
+		else removeLocalExamDraft(getExamDraftScope(input))
+	}
+	if (result && result.snapshot) {
+		const cacheKey = `${subjectId}|0|0|${hashString(questionIds.slice().sort().join('|'))}`
+		setCached(snapshotCache, cacheKey, result.snapshot, SNAPSHOT_CACHE_TTL)
+	}
+	return result
 }
 
 export async function getPracticeRound(options) {
@@ -2009,30 +2122,48 @@ export async function resetPracticeRound(options) {
 export async function getPracticeRecords(params) {
 	const input = params || {}
 	if (!practiceCloudSyncEnabled()) {
-		return getLocalPracticeRecords(input)
+		throw new UserPracticeServiceError(
+			'QUESTION_BANK_MEMBERSHIP_REQUIRED',
+			'错题集与收藏夹为会员权益，请先开通会员'
+		)
 	}
 	const subjectId = input.subjectId
 	const type = input.type || 'wrong'
-	const page = input.page || 1
-	const pageSize = input.pageSize || 20
-	const cacheKey = `${subjectId}|${type}|${page}|${pageSize}`
-	if (!input.forceRefresh && pendingPracticeEventCount() === 0) {
+	const idsOnly = Boolean(input.idsOnly)
+	const page = idsOnly ? 1 : (input.page || 1)
+	const pageSize = idsOnly ? 2000 : (input.pageSize || 20)
+	const cacheKey = `${subjectId}|${type}|${idsOnly ? 'ids' : page}|${pageSize}`
+	if (!idsOnly && !input.forceRefresh && pendingPracticeEventCount() === 0) {
 		const cached = getCached(recordsCache, cacheKey)
-		if (cached) return requireRecordQuestionTypes(cached)
+		if (cached) return idsOnly ? cached : requireRecordQuestionTypes(cached)
 	}
 	await flushPracticeEvents({ includeProgress: false })
-	if (!input.forceRefresh) {
+	if (!idsOnly && !input.forceRefresh) {
 		const cached = getCached(recordsCache, cacheKey)
-		if (cached) return requireRecordQuestionTypes(cached)
+		if (cached) return idsOnly ? cached : requireRecordQuestionTypes(cached)
 	}
 	const result = await executeCloudCall('getRecords', {
 		subjectId,
 		type,
 		page,
-		pageSize
+		pageSize,
+		idsOnly
 	})
-	requireRecordQuestionTypes(result)
-	return setCached(recordsCache, cacheKey, result, RECORDS_CACHE_TTL)
+	if (result && result.membership) cacheValidatedMembership(result.membership)
+	if (result && result.preferences) {
+		savePreferencesEntry(result.preferences, false, Date.now())
+		preferencesRefreshRequired = false
+	}
+	if (!idsOnly) requireRecordQuestionTypes(result)
+	return idsOnly ? result : setCached(recordsCache, cacheKey, result, RECORDS_CACHE_TTL)
+}
+
+export async function getPracticeRecordIds(params) {
+	return getPracticeRecords(Object.assign({}, params || {}, {
+		idsOnly: true,
+		page: 1,
+		pageSize: 2000
+	}))
 }
 
 export async function getSmartPracticeQuestions(options) {
@@ -2048,11 +2179,6 @@ export async function getSmartPracticeQuestions(options) {
 	const smartPractice = validateSmartPractice(input.smartPractice === undefined
 		? getLocalPracticePreferences().smartPractice : input.smartPractice)
 	const pageSize = Number(input.pageSize) || smartPractice.questionCount
-	const cacheKey = `${subjectId}|${pageSize}|${seed}|${JSON.stringify(smartPractice)}`
-	if (!input.forceRefresh && pendingPracticeEventCount() === 0) {
-		const cached = getCached(smartCache, cacheKey)
-		if (cached) return requireSmartQuestionResult(cached)
-	}
 	await flushPracticeEvents({ includeProgress: false })
 	const result = await executeCloudCall('getSmartPractice', {
 		subjectId,
@@ -2060,8 +2186,30 @@ export async function getSmartPracticeQuestions(options) {
 		seed,
 		smartPractice
 	})
+	if (result && result.membership) cacheValidatedMembership(result.membership)
+	if (result && result.preferences) {
+		savePreferencesEntry(result.preferences, false, Date.now())
+		preferencesRefreshRequired = false
+	}
 	requireSmartQuestionResult(result)
-	return setCached(smartCache, cacheKey, result, SMART_CACHE_TTL)
+	return result
+}
+
+export async function getSmartPracticeState(subjectId) {
+	if (!practiceCloudSyncEnabled()) {
+		throw new UserPracticeServiceError(
+			'QUESTION_BANK_MEMBERSHIP_REQUIRED',
+			'云端智能取题状态为会员权益，请先开通会员'
+		)
+	}
+	await flushPracticeEvents({ includeProgress: false })
+	const result = await executeCloudCall('getSmartPracticeState', { subjectId })
+	if (result && result.membership) cacheValidatedMembership(result.membership)
+	if (result && result.preferences) {
+		savePreferencesEntry(result.preferences, false, Date.now())
+		preferencesRefreshRequired = false
+	}
+	return result
 }
 
 export async function getPracticeProgress(options) {
@@ -2303,11 +2451,16 @@ export default {
 	getExamDraft,
 	getExamDraftScope,
 	getExamDraftSummaries,
+	getEffectiveAnswerMode,
+	getEffectiveSmartPractice,
 	getPracticeProgress,
 	getPracticePreferences,
+	getPracticeBootstrap,
 	getPracticeRound,
 	getPracticeRecords,
+	getPracticeRecordIds,
 	getSmartPracticeQuestions,
+	getSmartPracticeState,
 	getPracticeStateSnapshot,
 	getLocalPracticeRound,
 	getLocalPracticeRoundSnapshot,

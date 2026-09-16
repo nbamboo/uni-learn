@@ -1,11 +1,20 @@
-import { ensurePracticeUser, getCurrentPracticeUser, schedulePracticeSync } from '@/services/user-practice.js'
+import {
+	ensurePracticeUser,
+	getCurrentPracticeUser,
+	markPracticePreferencesRefreshRequired,
+	markPracticeRecordsRefreshRequired,
+	markPracticeSummaryRefreshRequired,
+	schedulePracticeSync
+} from '@/services/user-practice.js'
 
 const CLOUD_FUNCTION_NAME = 'virtualPayment'
 const STORAGE_KEY = 'uni-learn-membership-v1'
 const LAST_ORDER_KEY = 'uni-learn-membership-last-order-v1'
+const LAST_USER_ID_KEY = 'uni-learn-membership-last-user-id-v1'
 const MEMBER_CACHE_TTL = 6 * 60 * 60 * 1000
 const NON_MEMBER_CACHE_TTL = 6 * 60 * 60 * 1000
 const MEMBER_EXPIRY_GRACE_MS = 6 * 60 * 60 * 1000
+const MEMBERSHIP_PAGE_URL = '/pages/membership/membership'
 
 let membershipRequest = null
 
@@ -57,8 +66,10 @@ function normalizeMembership(value) {
 		expiresAt: isMember ? expiresAt : 0,
 		entitlements: {
 			adFree: isMember,
-			practiceRecords: true,
-			advancedAnswerModes: true
+			practiceRecords: isMember,
+			advancedAnswerModes: isMember,
+			reviewMode: isMember,
+			smartPracticeOver30: isMember
 		},
 		plans: Array.isArray(source.plans) ? source.plans.map(item => Object.assign({}, item)) : [],
 		cachedAt: Number(source.cachedAt) || 0
@@ -66,10 +77,22 @@ function normalizeMembership(value) {
 }
 
 function saveMembership(value) {
+	const previous = getCachedMembership()
 	const normalized = normalizeMembership(Object.assign({}, value, { cachedAt: Date.now() }))
 	storageSet(userScopedStorageKey(STORAGE_KEY), normalized)
+	const user = getCurrentPracticeUser()
+	if (user && user.uid) storageSet(LAST_USER_ID_KEY, user.uid)
 	if (normalized.isMember) schedulePracticeSync({ immediate: true })
+	if (previous.isMember !== normalized.isMember || previous.expiresAt !== normalized.expiresAt) {
+		markPracticePreferencesRefreshRequired()
+		markPracticeRecordsRefreshRequired()
+		markPracticeSummaryRefreshRequired()
+	}
 	return normalized
+}
+
+export function cacheMembershipSnapshot(value) {
+	return saveMembership(value)
 }
 
 export function getCachedMembership() {
@@ -78,6 +101,32 @@ export function getCachedMembership() {
 
 export function membershipIsActive(value) {
 	return normalizeMembership(value || getCachedMembership()).isMember
+}
+
+export function showMembershipUpsell(content, options) {
+	const config = options || {}
+	return new Promise(resolve => {
+		uni.showModal({
+			title: '会员专享功能',
+			content,
+			cancelText: '暂不开通',
+			confirmText: '开通会员',
+			confirmColor: '#008cff',
+			success: result => {
+				const confirmed = Boolean(result.confirm)
+				if (!confirmed) {
+					resolve(false)
+					return
+				}
+				const method = config.replace ? 'redirectTo' : 'navigateTo'
+				uni[method]({
+					url: MEMBERSHIP_PAGE_URL,
+					complete: () => resolve(true)
+				})
+			},
+			fail: () => resolve(false)
+		})
+	})
 }
 
 async function executeCloudCall(action, payload) {
@@ -105,9 +154,16 @@ async function executeCloudCall(action, payload) {
 
 export async function getMembership(options) {
 	const config = options || {}
+	const user = getCurrentPracticeUser()
+	const currentUserId = user && user.uid ? user.uid : ''
+	const lastUserId = storageGet(LAST_USER_ID_KEY) || ''
+	const identityRefreshRequired = !currentUserId || currentUserId !== lastUserId
 	const cached = getCachedMembership()
 	const cacheTtl = cached.isMember ? MEMBER_CACHE_TTL : NON_MEMBER_CACHE_TTL
-	if (!config.forceRefresh && cached.cachedAt && cached.cachedAt + cacheTtl > Date.now()) return cached
+	if (!config.forceRefresh
+		&& !identityRefreshRequired
+		&& cached.cachedAt
+		&& cached.cachedAt + cacheTtl > Date.now()) return cached
 	if (membershipRequest) return membershipRequest
 	membershipRequest = executeCloudCall('getMembership').then(result => {
 		membershipRequest = null
@@ -248,8 +304,10 @@ export async function restoreLastMembershipOrder() {
 
 export default {
 	getCachedMembership,
+	cacheMembershipSnapshot,
 	getMembership,
 	membershipIsActive,
+	showMembershipUpsell,
 	purchaseMembership,
 	queryMembershipOrder,
 	restoreLastMembershipOrder

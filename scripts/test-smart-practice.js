@@ -4,11 +4,43 @@ const assert = require('node:assert/strict')
 const fs = require('node:fs')
 const path = require('node:path')
 const helper = require('../services/smart-practice.js')
-const { defaultSmartPractice, validateSmartPractice, normalizeSmartPractice, smartPracticeQuotas, selectSmartPracticeIds } = helper
+const {
+	defaultSmartPractice,
+	validateSmartPractice,
+	normalizeSmartPractice,
+	smartPracticeQuotas,
+	selectSmartPracticeIds,
+	buildSmartPracticeUnits,
+	classifySmartPracticeUnits,
+	selectSmartPracticeUnits
+} = helper
 const canonical = fs.readFileSync(path.resolve(__dirname, '../services/smart-practice.js'), 'utf8')
 for (const name of ['questionBank', 'questionBankUser']) {
 	assert.equal(fs.readFileSync(path.resolve(__dirname, `../uniCloud-alipay/cloudfunctions/${name}/smart-practice.js`), 'utf8'), canonical)
 }
+const catalogSchema = JSON.parse(fs.readFileSync(path.resolve(
+	__dirname,
+	'../uniCloud-alipay/database/question_bank_catalogs.schema.json'
+), 'utf8'))
+assert.deepEqual(catalogSchema.properties.questionSchemaVersion.enum, [3])
+const questionSchema = JSON.parse(fs.readFileSync(path.resolve(
+	__dirname,
+	'../uniCloud-alipay/database/question_bank_questions.schema.json'
+), 'utf8'))
+for (const field of ['materialGroupId', 'materialText', 'materialQuestionIndex', 'materialQuestionCount']) {
+	assert.ok(questionSchema.properties[field], `${field} schema is required`)
+}
+assert.ok(questionSchema.fieldRules.some(item => item.rule.includes("type != 'material'")))
+assert.ok(questionSchema.fieldRules.some(item => item.rule.includes("type == 'material'")))
+const questionIndexes = JSON.parse(fs.readFileSync(path.resolve(
+	__dirname,
+	'../uniCloud-alipay/database/question_bank_questions.index.json'
+), 'utf8'))
+const materialIndex = questionIndexes.find(index => index.IndexName === 'subject_version_material_status_index')
+assert.deepEqual(materialIndex.MgoKeySchema.MgoIndexKeys.map(item => item.Name), [
+	'subjectId', 'version', 'materialGroupId', 'status', 'materialQuestionIndex'
+])
+assert.equal(materialIndex.MgoKeySchema.MgoIsSparse, true)
 const config = (strategy, custom, questionCount) => ({
 	strategy,
 	questionCount: questionCount === undefined ? 20 : questionCount,
@@ -59,4 +91,43 @@ assert.deepEqual(duplicate.slice().sort(), ['a', 'b', 'c'])
 assert.deepEqual(selectSmartPracticeIds({}, 20, config('balanced'), () => 0.5), [])
 const defaultSelection = selectSmartPracticeIds(groups, 20, defaultSmartPractice(), () => 0.5)
 assert.deepEqual(['fresh', 'wrong', 'mastered'].map(key => defaultSelection.filter(id => id.startsWith(key)).length), [16, 4, 0])
-console.log('Smart practice ratios: presets, all custom ratios, rounding, fallback, deduplication and bundle parity passed')
+
+const materialQuestions = [
+	{ questionId: 'normal-1', type: 'single', sortOrder: 5 },
+	{ questionId: 'm-2', type: 'material', materialGroupId: 'm', materialText: '材料', materialQuestionIndex: 2, materialQuestionCount: 2, sortOrder: 20 },
+	{ questionId: 'm-1', type: 'material', materialGroupId: 'm', materialText: '材料', materialQuestionIndex: 1, materialQuestionCount: 2, sortOrder: 19 }
+]
+const materialUnits = buildSmartPracticeUnits(materialQuestions)
+assert.deepEqual(materialUnits.map(unit => unit.questionIds), [['normal-1'], ['m-1', 'm-2']])
+assert.throws(() => buildSmartPracticeUnits([
+	{ questionId: 'gap-m-1', type: 'material', materialGroupId: 'gap-m', materialText: '材料', materialQuestionIndex: 1, materialQuestionCount: 2, sortOrder: 1 },
+	{ questionId: 'gap-normal', type: 'single', sortOrder: 2 },
+	{ questionId: 'gap-m-2', type: 'material', materialGroupId: 'gap-m', materialText: '材料', materialQuestionIndex: 2, materialQuestionCount: 2, sortOrder: 3 }
+]), /启用子题不连续/)
+assert.equal(classifySmartPracticeUnits(materialUnits, ['normal-1', 'm-1'], ['m-2']).wrong[0].materialGroupId, 'm')
+assert.equal(classifySmartPracticeUnits(materialUnits, ['normal-1', 'm-1', 'm-2'], []).mastered.length, 2)
+assert.equal(classifySmartPracticeUnits(materialUnits, ['m-1'], []).fresh
+	.find(unit => unit.materialGroupId === 'm').materialGroupId, 'm')
+
+const overflowUnits = Array.from({ length: 18 }, (_, index) => ({
+	unitId: `q-${index + 1}`,
+	questionIds: [`q-${index + 1}`],
+	questionCount: 1
+})).concat({
+	unitId: 'material:overflow',
+	materialGroupId: 'overflow',
+	questionIds: ['om-1', 'om-2', 'om-3', 'om-4'],
+	questionCount: 4
+})
+const overflowSelection = selectSmartPracticeUnits(
+	{ fresh: overflowUnits, wrong: [], mastered: [] },
+	20,
+	config('fresh'),
+	() => 0.999999
+)
+assert.equal(overflowSelection.requestedQuestionCount, 20)
+assert.equal(overflowSelection.actualQuestionCount, 22)
+assert.equal(overflowSelection.overflowQuestionCount, 2)
+assert.deepEqual(overflowSelection.questionIds.slice(-4), ['om-1', 'om-2', 'om-3', 'om-4'])
+
+console.log('Smart practice ratios, material grouping/state/order, soft overflow and bundle parity passed')

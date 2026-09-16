@@ -2,12 +2,15 @@ import { DEFAULT_SUBJECT_ID, getPracticeState } from './practice.js'
 import {
 	getAllPracticeQuestions,
 	getCatalog,
+	hasCompleteQuestionBankCache,
 	getPracticePage,
 	getQuestionsByIds
 } from '@/services/question-bank.js'
 import {
-	getPracticeRecords,
+	getPracticeRecordIds,
+	getSmartPracticeState,
 	getSmartPracticeQuestions,
+	getEffectiveSmartPractice,
 	getLocalPracticePreferences,
 	practiceCloudSyncEnabled
 } from '@/services/user-practice.js'
@@ -29,25 +32,14 @@ function applyLimit(list, limit) {
 }
 
 async function loadRecordedQuestions(subjectId, mode) {
-	const questionIds = []
-	let page = 1
-	let hasMore = true
-	while (hasMore && page <= 100) {
-		const result = await getPracticeRecords({
-			subjectId,
-			type: mode,
-			page,
-			pageSize: 50
-		})
-		;(result.items || []).forEach(item => {
-			const questionId = item && item.question && item.question.id
-			if (questionId) questionIds.push(questionId)
-		})
-		hasMore = Boolean(result.hasMore)
-		page += 1
-	}
+	const records = await getPracticeRecordIds({ subjectId, type: mode })
+	const questionIds = Array.isArray(records.questionIds) ? records.questionIds : []
 	if (!questionIds.length) return []
 	const result = await getQuestionsByIds({ subjectId, questionIds })
+	const favoriteIds = new Set(records.favoriteQuestionIds || [])
+	;(result.items || []).forEach(question => {
+		question.favorite = favoriteIds.has(question.id || question.questionId)
+	})
 	return result.items
 }
 
@@ -61,12 +53,30 @@ export async function buildPracticeQuestions(options) {
 	if (mode === 'wrong' || mode === 'favorite') {
 		list = await loadRecordedQuestions(subjectId, mode)
 	} else if (mode === 'smart') {
-		const smartPractice = getLocalPracticePreferences().smartPractice
+		const smartPractice = getEffectiveSmartPractice(getLocalPracticePreferences().smartPractice)
 		if (!effectiveLimit) effectiveLimit = smartPractice.questionCount
 		const pageSize = effectiveLimit
 		let result
 		if (practiceCloudSyncEnabled()) {
-			result = await getSmartPracticeQuestions({ subjectId, pageSize, smartPractice })
+			if (hasCompleteQuestionBankCache(subjectId)) {
+				const state = await getSmartPracticeState(subjectId)
+				result = await getPracticePage({
+					subjectId,
+					mode: 'smart',
+					smartPractice,
+					pageSize,
+					answeredQuestionIds: state.answeredQuestionIds,
+					wrongQuestionIds: state.wrongQuestionIds
+				}, {
+					versionFromResponse: true
+				})
+			} else {
+				result = await getSmartPracticeQuestions({ subjectId, pageSize, smartPractice })
+			}
+			const favoriteIds = new Set(result.favoriteQuestionIds || [])
+			;(result.items || []).forEach(question => {
+				question.favorite = favoriteIds.has(question.id || question.questionId)
+			})
 		} else {
 			const state = getPracticeState()
 			const localStates = Object.keys(state.answers).map(questionId => {
@@ -93,6 +103,7 @@ export async function buildPracticeQuestions(options) {
 			})
 		}
 		list = result.items
+		return list
 	} else if (mode === 'search') {
 		const result = await getPracticePage({
 			subjectId,

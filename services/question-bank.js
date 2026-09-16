@@ -1,9 +1,18 @@
-const { validateSmartPractice, selectSmartPracticeIds } = require('./smart-practice.js')
+const {
+	validateSmartPractice,
+	buildSmartPracticeUnits,
+	classifySmartPracticeUnits,
+	selectSmartPracticeUnits
+} = require('./smart-practice.js')
 const CLOUD_FUNCTION_NAME = 'questionBank'
 const CATALOG_STORAGE_KEY = 'uni-learn-question-bank-catalog-cache-v1'
+const CATALOG_SUMMARIES_STORAGE_KEY = 'uni-learn-question-bank-catalog-summaries-cache-v1'
 const CHAPTER_CACHE_INDEX_KEY = 'uni-learn-question-bank-chapter-cache-index-v1'
 const CHAPTER_CACHE_KEY_PREFIX = 'uni-learn-question-bank-chapter-cache-v1:'
-const CATALOG_CACHE_TTL = 60 * 60 * 1000
+const CATALOG_MEMORY_CACHE_TTL = 2 * 60 * 60 * 1000
+const CATALOG_STORAGE_CACHE_TTL = 24 * 60 * 60 * 1000
+const CATALOG_SUMMARIES_MEMORY_CACHE_TTL = 2 * 60 * 60 * 1000
+const CATALOG_SUMMARIES_STORAGE_CACHE_TTL = 24 * 60 * 60 * 1000
 const CHAPTER_CACHE_TTL = 30 * 24 * 60 * 60 * 1000
 const PAGE_CACHE_TTL = 3 * 60 * 1000
 const QUESTION_CACHE_TTL = 15 * 60 * 1000
@@ -17,7 +26,7 @@ const MAX_PAGE_SIZE = 50
 const MAX_BATCH_SIZE = 100
 const MAX_QUESTION_IDS = 5000
 const MAX_PRACTICE_PAGES = 100
-const QUESTION_SCHEMA_VERSION = 2
+const QUESTION_SCHEMA_VERSION = 3
 const DEFAULT_RETRY_COUNT = 1
 const RETRY_DELAY = 120
 const PRACTICE_MODES = ['sequence', 'chapter', 'section', 'knowledge', 'search', 'smart']
@@ -50,11 +59,11 @@ export class QuestionBankServiceError extends Error {
 	}
 }
 
-function requireV2Catalog(catalog) {
+function requireV3Catalog(catalog) {
 	if (!catalog || catalog.questionSchemaVersion !== QUESTION_SCHEMA_VERSION) {
 		throw new QuestionBankServiceError(
 			'QUESTION_BANK_SCHEMA_VERSION_UNSUPPORTED',
-			'当前题库不是题型 v2，请更新题库数据'
+			'当前题库不是题型 schema v3，请更新题库数据'
 		)
 	}
 	return catalog
@@ -62,12 +71,32 @@ function requireV2Catalog(catalog) {
 
 function requireQuestionSchema(question, requireSelectionMode) {
 	const expectedSelectionMode = question && QUESTION_SELECTION_MODES[question.type]
+	const materialFields = [
+		'materialGroupId', 'materialText', 'materialQuestionIndex', 'materialQuestionCount'
+	]
+	const hasMaterialField = Boolean(question)
+		&& materialFields.some(field => Object.prototype.hasOwnProperty.call(question, field))
+	const validMaterial = question && question.type === 'material'
+		&& typeof question.materialGroupId === 'string' && Boolean(question.materialGroupId.trim())
+		&& question.materialGroupId.length <= 64
+		&& ID_PATTERN.test(question.materialGroupId)
+		&& typeof question.materialText === 'string' && Boolean(question.materialText.trim())
+		&& question.materialText.length <= 10000
+		&& Number.isInteger(question.materialQuestionIndex)
+		&& Number.isInteger(question.materialQuestionCount)
+		&& question.materialQuestionIndex >= 1
+		&& question.materialQuestionCount >= question.materialQuestionIndex
+		&& typeof question.title === 'string' && Boolean(question.title.trim())
+		&& question.title.indexOf('[材料]') === -1
 	if (!expectedSelectionMode
-		|| (requireSelectionMode && question.selectionMode !== expectedSelectionMode)) {
+		|| (requireSelectionMode && question.selectionMode !== expectedSelectionMode)
+		|| (question && question.type === 'material'
+			&& (requireSelectionMode || hasMaterialField) && !validMaterial)
+		|| (question && question.type !== 'material' && hasMaterialField)) {
 		const questionId = question && (question.questionId || question.id) || 'unknown'
 		throw new QuestionBankServiceError(
 			'QUESTION_BANK_INVALID_QUESTION_SCHEMA',
-			`题目${questionId}不符合题型 v2 结构`
+			`题目${questionId}不符合题型 schema v3 结构`
 		)
 	}
 	return question
@@ -82,6 +111,23 @@ function requireQuestionItems(items, requireSelectionMode) {
 	}
 	items.forEach(question => requireQuestionSchema(question, requireSelectionMode))
 	return items
+}
+
+function requireSmartPracticeResponse(result) {
+	requireQuestionItems(result && result.items, true)
+	if (!Number.isInteger(result.requestedQuestionCount)
+		|| result.requestedQuestionCount < 0
+		|| result.actualQuestionCount !== result.items.length
+		|| result.overflowQuestionCount !== Math.max(
+			0,
+			result.actualQuestionCount - result.requestedQuestionCount
+		)) {
+		throw new QuestionBankServiceError(
+			'QUESTION_BANK_INVALID_RESPONSE',
+			'智能练习实际题量信息不正确'
+		)
+	}
+	return result
 }
 
 function invalidArgument(message) {
@@ -291,27 +337,45 @@ function savePersistedCatalogs() {
 
 function getCachedCatalog(subjectId) {
 	const memory = getBoundedCache(catalogMemoryCache, subjectId)
-	if (memory) return requireV2Catalog(memory)
+	if (memory) return requireV3Catalog(memory)
 	loadPersistedCatalogs()
 	const entry = persistedCatalogs[subjectId]
-	if (!entry || entry.expiresAt <= Date.now() || !entry.data) return null
-	setBoundedCache(catalogMemoryCache, subjectId, entry.data, entry.expiresAt - Date.now(), 20)
-	return requireV2Catalog(cloneValue(entry.data))
+	const now = Date.now()
+	if (!entry || entry.expiresAt <= now || !entry.data) return null
+	setBoundedCache(
+		catalogMemoryCache,
+		subjectId,
+		entry.data,
+		Math.min(CATALOG_MEMORY_CACHE_TTL, entry.expiresAt - now),
+		20
+	)
+	return requireV3Catalog(cloneValue(entry.data))
+}
+
+export function hasCompleteQuestionBankCache(subjectId) {
+	let normalizedSubjectId
+	try {
+		normalizedSubjectId = normalizeSubjectId(subjectId)
+	} catch (error) {
+		return false
+	}
+	const catalog = getCachedCatalog(normalizedSubjectId)
+	return Boolean(catalog && getPersistedSubjectQuestions(catalog))
 }
 
 function getStoredCatalog(subjectId) {
 	loadPersistedCatalogs()
 	const entry = persistedCatalogs[subjectId]
-	return entry && entry.data ? requireV2Catalog(cloneValue(entry.data)) : null
+	return entry && entry.data ? requireV3Catalog(cloneValue(entry.data)) : null
 }
 
 function setCachedCatalog(subjectId, catalog) {
-	requireV2Catalog(catalog)
-	setBoundedCache(catalogMemoryCache, subjectId, catalog, CATALOG_CACHE_TTL, 20)
+	requireV3Catalog(catalog)
+	setBoundedCache(catalogMemoryCache, subjectId, catalog, CATALOG_MEMORY_CACHE_TTL, 20)
 	loadPersistedCatalogs()
 	persistedCatalogs[subjectId] = {
 		data: cloneValue(catalog),
-		expiresAt: Date.now() + CATALOG_CACHE_TTL
+		expiresAt: Date.now() + CATALOG_STORAGE_CACHE_TTL
 	}
 	savePersistedCatalogs()
 }
@@ -322,6 +386,97 @@ function invalidateCachedCatalog(subjectId) {
 	if (!Object.prototype.hasOwnProperty.call(persistedCatalogs, subjectId)) return
 	delete persistedCatalogs[subjectId]
 	savePersistedCatalogs()
+}
+
+function normalizeCatalogSummaries(items) {
+	if (!Array.isArray(items)) return null
+	const normalized = []
+	for (let index = 0; index < items.length; index += 1) {
+		const item = items[index]
+		if (!item || !item.subjectId || !item.activeVersion) return null
+		requireV3Catalog(item)
+		normalized.push(item)
+	}
+	return normalized
+}
+
+function getCachedCatalogSummaries() {
+	const now = Date.now()
+	if (catalogSummariesCache && catalogSummariesCache.expiresAt > now) {
+		return cloneValue(catalogSummariesCache.items)
+	}
+	catalogSummariesCache = null
+	if (!storageAvailable()) return null
+	try {
+		const saved = uni.getStorageSync(CATALOG_SUMMARIES_STORAGE_KEY)
+		const items = isObject(saved) && saved.version === 1 && saved.expiresAt > now
+			? normalizeCatalogSummaries(saved.items)
+			: null
+		if (!items) {
+			if (saved) removeStorageValue(CATALOG_SUMMARIES_STORAGE_KEY)
+			return null
+		}
+		catalogSummariesCache = {
+			items: cloneValue(items),
+			expiresAt: now + Math.min(
+				CATALOG_SUMMARIES_MEMORY_CACHE_TTL,
+				saved.expiresAt - now
+			)
+		}
+		return cloneValue(items)
+	} catch (error) {
+		removeStorageValue(CATALOG_SUMMARIES_STORAGE_KEY)
+		return null
+	}
+}
+
+function setCachedCatalogSummaries(items) {
+	const normalized = normalizeCatalogSummaries(items)
+	if (!normalized) return
+	const now = Date.now()
+	catalogSummariesCache = {
+		items: cloneValue(normalized),
+		expiresAt: now + CATALOG_SUMMARIES_MEMORY_CACHE_TTL
+	}
+	if (!storageAvailable()) return
+	try {
+		uni.setStorageSync(CATALOG_SUMMARIES_STORAGE_KEY, {
+			version: 1,
+			cachedAt: now,
+			expiresAt: now + CATALOG_SUMMARIES_STORAGE_CACHE_TTL,
+			items: cloneValue(normalized)
+		})
+	} catch (error) {
+		// Storage quota failures must not prevent cloud reads.
+	}
+}
+
+function clearCatalogSummariesCache() {
+	catalogSummariesCache = null
+	removeStorageValue(CATALOG_SUMMARIES_STORAGE_KEY)
+}
+
+function getValidCachedCatalogVersion(subjectId) {
+	const now = Date.now()
+	const memoryEntry = catalogMemoryCache.get(subjectId)
+	if (memoryEntry && memoryEntry.expiresAt > now
+		&& memoryEntry.value && memoryEntry.value.activeVersion) {
+		return memoryEntry.value.activeVersion
+	}
+	loadPersistedCatalogs()
+	const persistedEntry = persistedCatalogs[subjectId]
+	if (!persistedEntry || persistedEntry.expiresAt <= now || !persistedEntry.data) return ''
+	return persistedEntry.data.activeVersion || ''
+}
+
+function reconcileCatalogSummaryVersions(items) {
+	items.forEach(item => {
+		const cachedVersion = getValidCachedCatalogVersion(item.subjectId)
+		if (!cachedVersion || cachedVersion === item.activeVersion) return
+		clearSubjectMemory(item.subjectId)
+		invalidateCachedCatalog(item.subjectId)
+		removePersistedChapterVersions(item.subjectId, item.activeVersion)
+	})
 }
 
 function chapterCacheId(subjectId, version, chapterId) {
@@ -752,23 +907,30 @@ function createRandom(seed) {
 function buildLocalSmartPage(catalog, items, payload) {
 	const answered = new Set(payload.answeredQuestionIds || [])
 	const wrong = new Set(payload.wrongQuestionIds || [])
-	const groups = { fresh: [], wrong: [], mastered: [] }
-	items.forEach(question => {
-		const questionId = question && (question.questionId || question.id)
-		if (wrong.has(questionId)) groups.wrong.push(question)
-		else if (answered.has(questionId)) groups.mastered.push(question)
-		else groups.fresh.push(question)
-	})
+	let units
+	try { units = buildSmartPracticeUnits(items) }
+	catch (error) {
+		throw new QuestionBankServiceError(
+			'QUESTION_BANK_INVALID_QUESTION_SCHEMA',
+			error && error.message || '材料题分组结构无效'
+		)
+	}
+	const groups = classifySmartPracticeUnits(units, answered, wrong)
 	const seed = payload.seed
 		|| `${catalog.subjectId}:${catalog.activeVersion}:${new Date().toISOString().slice(0, 10)}`
 	const random = createRandom(hashSeed(seed))
 	const byId = new Map(items.map(item => [item.questionId || item.id, item]))
-	const ids = selectSmartPracticeIds({
-		fresh: groups.fresh.map(item => item.questionId || item.id),
-		wrong: groups.wrong.map(item => item.questionId || item.id),
-		mastered: groups.mastered.map(item => item.questionId || item.id)
-	}, payload.pageSize, payload.smartPractice, random)
-	const selected = ids.map(id => byId.get(id))
+	const selection = selectSmartPracticeUnits(
+		groups,
+		payload.pageSize,
+		payload.smartPractice,
+		random
+	)
+	const selected = selection.questionIds.map(id => byId.get(id)).filter(Boolean)
+	const stateQuestionCount = key => groups[key].reduce(
+		(total, unit) => total + unit.questionCount,
+		0
+	)
 	return {
 		subjectId: catalog.subjectId,
 		version: catalog.activeVersion,
@@ -776,13 +938,16 @@ function buildLocalSmartPage(catalog, items, payload) {
 		seed,
 		total: items.length,
 		pageSize: payload.pageSize,
+		requestedQuestionCount: selection.requestedQuestionCount,
+		actualQuestionCount: selected.length,
+		overflowQuestionCount: Math.max(0, selected.length - selection.requestedQuestionCount),
 		cursor: 0,
 		nextCursor: null,
 		hasMore: false,
 		stateCounts: {
-			fresh: groups.fresh.length,
-			wrong: groups.wrong.length,
-			mastered: groups.mastered.length,
+			fresh: stateQuestionCount('fresh'),
+			wrong: stateQuestionCount('wrong'),
+			mastered: stateQuestionCount('mastered'),
 			sampled: items.length
 		},
 		items: cloneValue(selected),
@@ -1013,7 +1178,7 @@ export async function getQuestionCatalog(subjectId, options) {
 			'题库目录缺少有效版本'
 		)
 	}
-	requireV2Catalog(catalog)
+	requireV3Catalog(catalog)
 	if (previous && previous.activeVersion !== catalog.activeVersion) {
 		clearSubjectMemory(normalizedSubjectId)
 	}
@@ -1024,20 +1189,17 @@ export async function getQuestionCatalog(subjectId, options) {
 
 export async function getCatalogSummaries(options) {
 	const config = options || {}
-	if (!config.forceRefresh
-		&& catalogSummariesCache
-		&& catalogSummariesCache.expiresAt > Date.now()) {
-		return cloneValue(catalogSummariesCache.items)
+	if (!config.forceRefresh) {
+		const cached = getCachedCatalogSummaries()
+		if (cached) return cached
 	}
 	const data = await callQuestionBank('getCatalogSummaries', {}, config)
 	const items = data && Array.isArray(data.items)
 		? data.items.filter(item => item && item.subjectId && item.activeVersion)
 		: []
-	items.forEach(requireV2Catalog)
-	catalogSummariesCache = {
-		items: cloneValue(items),
-		expiresAt: Date.now() + CATALOG_CACHE_TTL
-	}
+	items.forEach(requireV3Catalog)
+	reconcileCatalogSummaryVersions(items)
+	setCachedCatalogSummaries(items)
 	return cloneValue(items)
 }
 
@@ -1069,7 +1231,8 @@ export async function getPracticePage(params, options) {
 	if (!config.forceRefresh) {
 		const cached = getBoundedCache(pageMemoryCache, key)
 		if (cached) {
-			requireQuestionItems(cached.items, true)
+			if (mode === 'smart') requireSmartPracticeResponse(cached)
+			else requireQuestionItems(cached.items, true)
 			return cached
 		}
 		const localPage = storedLocalPage || buildLocalPracticePage(catalog, mode, payload)
@@ -1079,7 +1242,8 @@ export async function getPracticePage(params, options) {
 		}
 	}
 	const data = await callQuestionBank('getPracticePage', payload, config)
-	requireQuestionItems(data && data.items, true)
+	if (mode === 'smart') requireSmartPracticeResponse(data)
+	else requireQuestionItems(data && data.items, true)
 	const returnedVersion = data && data.version
 	const version = returnedVersion || (versionFromResponse ? '' : expectedVersion)
 	if (!version) {
@@ -1221,9 +1385,42 @@ export async function getAllPracticeQuestions(params, options) {
 				hasMore: false,
 				items: cloneValue(items)
 			}
+			if (mode === 'smart' && page) {
+				result.requestedQuestionCount = page.requestedQuestionCount
+				result.actualQuestionCount = items.length
+				result.overflowQuestionCount = Math.max(
+					0,
+					items.length - page.requestedQuestionCount
+				)
+				result.stateCounts = cloneValue(page.stateCounts || {})
+				result.seed = page.seed || ''
+			}
 			if (mode === 'chapter' && firstCursor === 0) {
 				removePersistedChapterVersions(subjectId, version)
 				setPersistedChapter(subjectId, version, chapterId, result)
+			}
+			if (mode === 'sequence' && firstCursor === 0 && version) {
+				const catalog = await getQuestionCatalog(subjectId)
+				if (catalog.activeVersion === version && Array.isArray(catalog.chapters)) {
+					const byChapter = new Map()
+					items.forEach(question => {
+						const itemChapterId = String(question && question.chapterId || '')
+						if (!itemChapterId) return
+						if (!byChapter.has(itemChapterId)) byChapter.set(itemChapterId, [])
+						byChapter.get(itemChapterId).push(question)
+					})
+					removePersistedChapterVersions(subjectId, version)
+					catalog.chapters.forEach(chapter => {
+						const itemChapterId = String(chapter.id)
+						const chapterItems = byChapter.get(itemChapterId) || []
+						const expectedTotal = Number(chapter.count)
+						if (!Number.isInteger(expectedTotal) || chapterItems.length !== expectedTotal) return
+						setPersistedChapter(subjectId, version, itemChapterId, {
+							total: chapterItems.length,
+							items: chapterItems
+						})
+					})
+				}
 			}
 			return result
 		}
@@ -1420,7 +1617,7 @@ export async function checkQuestionAnswer(params, options) {
 
 export function clearQuestionBankCache(subjectId) {
 	if (subjectId === undefined || subjectId === null || subjectId === '') {
-		catalogSummariesCache = null
+		clearCatalogSummariesCache()
 		catalogMemoryCache.clear()
 		pageMemoryCache.clear()
 		questionMemoryCache.clear()
@@ -1438,7 +1635,7 @@ export function clearQuestionBankCache(subjectId) {
 		return
 	}
 	const normalizedSubjectId = normalizeSubjectId(subjectId)
-	catalogSummariesCache = null
+	clearCatalogSummariesCache()
 	catalogMemoryCache.delete(normalizedSubjectId)
 	clearSubjectMemory(normalizedSubjectId)
 	clearPersistedChapterCache(normalizedSubjectId)
@@ -1464,6 +1661,7 @@ const questionBankService = {
 	getCatalogSummaries,
 	getQuestionCatalog,
 	getPracticePage,
+	hasCompleteQuestionBankCache,
 	getAllPracticeQuestions,
 	searchQuestions,
 	searchQuestionBank,

@@ -159,8 +159,10 @@ function publicMembership(membership, timestamp) {
 		expiresAt: isMember ? expiresAt : 0,
 		entitlements: {
 			adFree: isMember,
-			practiceRecords: true,
-			advancedAnswerModes: true
+			practiceRecords: isMember,
+			advancedAnswerModes: isMember,
+			reviewMode: isMember,
+			smartPracticeOver30: isMember
 		}
 	}
 }

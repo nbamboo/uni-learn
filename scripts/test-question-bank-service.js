@@ -21,7 +21,16 @@ function loadService(sandbox) {
 		searchQuestionBank,
 		getQuestionsByIds,
 		checkQuestionAnswer,
-		clearQuestionBankCache
+		clearQuestionBankCache,
+		getCacheState(subjectId) {
+			const prefix = subjectId + '|'
+			return {
+				catalog: catalogMemoryCache.has(subjectId),
+				page: Array.from(pageMemoryCache.keys()).some(key => key.indexOf(prefix) === 0),
+				question: Array.from(questionMemoryCache.keys()).some(key => key.indexOf(prefix) === 0),
+				answer: Array.from(answerMemoryCache.keys()).some(key => key.indexOf(prefix) === 0)
+			}
+		}
 	}`
 	vm.createContext(sandbox)
 	vm.runInContext(source, sandbox, { filename: servicePath })
@@ -31,9 +40,19 @@ function loadService(sandbox) {
 function createEnvironment() {
 	const storage = new Map()
 	const calls = []
+	let currentTime = Date.now()
 	let networkFailures = 0
 	let catalogVersion = '2026-08-21'
-	let catalogSchemaVersion = 2
+	let catalogSchemaVersion = 3
+	class TestDate extends Date {
+		constructor(...args) {
+			super(...(args.length ? args : [currentTime]))
+		}
+
+		static now() {
+			return currentTime
+		}
+	}
 	const questions = {
 		q1: {
 			id: 'ipf-1',
@@ -75,6 +94,10 @@ function createEnvironment() {
 			knowledge: '另一个知识点',
 			type: 'material',
 			selectionMode: 'multiple',
+			materialGroupId: 'ipf-material-1',
+			materialText: '用于测试缓存恢复的材料正文',
+			materialQuestionIndex: 1,
+			materialQuestionCount: 1,
 			title: '题目三',
 			options: [{ alias: 'C', text: '选项三' }],
 			answer: ['C'],
@@ -160,6 +183,7 @@ function createEnvironment() {
 			}
 			if (data.action === 'getPracticePage') {
 				const isNextPage = data.cursor === 2
+				const items = isNextPage ? [questions.q3] : [questions.q1, questions.q2]
 				return {
 					result: {
 						errCode: 0,
@@ -171,7 +195,10 @@ function createEnvironment() {
 							total: 3,
 							nextCursor: isNextPage ? null : 2,
 							hasMore: !isNextPage,
-							items: isNextPage ? [questions.q3] : [questions.q1, questions.q2]
+							requestedQuestionCount: data.mode === 'smart' ? data.pageSize : undefined,
+							actualQuestionCount: data.mode === 'smart' ? items.length : undefined,
+							overflowQuestionCount: data.mode === 'smart' ? 0 : undefined,
+							items
 						}
 					}
 				}
@@ -235,7 +262,7 @@ function createEnvironment() {
 			console,
 			setTimeout,
 			clearTimeout,
-			Date,
+			Date: TestDate,
 			Map,
 			Set,
 			Promise,
@@ -260,6 +287,12 @@ function createEnvironment() {
 		},
 		setCatalogSchemaVersion(value) {
 			catalogSchemaVersion = value
+		},
+		advanceTime(milliseconds) {
+			currentTime += milliseconds
+		},
+		now() {
+			return currentTime
 		}
 	}
 }
@@ -318,6 +351,9 @@ async function testPersistentChapterCache() {
 		wrongQuestionIds: ['ipf-2']
 	}, { versionFromResponse: true })
 	assert.equal(localSmart.items.length, 2)
+	assert.equal(localSmart.requestedQuestionCount, 2)
+	assert.equal(localSmart.actualQuestionCount, 2)
+	assert.equal(localSmart.overflowQuestionCount, 0)
 	assert.equal(localSmart._localOnly, true)
 	const ratioRequest = { subjectId, mode: 'smart', pageSize: 1,
 		answeredQuestionIds: ['ipf-1', 'ipf-2'], wrongQuestionIds: ['ipf-2'],
@@ -351,7 +387,7 @@ async function testPersistentChapterCache() {
 	assert.deepEqual(Array.from(localByIds.items, item => item.id), ['ipf-3', 'ipf-1'])
 	assert.equal(environment.calls.length, callsBeforeCrossModeReuse)
 	const persistedCatalogCache = environment.storage.get('uni-learn-question-bank-catalog-cache-v1')
-	persistedCatalogCache.entries[subjectId].expiresAt = Date.now() - 1
+	persistedCatalogCache.entries[subjectId].expiresAt = environment.now() - 1
 	environment.storage.set('uni-learn-question-bank-catalog-cache-v1', persistedCatalogCache)
 	const catalogCallsBeforeExpiredReuse = environment.calls.filter(call => (
 		call.data.action === 'getCatalog'
@@ -406,6 +442,28 @@ async function testPersistentChapterCache() {
 	assert.equal(Object.keys(clearedIndex.entries).length, 0)
 }
 
+async function testSequenceBuildsChapterCache() {
+	const environment = createEnvironment()
+	const subjectId = 'junior-personal-finance'
+	const service = loadService(environment.sandbox)
+	const sequence = await service.getAllPracticeQuestions({ subjectId, mode: 'sequence' })
+	assert.equal(sequence.items.length, 3)
+	const cloudPages = environment.calls.filter(call => call.data.action === 'getPracticePage').length
+	assert.equal(environment.storage.has('uni-learn-question-bank-chapter-cache-index-v1'), true)
+	const restarted = reloadService(environment)
+	const chapter = await restarted.getAllPracticeQuestions({
+		subjectId,
+		mode: 'chapter',
+		chapterId: '1'
+	})
+	assert.deepEqual(Array.from(chapter.items, item => item.id), ['ipf-1', 'ipf-2', 'ipf-3'])
+	assert.equal(chapter._localOnly, true)
+	assert.equal(
+		environment.calls.filter(call => call.data.action === 'getPracticePage').length,
+		cloudPages
+	)
+}
+
 async function testPracticePageVersionFromResponse() {
 	const environment = createEnvironment()
 	const subjectId = 'junior-personal-finance'
@@ -448,7 +506,234 @@ async function testPracticePageVersionFromResponse() {
 	)
 }
 
-async function testInvalidPersistentV2CacheFailsFast() {
+async function testCatalogCacheDurations() {
+	const environment = createEnvironment()
+	const subjectId = 'junior-personal-finance'
+	const service = loadService(environment.sandbox)
+	const hour = 60 * 60 * 1000
+
+	await service.getQuestionCatalog(subjectId)
+	const persisted = environment.storage.get('uni-learn-question-bank-catalog-cache-v1')
+	assert.equal(persisted.entries[subjectId].expiresAt - environment.now(), 24 * hour)
+	assert.equal(environment.calls.filter(call => call.data.action === 'getCatalog').length, 1)
+
+	// Once memory expires after two hours, the 24-hour local entry still avoids a cloud call.
+	environment.advanceTime(2 * hour + 1)
+	await service.getQuestionCatalog(subjectId)
+	assert.equal(environment.calls.filter(call => call.data.action === 'getCatalog').length, 1)
+
+	// Restoring from local storage must only refill memory for another two hours.
+	persisted.entries[subjectId].expiresAt = environment.now() - 1
+	environment.advanceTime(2 * hour - 1)
+	await service.getQuestionCatalog(subjectId)
+	assert.equal(environment.calls.filter(call => call.data.action === 'getCatalog').length, 1)
+	environment.advanceTime(2)
+	await service.getQuestionCatalog(subjectId)
+	assert.equal(environment.calls.filter(call => call.data.action === 'getCatalog').length, 2)
+
+	const memoryEnvironment = createEnvironment()
+	const memoryService = loadService(memoryEnvironment.sandbox)
+	await memoryService.getQuestionCatalog(subjectId)
+	const memoryPersisted = memoryEnvironment.storage.get('uni-learn-question-bank-catalog-cache-v1')
+	memoryPersisted.entries[subjectId].expiresAt = memoryEnvironment.now() - 1
+	memoryEnvironment.advanceTime(2 * hour - 1)
+	await memoryService.getQuestionCatalog(subjectId)
+	assert.equal(memoryEnvironment.calls.filter(call => call.data.action === 'getCatalog').length, 1)
+	memoryEnvironment.advanceTime(2)
+	await memoryService.getQuestionCatalog(subjectId)
+	assert.equal(memoryEnvironment.calls.filter(call => call.data.action === 'getCatalog').length, 2)
+
+	const summariesEnvironment = createEnvironment()
+	const summariesService = loadService(summariesEnvironment.sandbox)
+	await summariesService.getCatalogSummaries()
+	const summariesStorageKey = 'uni-learn-question-bank-catalog-summaries-cache-v1'
+	const persistedSummaries = summariesEnvironment.storage.get(summariesStorageKey)
+	assert.equal(persistedSummaries.expiresAt - summariesEnvironment.now(), 24 * hour)
+	assert.equal(summariesEnvironment.calls.filter(call => (
+		call.data.action === 'getCatalogSummaries'
+	)).length, 1)
+
+	// The two-hour memory entry is used before local storage is consulted.
+	summariesEnvironment.advanceTime(2 * hour - 1)
+	await summariesService.getCatalogSummaries()
+	assert.equal(summariesEnvironment.calls.filter(call => (
+		call.data.action === 'getCatalogSummaries'
+	)).length, 1)
+
+	// After memory expires, the 24-hour local entry restores memory without a cloud call.
+	summariesEnvironment.advanceTime(2)
+	await summariesService.getCatalogSummaries()
+	assert.equal(summariesEnvironment.calls.filter(call => (
+		call.data.action === 'getCatalogSummaries'
+	)).length, 1)
+	const coldSummariesService = reloadService(summariesEnvironment)
+	await coldSummariesService.getCatalogSummaries()
+	assert.equal(summariesEnvironment.calls.filter(call => (
+		call.data.action === 'getCatalogSummaries'
+	)).length, 1)
+
+	// Memory restored from local storage is capped at two hours.
+	persistedSummaries.expiresAt = summariesEnvironment.now() - 1
+	summariesEnvironment.advanceTime(2 * hour - 1)
+	await coldSummariesService.getCatalogSummaries()
+	assert.equal(summariesEnvironment.calls.filter(call => (
+		call.data.action === 'getCatalogSummaries'
+	)).length, 1)
+	summariesEnvironment.advanceTime(2)
+	await coldSummariesService.getCatalogSummaries()
+	assert.equal(summariesEnvironment.calls.filter(call => (
+		call.data.action === 'getCatalogSummaries'
+	)).length, 2)
+	await coldSummariesService.getCatalogSummaries({ forceRefresh: true })
+	assert.equal(summariesEnvironment.calls.filter(call => (
+		call.data.action === 'getCatalogSummaries'
+	)).length, 3)
+
+	const summaryMemoryEnvironment = createEnvironment()
+	const summaryMemoryService = loadService(summaryMemoryEnvironment.sandbox)
+	await summaryMemoryService.getCatalogSummaries()
+	const summaryMemoryPersisted = summaryMemoryEnvironment.storage.get(summariesStorageKey)
+	summaryMemoryPersisted.expiresAt = summaryMemoryEnvironment.now() - 1
+	summaryMemoryEnvironment.advanceTime(2 * hour - 1)
+	await summaryMemoryService.getCatalogSummaries()
+	assert.equal(summaryMemoryEnvironment.calls.filter(call => (
+		call.data.action === 'getCatalogSummaries'
+	)).length, 1)
+	summaryMemoryEnvironment.advanceTime(2)
+	await summaryMemoryService.getCatalogSummaries()
+	assert.equal(summaryMemoryEnvironment.calls.filter(call => (
+		call.data.action === 'getCatalogSummaries'
+	)).length, 2)
+
+	const expiryEnvironment = createEnvironment()
+	const expiryService = loadService(expiryEnvironment.sandbox)
+	await expiryService.getCatalogSummaries()
+	expiryEnvironment.advanceTime(24 * hour - 1)
+	await expiryService.getCatalogSummaries()
+	assert.equal(expiryEnvironment.calls.filter(call => (
+		call.data.action === 'getCatalogSummaries'
+	)).length, 1)
+	expiryEnvironment.advanceTime(2)
+	await expiryService.getCatalogSummaries()
+	assert.equal(expiryEnvironment.calls.filter(call => (
+		call.data.action === 'getCatalogSummaries'
+	)).length, 2)
+
+	const invalidEnvironment = createEnvironment()
+	invalidEnvironment.storage.set(summariesStorageKey, {
+		version: 1,
+		expiresAt: invalidEnvironment.now() + hour,
+		items: [{ subjectId, activeVersion: 'broken' }]
+	})
+	await loadService(invalidEnvironment.sandbox).getCatalogSummaries()
+	assert.equal(invalidEnvironment.calls.filter(call => (
+		call.data.action === 'getCatalogSummaries'
+	)).length, 1)
+
+	const storageFailureEnvironment = createEnvironment()
+	storageFailureEnvironment.sandbox.uni.getStorageSync = () => {
+		throw new Error('storage read failed')
+	}
+	storageFailureEnvironment.sandbox.uni.setStorageSync = () => {
+		throw new Error('storage write failed')
+	}
+	const storageFailureService = loadService(storageFailureEnvironment.sandbox)
+	const storageFailureSummaries = await storageFailureService.getCatalogSummaries()
+	assert.equal(storageFailureSummaries.length, 2)
+	await storageFailureService.getCatalogSummaries()
+	assert.equal(storageFailureEnvironment.calls.filter(call => (
+		call.data.action === 'getCatalogSummaries'
+	)).length, 1)
+}
+
+async function testCatalogSummaryVersionLinking() {
+	const subjectId = 'junior-personal-finance'
+	const nextVersion = '2026-09-14-v2'
+
+	// Cached summaries are not authoritative and must not invalidate a newer catalog.
+	const staleSummaryEnvironment = createEnvironment()
+	const staleSummaryService = loadService(staleSummaryEnvironment.sandbox)
+	await staleSummaryService.getCatalogSummaries()
+	staleSummaryEnvironment.setCatalogVersion(nextVersion)
+	await staleSummaryService.getQuestionCatalog(subjectId, { forceRefresh: true })
+	const catalogCallsAfterRefresh = staleSummaryEnvironment.calls.filter(call => (
+		call.data.action === 'getCatalog'
+	)).length
+	const cachedSummaries = await staleSummaryService.getCatalogSummaries()
+	assert.equal(cachedSummaries.find(item => item.subjectId === subjectId).activeVersion, '2026-08-21')
+	assert.equal((await staleSummaryService.getQuestionCatalog(subjectId)).activeVersion, nextVersion)
+	assert.equal(staleSummaryEnvironment.calls.filter(call => (
+		call.data.action === 'getCatalog'
+	)).length, catalogCallsAfterRefresh)
+
+	const coldStaleSummaryService = reloadService(staleSummaryEnvironment)
+	await coldStaleSummaryService.getCatalogSummaries()
+	assert.equal((await coldStaleSummaryService.getQuestionCatalog(subjectId)).activeVersion, nextVersion)
+	assert.equal(staleSummaryEnvironment.calls.filter(call => (
+		call.data.action === 'getCatalog'
+	)).length, catalogCallsAfterRefresh)
+
+	// A fresh cloud summary invalidates only the subject whose active version changed.
+	const environment = createEnvironment()
+	const service = loadService(environment.sandbox)
+	await service.getAllPracticeQuestions({ subjectId, mode: 'chapter', chapterId: '1' })
+	await service.checkQuestionAnswer({ subjectId, questionId: 'ipf-1', selected: ['A'] })
+	const subjectStateBefore = service.getCacheState(subjectId)
+	assert.equal(subjectStateBefore.catalog, true)
+	assert.equal(subjectStateBefore.page, true)
+	assert.equal(subjectStateBefore.question, true)
+	assert.equal(subjectStateBefore.answer, true)
+
+	const otherSubjectId = 'junior-law'
+	environment.setCatalogVersion('2026-09-01')
+	await service.getAllPracticeQuestions({
+		subjectId: otherSubjectId,
+		mode: 'chapter',
+		chapterId: '1'
+	})
+	const otherStateBefore = service.getCacheState(otherSubjectId)
+	assert.equal(otherStateBefore.catalog, true)
+	assert.equal(otherStateBefore.page, true)
+	assert.equal(otherStateBefore.question, true)
+
+	environment.setCatalogVersion(nextVersion)
+	const catalogCallsBeforeSummaryRefresh = environment.calls.filter(call => (
+		call.data.action === 'getCatalog'
+	)).length
+	await service.getCatalogSummaries({ forceRefresh: true })
+	assert.equal(environment.calls.filter(call => (
+		call.data.action === 'getCatalog'
+	)).length, catalogCallsBeforeSummaryRefresh)
+
+	const subjectStateAfter = service.getCacheState(subjectId)
+	assert.equal(subjectStateAfter.catalog, false)
+	assert.equal(subjectStateAfter.page, false)
+	assert.equal(subjectStateAfter.question, false)
+	assert.equal(subjectStateAfter.answer, false)
+	const otherStateAfter = service.getCacheState(otherSubjectId)
+	assert.equal(otherStateAfter.catalog, true)
+	assert.equal(otherStateAfter.page, true)
+	assert.equal(otherStateAfter.question, true)
+
+	const persistedCatalogs = environment.storage.get('uni-learn-question-bank-catalog-cache-v1')
+	assert.equal(Boolean(persistedCatalogs.entries[subjectId]), false)
+	assert.equal(Boolean(persistedCatalogs.entries[otherSubjectId]), true)
+	const chapterIndex = environment.storage.get('uni-learn-question-bank-chapter-cache-index-v1')
+	const chapterEntries = Object.values(chapterIndex.entries)
+	assert.equal(chapterEntries.some(item => item.subjectId === subjectId), false)
+	assert.equal(chapterEntries.some(item => item.subjectId === otherSubjectId), true)
+
+	assert.equal((await service.getQuestionCatalog(subjectId)).activeVersion, nextVersion)
+	assert.equal(environment.calls.filter(call => (
+		call.data.action === 'getCatalog'
+	)).length, catalogCallsBeforeSummaryRefresh + 1)
+	assert.equal((await service.getQuestionCatalog(otherSubjectId)).activeVersion, '2026-09-01')
+	assert.equal(environment.calls.filter(call => (
+		call.data.action === 'getCatalog'
+	)).length, catalogCallsBeforeSummaryRefresh + 1)
+}
+
+async function testInvalidPersistentV3CacheFailsFast() {
 	const environment = createEnvironment()
 	const subjectId = 'junior-personal-finance'
 	const service = loadService(environment.sandbox)
@@ -467,16 +752,38 @@ async function testInvalidPersistentV2CacheFailsFast() {
 		error => error.errCode === 'QUESTION_BANK_INVALID_QUESTION_SCHEMA'
 	)
 
+	const invalidMaterialCacheEnvironment = createEnvironment()
+	const invalidMaterialCacheService = loadService(invalidMaterialCacheEnvironment.sandbox)
+	await invalidMaterialCacheService.getAllPracticeQuestions({
+		subjectId,
+		mode: 'chapter',
+		chapterId: '1'
+	})
+	const materialIndex = invalidMaterialCacheEnvironment.storage
+		.get('uni-learn-question-bank-chapter-cache-index-v1')
+	const materialMetadata = Object.values(materialIndex.entries)[0]
+	const materialCache = invalidMaterialCacheEnvironment.storage.get(materialMetadata.storageKey)
+	delete materialCache.items.find(item => item.type === 'material').materialText
+	invalidMaterialCacheEnvironment.storage.set(materialMetadata.storageKey, materialCache)
+	await assert.rejects(
+		reloadService(invalidMaterialCacheEnvironment).getAllPracticeQuestions({
+			subjectId,
+			mode: 'chapter',
+			chapterId: '1'
+		}),
+		error => error.errCode === 'QUESTION_BANK_INVALID_QUESTION_SCHEMA'
+	)
+
 	const oldCatalogEnvironment = createEnvironment()
 	oldCatalogEnvironment.storage.set('uni-learn-question-bank-catalog-cache-v1', {
 		version: 1,
 		entries: {
 			[subjectId]: {
-				expiresAt: Date.now() + 60 * 1000,
+				expiresAt: oldCatalogEnvironment.now() + 60 * 1000,
 				data: {
 					subjectId,
 					activeVersion: 'legacy-v1',
-					questionSchemaVersion: 1
+					questionSchemaVersion: 2
 				}
 			}
 		}
@@ -503,7 +810,7 @@ async function run() {
 		service.getQuestionCatalog(subjectId)
 	])
 	assert.equal(catalogs[0].activeVersion, '2026-08-21')
-	assert.equal(catalogs[0].questionSchemaVersion, 2)
+	assert.equal(catalogs[0].questionSchemaVersion, 3)
 	assert.equal(environment.calls.filter(call => call.data.action === 'getCatalog').length, 1)
 
 	const firstPage = await service.getPracticePage({ subjectId, mode: 'sequence', pageSize: 20 })
@@ -553,6 +860,9 @@ async function run() {
 	assert.equal(environment.calls.filter(call => call.data.action === 'checkAnswer').length, 1)
 
 	service.clearQuestionBankCache(subjectId)
+	assert.equal(environment.storage.has(
+		'uni-learn-question-bank-catalog-summaries-cache-v1'
+	), false)
 	environment.setNetworkFailures(1)
 	await service.getQuestionCatalog(subjectId, { forceRefresh: true })
 	const catalogCalls = environment.calls.filter(call => call.data.action === 'getCatalog')
@@ -572,7 +882,7 @@ async function run() {
 	)
 
 	const oldCatalogEnvironment = createEnvironment()
-	oldCatalogEnvironment.setCatalogSchemaVersion(1)
+	oldCatalogEnvironment.setCatalogSchemaVersion(2)
 	await assert.rejects(
 		loadService(oldCatalogEnvironment.sandbox).getQuestionCatalog(subjectId),
 		error => error.errCode === 'QUESTION_BANK_SCHEMA_VERSION_UNSUPPORTED'
@@ -593,8 +903,11 @@ async function run() {
 async function main() {
 	await run()
 	await testPersistentChapterCache()
+	await testSequenceBuildsChapterCache()
 	await testPracticePageVersionFromResponse()
-	await testInvalidPersistentV2CacheFailsFast()
+	await testCatalogCacheDurations()
+	await testCatalogSummaryVersionLinking()
+	await testInvalidPersistentV3CacheFailsFast()
 	console.log('question-bank service tests passed')
 }
 

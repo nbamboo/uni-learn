@@ -74,6 +74,32 @@
         }
       }
     },
+    "chapterAttemptCount": {
+      "bsonType": "int",
+      "minimum": 0,
+      "description": "当前章节轮次的去重已答题数"
+    },
+    "sectionAttemptCounts": {
+      "bsonType": "array",
+      "arrayType": "object",
+      "maxLength": 500,
+      "description": "当前章节轮次按小节维护的去重已答题数",
+      "items": {
+        "bsonType": "object",
+        "required": ["section", "count"],
+        "properties": {
+          "section": {
+            "bsonType": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "count": {
+            "bsonType": "int",
+            "minimum": 0
+          }
+        }
+      }
+    },
     "chapterPosition": {
       "bsonType": "object",
       "properties": {

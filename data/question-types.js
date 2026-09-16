@@ -18,6 +18,12 @@ export function getQuestionTypeLabel(type) {
 	return label
 }
 
+export function getQuestionTypeDisplayLabel(question) {
+	const label = getQuestionTypeLabel(question && question.type)
+	if (!question || question.type !== 'material') return label
+	return `${label}，第 ${question.materialQuestionIndex}/${question.materialQuestionCount} 小题`
+}
+
 export function isValidQuestionSelectionMode(type, selectionMode) {
 	return Boolean(QUESTION_SELECTION_MODES[type])
 		&& QUESTION_SELECTION_MODES[type] === selectionMode

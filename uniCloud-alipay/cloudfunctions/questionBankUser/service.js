@@ -1,7 +1,13 @@
 'use strict'
 
 const crypto = require('crypto')
-const { normalizeSmartPractice, validateSmartPractice, selectSmartPracticeIds } = require('./smart-practice.js')
+const {
+	normalizeSmartPractice,
+	validateSmartPractice,
+	buildSmartPracticeUnits,
+	classifySmartPracticeUnits,
+	selectSmartPracticeUnits
+} = require('./smart-practice.js')
 
 const CATALOG_COLLECTION = 'question_bank_catalogs'
 const QUESTION_COLLECTION = 'question_bank_questions'
@@ -20,10 +26,10 @@ const MAX_PRACTICE_ROUND_ROWS = 500
 const MAX_EXAM_DRAFT_ROWS = 500
 const MAX_EXAM_DRAFT_QUESTIONS = 5000
 const MAX_SNAPSHOT_QUESTION_IDS = 100
-const MAX_SMART_CANDIDATES = 100
+const SMART_METADATA_PAGE_SIZE = 500
 const DEFAULT_PAGE_SIZE = 20
 const MAX_PAGE_SIZE = 50
-const QUESTION_SCHEMA_VERSION = 2
+const QUESTION_SCHEMA_VERSION = 3
 const SUBJECT_ID_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/
 const QUESTION_ID_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/
 const EVENT_ID_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/
@@ -47,7 +53,9 @@ const MEMBER_SYNC_ACTIONS = new Set([
 	'getPracticeRound',
 	'getExamDraft',
 	'getExamDraftSummaries',
+	'getPracticeBootstrap',
 	'getSmartPractice',
+	'getSmartPracticeState',
 	'getRecords',
 	'getPreferences',
 	'updatePreferences',
@@ -66,11 +74,11 @@ class QuestionBankUserError extends Error {
 	}
 }
 
-function requireV2Catalog(catalog) {
+function requireV3Catalog(catalog) {
 	if (!catalog || catalog.questionSchemaVersion !== QUESTION_SCHEMA_VERSION) {
 		throw new QuestionBankUserError(
 			'QUESTION_BANK_SCHEMA_VERSION_UNSUPPORTED',
-			'当前题库不是题型 v2，请重新发布题库目录'
+			'当前题库不是题型 schema v3，请重新发布题库目录'
 		)
 	}
 	return catalog
@@ -78,12 +86,32 @@ function requireV2Catalog(catalog) {
 
 function requireQuestionSchema(document, requireSelectionMode) {
 	const expectedSelectionMode = document && QUESTION_SELECTION_MODES[document.type]
+	const materialFields = [
+		'materialGroupId', 'materialText', 'materialQuestionIndex', 'materialQuestionCount'
+	]
+	const hasMaterialField = Boolean(document)
+		&& materialFields.some(field => Object.prototype.hasOwnProperty.call(document, field))
+	const validMaterial = document && document.type === 'material'
+		&& typeof document.materialGroupId === 'string'
+		&& document.materialGroupId.length <= 64
+		&& QUESTION_ID_PATTERN.test(document.materialGroupId)
+		&& typeof document.materialText === 'string' && Boolean(document.materialText.trim())
+		&& document.materialText.length <= 10000
+		&& Number.isInteger(document.materialQuestionIndex)
+		&& Number.isInteger(document.materialQuestionCount)
+		&& document.materialQuestionIndex >= 1
+		&& document.materialQuestionCount >= document.materialQuestionIndex
+		&& typeof document.title === 'string' && Boolean(document.title.trim())
+		&& document.title.indexOf('[材料]') === -1
 	if (!expectedSelectionMode
-		|| (requireSelectionMode && document.selectionMode !== expectedSelectionMode)) {
+		|| (requireSelectionMode && document.selectionMode !== expectedSelectionMode)
+		|| (document && document.type === 'material'
+			&& (requireSelectionMode || hasMaterialField) && !validMaterial)
+		|| (document && document.type !== 'material' && hasMaterialField)) {
 		const questionId = document && (document.questionId || document._id) || 'unknown'
 		throw new QuestionBankUserError(
 			'QUESTION_BANK_INVALID_QUESTION_SCHEMA',
-			`题目${questionId}不符合题型 v2 结构`
+			`题目${questionId}不符合题型 schema v3 结构`
 		)
 	}
 	return document
@@ -306,6 +334,8 @@ function emptyPracticeRound(userId, subjectId, chapterId, timestamp) {
 		subjectId,
 		chapterId: String(chapterId),
 		answers: [],
+		chapterAttemptCount: 0,
+		sectionAttemptCounts: [],
 		chapterPosition: {},
 		sectionPositions: [],
 		chapterResetAt: new Date(0),
@@ -313,6 +343,24 @@ function emptyPracticeRound(userId, subjectId, chapterId, timestamp) {
 		createdAt: timestamp,
 		updatedAt: timestamp
 	}
+}
+
+function refreshPracticeRoundCounts(round) {
+	const seenQuestionIds = new Set()
+	const sectionCounts = new Map()
+	;(Array.isArray(round.answers) ? round.answers : []).forEach(answer => {
+		if (!answer || !answer.questionId || seenQuestionIds.has(answer.questionId)) return
+		seenQuestionIds.add(answer.questionId)
+		if (answer.section) {
+			sectionCounts.set(answer.section, (sectionCounts.get(answer.section) || 0) + 1)
+		}
+	})
+	round.chapterAttemptCount = seenQuestionIds.size
+	round.sectionAttemptCounts = Array.from(sectionCounts.entries()).map(([section, count]) => ({
+		section,
+		count
+	}))
+	return round
 }
 
 function normalizePracticeRound(saved, userId, subjectId, chapterId, timestamp) {
@@ -329,7 +377,7 @@ function normalizePracticeRound(saved, userId, subjectId, chapterId, timestamp) 
 	round.chapterPosition = isPlainObject(round.chapterPosition) && round.chapterPosition.questionId
 		? round.chapterPosition
 		: {}
-	return round
+	return refreshPracticeRoundCounts(round)
 }
 
 function practiceRoundResetAt(round, section) {
@@ -359,6 +407,7 @@ function applyPracticeRoundAnswer(round, item, correct, chapterId, section) {
 	if (savedIndex > -1) round.answers.splice(savedIndex, 1, answer)
 	else round.answers.push(answer)
 	round.chapterId = String(chapterId)
+	refreshPracticeRoundCounts(round)
 	return true
 }
 
@@ -404,6 +453,7 @@ function applyPracticeRoundReset(round, item) {
 		})
 		round.chapterResetAt = item.occurredAt
 		round.chapterResetEventId = item.eventId
+		refreshPracticeRoundCounts(round)
 		return true
 	}
 	const savedIndex = round.sectionResets.findIndex(reset => reset.section === item.section)
@@ -423,6 +473,7 @@ function applyPracticeRoundReset(round, item) {
 	const reset = { section: item.section, resetAt: item.occurredAt, resetEventId: item.eventId }
 	if (savedIndex > -1) round.sectionResets.splice(savedIndex, 1, reset)
 	else round.sectionResets.push(reset)
+	refreshPracticeRoundCounts(round)
 	return true
 }
 
@@ -645,6 +696,22 @@ async function requireActiveMembership(store, userId, currentTime, featureName) 
 	return saved
 }
 
+function membershipResponse(saved) {
+	const expiresAt = getDateValue(saved && saved.expiresAt)
+	return {
+		isMember: true,
+		status: 'active',
+		expiresAt,
+		entitlements: {
+			adFree: true,
+			practiceRecords: true,
+			advancedAnswerModes: true,
+			reviewMode: true,
+			smartPracticeOver30: true
+		}
+	}
+}
+
 function emptyState(userId, subjectId, questionId, timestamp) {
 	return {
 		_id: stateDocumentId(userId, subjectId, questionId),
@@ -682,6 +749,15 @@ function incrementAggregate(entries, key) {
 	else entries.push({ key, count: 1 })
 }
 
+function addUniqueId(ids, questionId) {
+	if (questionId && ids.length < MAX_STATE_ROWS && ids.indexOf(questionId) === -1) ids.push(questionId)
+}
+
+function removeId(ids, questionId) {
+	const index = ids.indexOf(questionId)
+	if (index > -1) ids.splice(index, 1)
+}
+
 function aggregateEntriesToObject(entries) {
 	const result = {}
 	entries.forEach(item => {
@@ -717,7 +793,10 @@ function emptyStats(userId, subjectId, timestamp, todayKey) {
 		chapterAttempts: [],
 		sectionAttempts: [],
 		knowledgeAttempts: [],
-		stateAggregateVersion: 5,
+		answeredQuestionIds: [],
+		wrongQuestionIds: [],
+		favoriteQuestionIds: [],
+		stateAggregateVersion: 7,
 		createdAt: timestamp,
 		updatedAt: timestamp
 	}
@@ -728,6 +807,15 @@ function normalizeStats(stats, userId, subjectId, timestamp, todayKey) {
 	result.chapterAttempts = normalizeAggregateEntries(result.chapterAttempts)
 	result.sectionAttempts = normalizeAggregateEntries(result.sectionAttempts)
 	result.knowledgeAttempts = normalizeAggregateEntries(result.knowledgeAttempts)
+	result.answeredQuestionIds = Array.from(new Set(
+		(Array.isArray(result.answeredQuestionIds) ? result.answeredQuestionIds : []).filter(Boolean)
+	)).slice(0, MAX_STATE_ROWS)
+	result.wrongQuestionIds = Array.from(new Set(
+		(Array.isArray(result.wrongQuestionIds) ? result.wrongQuestionIds : []).filter(Boolean)
+	)).slice(0, MAX_STATE_ROWS)
+	result.favoriteQuestionIds = Array.from(new Set(
+		(Array.isArray(result.favoriteQuestionIds) ? result.favoriteQuestionIds : []).filter(Boolean)
+	)).slice(0, MAX_STATE_ROWS)
 	if (result.todayKey !== todayKey) {
 		result.todayKey = todayKey
 		result.todayAttempts = 0
@@ -788,6 +876,41 @@ async function loadFullQuestionsByIds(db, catalog, questionIds) {
 		byId.set(question.questionId, question)
 	})
 	return questionIds.map(questionId => byId.get(questionId)).filter(Boolean)
+}
+
+async function loadSmartQuestionReferences(db, catalog) {
+	const result = []
+	for (let offset = 0; ; offset += SMART_METADATA_PAGE_SIZE) {
+		const response = await db.collection(QUESTION_COLLECTION)
+			.where({
+				subjectId: catalog.subjectId,
+				version: catalog.activeVersion,
+				status: 1
+			})
+			.field({
+				questionId: true,
+				chapterId: true,
+				chapter: true,
+				section: true,
+				type: true,
+				selectionMode: true,
+				title: true,
+				sortOrder: true,
+				materialGroupId: true,
+				materialText: true,
+				materialQuestionIndex: true,
+				materialQuestionCount: true
+			})
+			.orderBy('sortOrder', 'asc')
+			.skip(offset)
+			.limit(SMART_METADATA_PAGE_SIZE)
+			.get()
+		const rows = getRows(response)
+		rows.forEach(question => requireQuestionSchema(question, true))
+		result.push(...rows)
+		if (rows.length < SMART_METADATA_PAGE_SIZE) break
+	}
+	return result
 }
 
 function readExamEventScope(event, index) {
@@ -980,7 +1103,7 @@ async function loadCatalog(db, subjectId) {
 	if (!catalog || catalog.status !== 1 || !catalog.activeVersion) {
 		throw new QuestionBankUserError('QUESTION_BANK_SUBJECT_NOT_FOUND', '科目题库不存在或尚未启用')
 	}
-	return requireV2Catalog(catalog)
+	return requireV3Catalog(catalog)
 }
 
 async function loadQuestionsForEvents(db, events) {
@@ -1009,6 +1132,11 @@ async function loadQuestionsForEvents(db, events) {
 				knowledge: true,
 				type: true,
 				selectionMode: true,
+				title: true,
+				materialGroupId: true,
+				materialText: true,
+				materialQuestionIndex: true,
+				materialQuestionCount: true,
 				answer: true
 			})
 			.limit(questionIds.length)
@@ -1076,6 +1204,10 @@ async function loadQuestionSummaries(db, subjectId, questionIds) {
 			type: true,
 			selectionMode: true,
 			title: true,
+			materialGroupId: true,
+			materialText: true,
+			materialQuestionIndex: true,
+			materialQuestionCount: true,
 			sortOrder: true
 		})
 		.limit(questionIds.length)
@@ -1245,14 +1377,18 @@ function createQuestionBankUserService(db, options) {
 					state.updatedAt = serverDate()
 
 					if (!wasAttempted) {
+						addUniqueId(stats.answeredQuestionIds, item.questionId)
+						if (!correct) addUniqueId(stats.wrongQuestionIds, item.questionId)
 						stats.attempted += 1
 						if (correct) stats.correct += 1
 						else stats.wrong += 1
 					} else if (wasCorrect !== correct) {
 						if (correct) {
+							removeId(stats.wrongQuestionIds, item.questionId)
 							stats.correct += 1
 							stats.wrong = Math.max(0, stats.wrong - 1)
 						} else {
+							addUniqueId(stats.wrongQuestionIds, item.questionId)
 							stats.wrong += 1
 							stats.correct = Math.max(0, stats.correct - 1)
 						}
@@ -1294,6 +1430,8 @@ function createQuestionBankUserService(db, options) {
 					state.favoriteUpdatedAt = item.occurredAt
 					state.updatedAt = serverDate()
 					if (previous !== item.favorite) {
+						if (item.favorite) addUniqueId(stats.favoriteQuestionIds, item.questionId)
+						else removeId(stats.favoriteQuestionIds, item.questionId)
 						stats.favorite = Math.max(0, stats.favorite + (item.favorite ? 1 : -1))
 						stats.updatedAt = serverDate()
 					}
@@ -1488,13 +1626,13 @@ function createQuestionBankUserService(db, options) {
 		const todayKey = chinaDayKey(currentTime)
 		const saved = await getDocument(store, STATS_COLLECTION, statsDocumentId(userId, subjectId))
 		const stats = normalizeStats(saved, userId, subjectId, currentTime, todayKey)
-		if (saved && stats.stateAggregateVersion === 5) return stats
+		if (saved && stats.stateAggregateVersion === 7) return stats
 
 		// Existing users are backfilled once. Later snapshots read these bounded
 		// maps from the stats document instead of returning every answered state.
 		const response = await store.collection(STATE_COLLECTION)
-			.where({ userId, subjectId, attempted: true })
-			.field({ questionId: true, chapterId: true, section: true, knowledge: true, practiceModes: true })
+			.where({ userId, subjectId })
+			.field({ questionId: true, attempted: true, favorite: true, chapterId: true, section: true, knowledge: true, practiceModes: true, lastCorrect: true })
 			.limit(MAX_STATE_ROWS + 1)
 			.get()
 		const rows = getRows(response)
@@ -1504,6 +1642,9 @@ function createQuestionBankUserService(db, options) {
 		stats.chapterAttempts = []
 		stats.sectionAttempts = []
 		stats.knowledgeAttempts = []
+		stats.answeredQuestionIds = []
+		stats.wrongQuestionIds = []
+		stats.favoriteQuestionIds = []
 		const questionScopes = new Map()
 		const missingScopeQuestionIds = Array.from(new Set(rows.filter(item => {
 			const modes = normalizePracticeModes(item.practiceModes)
@@ -1531,6 +1672,10 @@ function createQuestionBankUserService(db, options) {
 			}
 		}
 		rows.forEach(item => {
+			if (item.favorite) addUniqueId(stats.favoriteQuestionIds, item.questionId)
+			if (!item.attempted) return
+			addUniqueId(stats.answeredQuestionIds, item.questionId)
+			if (item.lastCorrect === false) addUniqueId(stats.wrongQuestionIds, item.questionId)
 			const modes = normalizePracticeModes(item.practiceModes)
 			const isChapterScopePractice = modes.indexOf('chapter') > -1
 				|| modes.indexOf('section') > -1
@@ -1545,7 +1690,7 @@ function createQuestionBankUserService(db, options) {
 				incrementAggregate(stats.knowledgeAttempts, knowledgeScopeKey(item.chapterId, item.knowledge))
 			}
 		})
-		stats.stateAggregateVersion = 5
+		stats.stateAggregateVersion = 7
 		stats.updatedAt = serverDate()
 		await setDocument(store, STATS_COLLECTION, stats._id, stats)
 		return stats
@@ -1598,12 +1743,12 @@ function createQuestionBankUserService(db, options) {
 			? db.collection(PRACTICE_ROUND_COLLECTION)
 				.where({ userId, subjectId })
 				.field({
+					_id: true,
 					chapterId: true,
-					answers: true,
+					chapterAttemptCount: true,
+					sectionAttemptCounts: true,
 					chapterPosition: true,
-					sectionPositions: true,
-					chapterResetAt: true,
-					sectionResets: true
+					sectionPositions: true
 				})
 				.limit(MAX_PRACTICE_ROUND_ROWS + 1)
 				.get()
@@ -1617,12 +1762,38 @@ function createQuestionBankUserService(db, options) {
 		const rows = getRows(responses[0])
 		const progressRows = getRows(responses[1])
 		const stats = responses[2]
-		const roundRows = getRows(responses[3])
+		let roundRows = getRows(responses[3])
 		if (progressRows.length > MAX_PROGRESS_ROWS) {
 			throw new QuestionBankUserError('QUESTION_BANK_USER_PROGRESS_LIMIT', '用户练习进度超过处理上限')
 		}
 		if (roundRows.length > MAX_PRACTICE_ROUND_ROWS) {
 			throw new QuestionBankUserError('QUESTION_BANK_USER_ROUND_LIMIT', '用户章节练习轮次超过处理上限')
+		}
+		const legacyRoundIds = roundRows.filter(round => (
+			!Number.isInteger(round.chapterAttemptCount)
+			|| !Array.isArray(round.sectionAttemptCounts)
+		)).map(round => round._id).filter(Boolean)
+		if (legacyRoundIds.length) {
+			const backfilled = new Map()
+			for (let offset = 0; offset < legacyRoundIds.length; offset += MAX_SNAPSHOT_QUESTION_IDS) {
+				const ids = legacyRoundIds.slice(offset, offset + MAX_SNAPSHOT_QUESTION_IDS)
+				const response = await db.collection(PRACTICE_ROUND_COLLECTION)
+					.where({ _id: db.command.in(ids) })
+					.limit(ids.length)
+					.get()
+				for (const savedRound of getRows(response)) {
+					const normalized = normalizePracticeRound(
+						savedRound,
+						userId,
+						subjectId,
+						savedRound.chapterId,
+						currentTime
+					)
+					await setDocument(db, PRACTICE_ROUND_COLLECTION, normalized._id, normalized)
+					backfilled.set(normalized._id, normalized)
+				}
+			}
+			roundRows = roundRows.map(round => backfilled.get(round._id) || round)
 		}
 		const answeredRows = rows.filter(item => item.attempted)
 			.sort((left, right) => getDateValue(right.lastAnsweredAt) - getDateValue(left.lastAnsweredAt))
@@ -1637,25 +1808,15 @@ function createQuestionBankUserService(db, options) {
 		const answerSelections = {}
 		const progressPositions = { chapter: {}, section: {}, knowledge: {} }
 		roundRows.forEach(savedRound => {
-			const round = normalizePracticeRound(
-				savedRound,
-				userId,
-				subjectId,
-				savedRound.chapterId,
-				currentTime
-			)
+			const round = savedRound
 			const chapterId = String(round.chapterId)
 			if (includeAggregates) {
-				const seenQuestions = new Set()
-				round.answers.forEach(answer => {
-					if (seenQuestions.has(answer.questionId)) return
-					seenQuestions.add(answer.questionId)
-					chapterAttempts[chapterId] = (chapterAttempts[chapterId] || 0) + 1
-					if (answer.section) {
-						const scopeKey = sectionScopeKey(chapterId, answer.section)
-						sectionAttempts[scopeKey] = (sectionAttempts[scopeKey] || 0) + 1
-					}
-				})
+				chapterAttempts[chapterId] = Math.max(0, Number(round.chapterAttemptCount) || 0)
+				;(Array.isArray(round.sectionAttemptCounts) ? round.sectionAttemptCounts : [])
+					.forEach(item => {
+						const scopeKey = sectionScopeKey(chapterId, item && item.section)
+						if (scopeKey) sectionAttempts[scopeKey] = Math.max(0, Number(item.count) || 0)
+					})
 			}
 			if (includeProgress && round.chapterPosition && round.chapterPosition.questionId) {
 				progressPositions.chapter[chapterId] = round.chapterPosition.questionId
@@ -1881,7 +2042,50 @@ function createQuestionBankUserService(db, options) {
 		return { subjectId, summaries }
 	}
 
-	async function getSmartPractice(event, userId) {
+	async function getPracticeBootstrap(event, userId, membership) {
+		const subjectId = readSubjectId(event.subjectId)
+		const mode = readString(event.mode, 'mode', {
+			required: true,
+			values: PRACTICE_ENTRY_MODES
+		})
+		const questionIds = readQuestionIds(
+			event.questionIds,
+			'questionIds',
+			MAX_SNAPSHOT_QUESTION_IDS
+		)
+		const preferences = await getPreferences(event, userId)
+		const snapshotPromise = getStateSnapshot({
+			subjectId,
+			questionIds,
+			includeAggregates: false,
+			includeProgress: false
+		}, userId)
+		let sessionPromise = Promise.resolve(null)
+		let sessionType = ''
+		if (preferences.answerMode === 'practice' && ['chapter', 'section'].indexOf(mode) > -1) {
+			sessionType = 'practiceRound'
+			sessionPromise = getPracticeRound({
+				subjectId,
+				chapterId: event.chapterId,
+				section: mode === 'section' ? event.section : ''
+			}, userId)
+		} else if (preferences.answerMode === 'exam' && mode !== 'smart') {
+			sessionType = 'examDraft'
+			sessionPromise = getExamDraft(Object.assign({}, event, { subjectId, mode }), userId)
+		}
+		const [snapshot, session] = await Promise.all([snapshotPromise, sessionPromise])
+		return {
+			subjectId,
+			mode,
+			membership: membershipResponse(membership),
+			preferences,
+			snapshot,
+			practiceRound: sessionType === 'practiceRound' ? session : null,
+			examDraft: sessionType === 'examDraft' ? session : null
+		}
+	}
+
+	async function getSmartPractice(event, userId, membership) {
 		let smartPractice
 		try { smartPractice = validateSmartPractice(event.smartPractice) }
 		catch (error) { invalidArgument(error.message) }
@@ -1891,94 +2095,121 @@ function createQuestionBankUserService(db, options) {
 			minimum: 1,
 			maximum: MAX_PAGE_SIZE
 		})
+		const preferencesPromise = getPreferences(event, userId)
 		const catalog = await loadCatalog(db, subjectId)
 		const questionCount = Math.max(0, Number(catalog.questionCount) || 0)
 		if (!questionCount) {
-			return { subjectId, version: catalog.activeVersion, items: [], total: 0 }
+			return {
+				subjectId,
+				version: catalog.activeVersion,
+				total: 0,
+				pageSize,
+				requestedQuestionCount: pageSize,
+				actualQuestionCount: 0,
+				overflowQuestionCount: 0,
+				stateCounts: { fresh: 0, wrong: 0, mastered: 0, sampled: 0 },
+				favoriteQuestionIds: [],
+				membership: membershipResponse(membership),
+				preferences: await preferencesPromise,
+				items: []
+			}
 		}
 		const seed = readString(event.seed, 'seed', {
 			defaultValue: `${subjectId}:${catalog.activeVersion}:${now().toISOString().slice(0, 10)}`,
 			maxLength: 128
 		})
 		const random = createRandom(hashSeed(seed))
-		const candidateCount = Math.min(
-			questionCount,
-			MAX_SMART_CANDIDATES,
-			Math.max(pageSize * 4, Math.min(50, questionCount))
-		)
-		const sortOrders = new Set()
-		while (sortOrders.size < candidateCount) {
-			sortOrders.add(1 + Math.floor(random() * questionCount))
+		const indexedUnits = Array.isArray(catalog.smartPracticeUnits)
+			&& catalog.smartPracticeUnits.length
+			? catalog.smartPracticeUnits
+			: null
+		const references = indexedUnits ? null : await loadSmartQuestionReferences(db, catalog)
+		const stats = await loadStateAggregates(userId, subjectId, now())
+		const answeredIds = new Set(stats.answeredQuestionIds)
+		const wrongIds = new Set(stats.wrongQuestionIds)
+		let units
+		try { units = indexedUnits || buildSmartPracticeUnits(references) }
+		catch (error) {
+			throw new QuestionBankUserError(
+				'QUESTION_BANK_INVALID_QUESTION_SCHEMA',
+				error && error.message || '材料题分组结构无效'
+			)
 		}
-		const candidateResponse = await db.collection(QUESTION_COLLECTION)
-			.where({
-				subjectId,
-				version: catalog.activeVersion,
-				status: 1,
-				sortOrder: db.command.in(Array.from(sortOrders))
-			})
-			.field({ questionId: true, sortOrder: true })
-			.limit(candidateCount)
-			.get()
-		const candidates = getRows(candidateResponse)
-		const candidateIds = candidates.map(item => item.questionId)
-		const stateResponse = candidateIds.length
-			? await db.collection(STATE_COLLECTION)
-				.where({ userId, subjectId, questionId: db.command.in(candidateIds) })
-				.field({ questionId: true, attempted: true, lastCorrect: true })
-				.limit(candidateIds.length)
-				.get()
-			: { data: [] }
-		const stateById = new Map()
-		getRows(stateResponse).forEach(state => stateById.set(state.questionId, state))
-		const freshIds = []
-		const masteredIds = []
-		const sampledWrongIds = []
-		candidateIds.forEach(questionId => {
-			const state = stateById.get(questionId)
-			if (!state || !state.attempted) freshIds.push(questionId)
-			else if (state.lastCorrect === false) sampledWrongIds.push(questionId)
-			else masteredIds.push(questionId)
-		})
-
-		const wrongResponse = await db.collection(STATE_COLLECTION)
-			.where({ userId, subjectId, attempted: true, lastCorrect: false })
-			.field({ questionId: true })
-			.orderBy('lastAnsweredAt', 'desc')
-			.limit(Math.min(MAX_SMART_CANDIDATES, pageSize * 2))
-			.get()
-		const recentWrongIds = getRows(wrongResponse).map(item => item.questionId)
-		const selectedIds = selectSmartPracticeIds({ fresh: freshIds,
-			wrong: recentWrongIds.concat(sampledWrongIds), mastered: masteredIds
-		}, pageSize, smartPractice, random)
-		const documents = await loadFullQuestionsByIds(db, catalog, selectedIds)
+		if (!indexedUnits && units.length) {
+			const catalogDocument = db.collection(CATALOG_COLLECTION).doc(catalog._id || catalog.subjectId)
+			if (catalogDocument && typeof catalogDocument.update === 'function') {
+				try { await catalogDocument.update({ smartPracticeUnits: units }) }
+				catch (error) {
+					// Index backfill failure must not block this smart-practice request.
+				}
+			}
+		}
+		const groups = classifySmartPracticeUnits(units, answeredIds, wrongIds)
+		const selection = selectSmartPracticeUnits(groups, pageSize, smartPractice, random)
+		const documents = await loadFullQuestionsByIds(db, catalog, selection.questionIds)
+		if (documents.length !== selection.questionIds.length) {
+			throw new QuestionBankUserError(
+				'QUESTION_BANK_INVALID_QUESTION_SCHEMA',
+				'智能练习材料组存在缺失的启用子题'
+			)
+		}
+		const stateQuestionCount = key => groups[key].reduce(
+			(total, unit) => total + unit.questionCount,
+			0
+		)
 		return {
 			subjectId,
 			version: catalog.activeVersion,
 			seed,
 			total: questionCount,
+			pageSize,
+			requestedQuestionCount: selection.requestedQuestionCount,
+			actualQuestionCount: documents.length,
+			overflowQuestionCount: Math.max(0, documents.length - selection.requestedQuestionCount),
 			stateCounts: {
-				fresh: freshIds.length,
-				wrong: recentWrongIds.length,
-				mastered: masteredIds.length,
-				sampled: candidates.length
+				fresh: stateQuestionCount('fresh'),
+				wrong: stateQuestionCount('wrong'),
+				mastered: stateQuestionCount('mastered'),
+				sampled: questionCount
 			},
+			favoriteQuestionIds: selection.questionIds.filter(questionId => (
+				stats.favoriteQuestionIds.indexOf(questionId) > -1
+			)),
+			membership: membershipResponse(membership),
+			preferences: await preferencesPromise,
 			items: documents.map(toPublicQuestion)
 		}
 	}
 
-	async function getRecords(event, userId) {
+	async function getSmartPracticeState(event, userId, membership) {
+		const subjectId = readSubjectId(event.subjectId)
+		const [stats, preferences] = await Promise.all([
+			loadStateAggregates(userId, subjectId, now()),
+			getPreferences(event, userId)
+		])
+		return {
+			subjectId,
+			answeredQuestionIds: stats.answeredQuestionIds.slice(),
+			wrongQuestionIds: stats.wrongQuestionIds.slice(),
+			favoriteQuestionIds: stats.favoriteQuestionIds.slice(),
+			membership: membershipResponse(membership),
+			preferences
+		}
+	}
+
+	async function getRecords(event, userId, membership) {
 		const subjectId = readSubjectId(event.subjectId)
 		const type = readString(event.type, 'type', {
 			defaultValue: 'wrong',
 			values: RECORD_TYPES
 		})
+		const idsOnly = event.idsOnly === true
 		const page = readInteger(event.page, 'page', {
 			defaultValue: 1,
 			minimum: 1,
 			maximum: 100
 		})
-		const pageSize = readInteger(event.pageSize, 'pageSize', {
+		const pageSize = idsOnly ? MAX_STATE_ROWS : readInteger(event.pageSize, 'pageSize', {
 			defaultValue: DEFAULT_PAGE_SIZE,
 			minimum: 1,
 			maximum: MAX_PAGE_SIZE
@@ -1994,19 +2225,42 @@ function createQuestionBankUserService(db, options) {
 					questionId: true,
 					lastCorrect: true,
 					lastAnsweredAt: true,
+					favorite: true,
 					favoriteUpdatedAt: true
 				})
 				.orderBy(recordSortField(type), 'desc')
-				.skip((page - 1) * pageSize)
+				.skip(idsOnly ? 0 : (page - 1) * pageSize)
 				.limit(pageSize + 1)
 				.get()
 		])
-		const total = responses[0]
+		let total = responses[0]
 			? Math.max(0, Number(responses[0][type === 'favorite' ? 'favorite' : 'wrong']) || 0)
 			: (page === 1 ? 0 : null)
 		const rows = getRows(responses[1])
 		const hasMore = rows.length > pageSize
 		const states = hasMore ? rows.slice(0, pageSize) : rows
+		if (idsOnly) {
+			const currentTime = now()
+			const cachedStats = responses[0] && responses[0].stateAggregateVersion === 7
+				? normalizeStats(responses[0], userId, subjectId, currentTime, chinaDayKey(currentTime))
+				: null
+			const [stats, preferences] = await Promise.all([
+				cachedStats || loadStateAggregates(userId, subjectId, currentTime),
+				getPreferences(event, userId)
+			])
+			total = Math.max(0, Number(stats[type === 'favorite' ? 'favorite' : 'wrong']) || 0)
+			return {
+				subjectId,
+				type,
+				total,
+				hasMore,
+				questionIds: states.map(state => state.questionId),
+				favoriteQuestionIds: states.filter(state => state.favorite)
+					.map(state => state.questionId),
+				membership: membershipResponse(membership),
+				preferences
+			}
+		}
 		const questionMap = await loadQuestionSummaries(db, subjectId, states.map(item => item.questionId))
 		const items = states.map(state => {
 			const question = questionMap.get(state.questionId)
@@ -2037,7 +2291,9 @@ function createQuestionBankUserService(db, options) {
 		getPracticeRound,
 		getExamDraft,
 		getExamDraftSummaries,
+		getPracticeBootstrap,
 		getSmartPractice,
+		getSmartPracticeState,
 		getRecords,
 		getUserProfile,
 		getPreferences,
@@ -2053,10 +2309,11 @@ function createQuestionBankUserService(db, options) {
 		if (!handler) {
 			throw new QuestionBankUserError('QUESTION_BANK_USER_UNSUPPORTED_ACTION', `不支持的action: ${action}`)
 		}
+		let membership = null
 		if (MEMBER_SYNC_ACTIONS.has(action)) {
-			await requireActiveMembership(db, uid, now(), '云端学习数据同步')
+			membership = await requireActiveMembership(db, uid, now(), '云端学习数据同步')
 		}
-		return handler(event, uid)
+		return handler(event, uid, membership)
 	}
 
 	return { execute }

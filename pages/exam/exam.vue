@@ -76,7 +76,8 @@
 				<view class="feature-item" v-for="item in features" :key="item.key" @tap="handleFeature(item)">
 					<view class="feature-icon" :class="item.tone">
 						<uni-icons :type="item.icon" size="25" :color="item.color"></uni-icons>
-						<view class="feature-badge" v-if="featureCount(item.key)">{{ featureCount(item.key) }}</view>
+						<view class="feature-member-badge" v-if="isLockedPracticeFeature(item.key)">会员</view>
+						<view class="feature-badge" v-else-if="featureCount(item.key)">{{ featureCount(item.key) }}</view>
 					</view>
 					<view class="feature-copy">
 						<text class="feature-title">{{ item.title }}</text>
@@ -160,17 +161,23 @@
 		getPracticePreferences,
 		getPracticeSummary
 	} from '@/services/user-practice.js'
+	import {
+		getCachedMembership,
+		getMembership,
+		showMembershipUpsell
+	} from '@/services/membership.js'
 	export default {
 		data() {
 			const localPreferences = getLocalPracticePreferences()
 			return {
 				nightMode: Boolean(localPreferences.nightMode),
+				membership: getCachedMembership(),
+				membershipLoaded: false,
 				currentSubjectId: '',
 				subjectGroups,
 				catalogStates: {},
 				catalogRequestIds: {},
 				nextCatalogRequestId: 0,
-				catalogSummariesLoaded: false,
 				nextCatalogSummariesRequestId: 0,
 				nextUserDataRequestId: 0,
 				userDataError: '',
@@ -235,6 +242,7 @@
 			}
 		},
 		async onShow() {
+			const membershipTask = this.refreshMembership()
 			try {
 				await this.refreshNightMode()
 			} catch (error) {
@@ -243,12 +251,25 @@
 			const state = getPracticeState()
 			this.currentSubjectId = state.currentSubjectId
 			this.refreshStats(this.subjectQuestionCount(this.currentSubjectId))
-			await this.loadCatalog(this.currentSubjectId)
+			await Promise.all([
+				this.loadCatalog(this.currentSubjectId),
+				membershipTask
+			])
 		},
 		onHide() {
 			this.applyTabBarTheme(false)
 		},
 		methods: {
+			async refreshMembership() {
+				try {
+					this.membership = await getMembership()
+				} catch (error) {
+					this.membership = getCachedMembership()
+				} finally {
+					this.membershipLoaded = true
+				}
+				return this.membership
+			},
 			applyNightMode(preferences) {
 				this.nightMode = Boolean(preferences && preferences.nightMode)
 				uni.setNavigationBarColor({
@@ -317,7 +338,6 @@
 			},
 			async loadCatalogSummaries(options) {
 				const config = options || {}
-				if (this.catalogSummariesLoaded && !config.forceRefresh) return
 				const requestId = ++this.nextCatalogSummariesRequestId
 				const subjects = []
 				this.subjectGroups.forEach(group => {
@@ -357,7 +377,6 @@
 						}
 					})
 					this.catalogStates = nextStates
-					this.catalogSummariesLoaded = true
 					this.refreshStats(this.subjectQuestionCount(this.currentSubjectId))
 				} catch (error) {
 					if (requestId !== this.nextCatalogSummariesRequestId) return
@@ -447,12 +466,7 @@
 				selectSubject(subjectId)
 				this.refreshStats(this.subjectQuestionCount(subjectId))
 				this.closeSubjectPicker()
-				const catalogState = this.catalogStates[subjectId]
-				if (catalogState && catalogState.loaded && catalogState.questionCount > 0) {
-					this.loadCloudStats(subjectId)
-				} else {
-					this.loadCatalog(subjectId)
-				}
+				return this.loadCatalog(subjectId)
 			},
 			subjectQuestionCount(subjectId) {
 				const state = this.catalogStates[subjectId]
@@ -502,10 +516,23 @@
 					this.goChapter(item.key)
 					return
 				}
+				if (item.key === 'wrong' || item.key === 'favorite') {
+					if (!this.membershipLoaded) await this.refreshMembership()
+					if (!this.membership.isMember) {
+						await showMembershipUpsell(item.key === 'wrong'
+							? '开通会员后即可使用错题集，集中巩固薄弱题目。'
+							: '开通会员后即可使用收藏夹，随时复习重点题目。')
+						return
+					}
+				}
 				if (!this.ensureQuestions()) return
 				uni.navigateTo({ url: `/practice-pages/practice-records/practice-records?subjectId=${this.currentSubjectId}&view=${item.key}` })
 			},
+			isLockedPracticeFeature(key) {
+				return (key === 'wrong' || key === 'favorite') && !this.membership.isMember
+			},
 			featureCount(key) {
+				if (this.isLockedPracticeFeature(key)) return 0
 				if (key === 'wrong') return this.stats.wrong
 				if (key === 'favorite') return this.stats.favorite
 				return 0
@@ -519,48 +546,49 @@
 	.practice-home { min-height: 100vh; padding-bottom: calc(24rpx + env(safe-area-inset-bottom)); background: #f5f6f8; }
 	.subject-bar { display: flex; align-items: center; min-height: 104rpx; padding: 18rpx 24rpx; border-bottom: 1rpx solid #edf0f3; box-sizing: border-box; background: #ffffff; }
 	.subject-copy { display: flex; flex: 1; flex-direction: column; min-width: 0; margin-left: 24rpx; }
-	.subject-label, .sheet-caption { color: #7a828c; font-size: 22rpx; }
-	.subject-name { margin-top: 5rpx; font-size: 30rpx; font-weight: 600; line-height: 1.3; }
-	.subject-switch { display: flex; align-items: center; gap: 4rpx; padding: 10rpx 12rpx; border-radius: 12rpx; background: #f1f8fe; color: #008cff; font-size: 24rpx; }
+	.subject-label, .sheet-caption { color: #7a828c; font-size: 24rpx; }
+	.subject-name { margin-top: 5rpx; font-size: 32rpx; font-weight: 600; line-height: 1.3; }
+	.subject-switch { display: flex; align-items: center; gap: 4rpx; padding: 10rpx 12rpx; border-radius: 12rpx; background: #f1f8fe; color: #008cff; font-size: 26rpx; }
 	.overview-card,
 	.practice-card { margin: 16rpx 24rpx 0; padding: 24rpx; border: 1rpx solid #e4eaf0; border-radius: 18rpx; background: #ffffff; box-shadow: 0 5rpx 18rpx rgba(31, 48, 65, 0.04); }
 	.overview-card { margin-top: 20rpx; }
 	.card-heading, .completion-heading, .sheet-header { display: flex; align-items: center; justify-content: space-between; }
-	.card-title { font-size: 29rpx; font-weight: 600; }
+	.card-title { font-size: 32rpx; font-weight: 600; }
 	.completion-heading { margin-top: 24rpx; }
 	.completion-copy, .sheet-header > view:first-child { display: flex; flex-direction: column; }
 	.overview-subtitle { color: #7a828c; font-size: 26rpx; }
-	.completion-value { color: #008cff; font-size: 42rpx; font-weight: 600; line-height: 1; }
+	.completion-value { color: #008cff; font-size: 40rpx; font-weight: 600; line-height: 1; }
 	.completion-progress { height: 12rpx; margin-top: 18rpx; overflow: hidden; border-radius: 6rpx; background: #e9edf1; }
 	.completion-progress-fill { height: 100%; border-radius: 6rpx; background: #008cff; transition: width 0.2s ease; }
 	.stat-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12rpx; margin-top: 22rpx; padding-top: 22rpx; border-top: 1rpx solid #eef1f4; }
 	.stat-item { display: flex; align-items: center; flex-direction: column; justify-content: center; min-height: 88rpx; border-radius: 12rpx; background: #f5f9fc; text-align: center; }
-	.stat-value { color: #2f3944; font-size: 28rpx; font-weight: 600; line-height: 1.1; }
+	.stat-value { color: #2f3944; font-size: 30rpx; font-weight: 600; line-height: 1.1; }
 	.stat-label { margin-top: 8rpx; color: #7f8892; font-size: 24rpx; }
-	.search-entry { display: flex; align-items: center; height: 82rpx; margin-top: 16rpx; padding: 0 20rpx; border: 1rpx solid #d6e7f4; border-radius: 14rpx; box-sizing: border-box; background: #f7fbfe; color: #56616d; font-size: 25rpx; }
+	.search-entry { display: flex; align-items: center; height: 82rpx; margin-top: 16rpx; padding: 0 20rpx; border: 1rpx solid #d6e7f4; border-radius: 14rpx; box-sizing: border-box; background: #f7fbfe; color: #56616d; font-size: 28rpx; }
 	.search-entry text { flex: 1; margin-left: 14rpx; white-space: nowrap; }
 	.feature-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14rpx; margin-top: 16rpx; }
 	.feature-item { display: flex; align-items: center; min-height: 126rpx; padding: 20rpx; border: 1rpx solid #edf1f4; border-radius: 14rpx; box-sizing: border-box; background: #f8fafc; }
 	.feature-icon { position: relative; display: flex; align-items: center; justify-content: center; width: 72rpx; height: 72rpx; flex: 0 0 72rpx; border-radius: 12rpx; background: #eaf5ff; }
-	.feature-badge { position: absolute; top: -10rpx; right: -14rpx; min-width: 34rpx; height: 34rpx; padding: 0 8rpx; border: 3rpx solid #ffffff; border-radius: 18rpx; box-sizing: border-box; background: #e65757; color: #ffffff; font-size: 19rpx; line-height: 31rpx; }
+	.feature-badge { position: absolute; top: -10rpx; right: -14rpx; min-width: 34rpx; height: 34rpx; padding: 0 8rpx; border: 3rpx solid #ffffff; border-radius: 18rpx; box-sizing: border-box; background: #e65757; color: #ffffff; font-size: 17rpx; line-height: 31rpx; }
+	.feature-member-badge { position: absolute; top: -14rpx; right: -22rpx; height: 34rpx; padding: 0 10rpx; border: 3rpx solid #ffffff; border-radius: 18rpx; box-sizing: border-box; background: #30465f; color: #ffffff; font-size: 18rpx; line-height: 30rpx; white-space: nowrap; }
 	.feature-copy { display: flex; flex: 1; flex-direction: column; min-width: 0; margin-left: 18rpx; }
-	.feature-title { font-size: 26rpx; font-weight: 600; line-height: 1.25; }
-	.feature-desc { margin-top: 7rpx; color: #8c949d; font-size: 20rpx; line-height: 1.35; }
+	.feature-title { font-size: 28rpx; font-weight: 600; line-height: 1.25; }
+	.feature-desc { margin-top: 7rpx; color: #8c949d; font-size: 24rpx; line-height: 1.35; }
 	.bank-note { display: flex; align-items: center; gap: 10rpx; margin: 10rpx 32rpx 0; padding: 20rpx 22rpx; border-radius: 8rpx; background: #f5f6f8; font-size: 24rpx; color: #6f747d; }
 	.bank-note.error { background: #fff2f2; color: #bd3f3f; }
 	.subject-sheet { padding: 28rpx; border-radius: 16rpx 16rpx 0 0; background: #ffffff; }
 	.sheet-header { padding: 0 4rpx 24rpx; border-bottom: 1rpx solid #edf0f3; }
-	.sheet-title { font-size: 34rpx; font-weight: 600; }
+	.sheet-title { font-size: 32rpx; font-weight: 600; }
 	.sheet-caption { margin-top: 6rpx; }
 	.sheet-close { padding: 12rpx; }
 	.subject-scroll { max-height: 68vh; }
 	.subject-group { padding: 26rpx 4rpx 4rpx; }
-	.group-title { font-size: 29rpx; font-weight: 600; }
+	.group-title { font-size: 30rpx; font-weight: 600; }
 	.subject-options { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16rpx; margin-top: 18rpx; }
-	.subject-option { display: flex; align-items: flex-start; flex-direction: column; justify-content: center; min-height: 82rpx; padding: 12rpx 18rpx; border: 2rpx solid transparent; border-radius: 8rpx; box-sizing: border-box; background: #f3f4f6; font-size: 26rpx; }
+	.subject-option { display: flex; align-items: flex-start; flex-direction: column; justify-content: center; min-height: 82rpx; padding: 12rpx 18rpx; border: 2rpx solid transparent; border-radius: 8rpx; box-sizing: border-box; background: #f3f4f6; font-size: 28rpx; }
 	.subject-option.active { border-color: #008cff; background: #eaf5ff; color: #0074d4; }
 	.subject-option.unavailable:not(.active) { color: #7d828a; }
-	.subject-status { margin-top: 4rpx; font-size: 20rpx; color: #979ca5; }
+	.subject-status { margin-top: 4rpx; font-size: 22rpx; color: #979ca5; }
 
 	.practice-home.night-mode { background: #12171d; color: #e6e9ed; }
 	.night-mode .subject-bar { border-color: #303943; background: #171c22; }
@@ -582,6 +610,7 @@
 	.night-mode .stat-value { color: #e6e9ed; }
 	.night-mode .search-entry { border-color: #39434e; background: #202933; color: #c2c9d1; }
 	.night-mode .feature-badge { border-color: #12171d; }
+	.night-mode .feature-member-badge { border-color: #12171d; background: #49637f; }
 	.night-mode .bank-note { background: #1b222a; color: #aeb7c1; }
 	.night-mode .bank-note.error { background: #3b2327; color: #ef9a9a; }
 	.night-mode .subject-sheet { background: #1b222a; color: #e6e9ed; }

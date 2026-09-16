@@ -28,6 +28,8 @@ async function run() {
 		DAILY_GOAL: 20,
 		DEFAULT_SUBJECT_ID: 'junior-personal-finance',
 		practiceCloudSyncEnabled: () => member,
+		hasCompleteQuestionBankCache: () => false,
+		getEffectiveSmartPractice: value => value,
 		getLocalPracticePreferences: () => ({ smartPractice: {
 			strategy: 'balanced', questionCount: 35, custom: { fresh: 60, wrong: 30, mastered: 10 }
 		} }),
@@ -44,6 +46,10 @@ async function run() {
 			cloudSmartCalls += 1
 			return { items: [{ id: 'member-smart' }] }
 		},
+		getSmartPracticeState: async () => ({
+			answeredQuestionIds: ['member-correct'],
+			wrongQuestionIds: []
+		}),
 		getAllPracticeQuestions: async params => {
 			questionBankAllCalls += 1
 			lastAllParams = params
@@ -62,7 +68,7 @@ async function run() {
 		},
 		getCatalog: async () => ({ knowledgeGroups: [] }),
 		getQuestionsByIds: async () => ({ items: [] }),
-		getPracticeRecords: async () => ({ items: [], hasMore: false }),
+		getPracticeRecordIds: async () => ({ questionIds: [] }),
 		Promise,
 		Object,
 		Array,

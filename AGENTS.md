@@ -39,10 +39,10 @@ outputs/question-bank/<subjectId>/<version>/
 - 只处理“权限状态”为“可查看”的题目。
 - 章节、小节、知识点、题干、选项和答案必须完整。
 - Excel 判断题答案必须已是 `A/B`；转换器不接受 `1/0`。
-- Excel G 列“题型”必须按固定优先级编码：含 `[材料]` 为 `4`；非材料且恰好两个选项为 `2`；其余多个答案为 `3`、单个答案为 `1`；缺少答案且无法可靠判断的权限题保留来源值。转换器必须拒绝不一致的行，并在报告写入 `questionTypesMatch=true`。
+- Excel G 列“题型”必须按固定优先级编码：X 列存在材料正文为 `4`；非材料且恰好两个选项为 `2`；其余多个答案为 `3`、单个答案为 `1`；缺少答案且无法可靠判断的权限题保留来源值。H 列只保存子题题干，U-X 分别为材料组 ID、材料内序号、材料题数和材料正文，非材料题 U-X 必须为空。
 - JSON 题型只由 Excel G 列决定：`1 -> single`、`2 -> judgment`、`3 -> multiple`、`4 -> material`，不得根据答案数量重新推断题型。
 - JSON 必须包含 `selectionMode`：`single` 和 `judgment` 为 `single`，`multiple` 和 `material` 固定为 `multiple`。
-- `catalog.json` 必须包含 `questionSchemaVersion: 2`，`manifest.json` 必须使用 `schemaVersion: 2`。
+- `catalog.json` 必须包含 `questionSchemaVersion: 3`，`manifest.json` 必须使用 `schemaVersion: 3`。材料题必须包含 `materialGroupId`、`materialText`、`materialQuestionIndex`、`materialQuestionCount`，同一材料组连续且组内序号为 `1..N`；非材料题不得包含这些字段。
 - `sortOrder` 必须在过滤后重新生成，并从 1 连续到题目总数。
 - `catalog.json` 中每章的小节必须按名称开头的自然序号排列，同时识别“第一节、第二节……”和“第一部分、第二部分……”；无法识别序号时才按题目首次出现顺序排列。
 - 答案解析中的图片必须先下载并识别其中的文字，结合题干、选项和答案整理成与现有解析一致的文字段落，写回 Excel 的“答案解析”列后再生成导入文件。
@@ -65,7 +65,7 @@ uniCloud 虽然要求上传文件扩展名为 `.json`，但 `questions.json`、`
 
 ## 导入 uniCloud
 
-在导入前检查 `validation-report.json`，确认包括 `questionTypesMatch`、`jsonQuestionTypesMatch`、`selectionModesMatch`、`judgmentAnswersNormalized` 和 `questionSchemaVersionMatch` 在内的所有 `checks` 均为 `true`，并确认接受、拒绝和跳过的题目数量符合预期。
+在导入前检查 `validation-report.json`，确认包括 `questionTypesMatch`、`jsonQuestionTypesMatch`、`selectionModesMatch`、`judgmentAnswersNormalized`、`questionSchemaVersionMatch`、`materialFieldsMatch`、`materialGroupsMatch`、`materialGroupsContiguous` 和 `noSourceQuestionOrdinalReferences` 在内的所有 `checks` 均为 `true`，并确认接受、拒绝和跳过的题目数量符合预期。
 
 导入顺序不能颠倒：
 

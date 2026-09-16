@@ -99,7 +99,7 @@
 				>
 					<view class="question-shell">
 							<view class="question-header">
-								<view class="type-badge">{{ questionTypeLabel(slide.question.type) }}</view>
+								<view class="type-badge">{{ questionTypeLabel(slide.question) }}</view>
 								<view class="question-count"><text>{{ slide.index + 1 }}</text>/{{ questionList.length }}</view>
 							</view>
 
@@ -113,7 +113,13 @@
 								</view>
 							</view>
 
-							<text class="question-title">{{ slide.question.title }}</text>
+							<view class="material-block" v-if="slide.question.type === 'material'">
+								<text class="material-text">{{ slide.question.materialText }}</text>
+							</view>
+
+							<view class="question-stem" :class="{ 'material-question-stem': slide.question.type === 'material' }">
+								<text class="question-title">{{ slide.question.title }}</text>
+							</view>
 
 							<view class="option-list">
 								<view
@@ -232,7 +238,7 @@
 					</view>
 				</view>
 				<scroll-view class="calculator-sheet-scroll" scroll-y>
-					<finance-calculator ref="embeddedFinanceCalculator"></finance-calculator>
+					<finance-calculator ref="embeddedFinanceCalculator" :embedded="true"></finance-calculator>
 				</scroll-view>
 			</view>
 		</uni-popup>
@@ -247,7 +253,7 @@
 
 <script>
 	import { buildPracticeQuestionSet, buildPracticeQuestions } from '@/data/practice-questions.js'
-	import { getQuestionTypeLabel } from '@/data/question-types.js'
+	import { getQuestionTypeDisplayLabel } from '@/data/question-types.js'
 	import {
 		getPracticeState,
 		isCorrectAnswer,
@@ -261,8 +267,10 @@
 		completeExamDraft,
 		examDraftHasProgress,
 		flushPracticeEvents,
-		getExamDraft,
+		getEffectiveAnswerMode,
+		getLocalExamDraft,
 		getLocalPracticePreferences,
+		getPracticeBootstrap,
 		getPracticePreferences,
 		getPracticeRound,
 		getPracticeStateSnapshot,
@@ -274,8 +282,10 @@
 		startExamDraft
 	} from '@/services/user-practice.js'
 	import {
+		cacheMembershipSnapshot,
 		getCachedMembership,
-		getMembership
+		getMembership,
+		showMembershipUpsell
 	} from '@/services/membership.js'
 	import FinanceCalculator from '@/components/finance-calculator/finance-calculator.vue'
 
@@ -285,8 +295,9 @@
 		},
 		data() {
 			const localPreferences = getLocalPracticePreferences()
+			const cachedMembership = getCachedMembership()
 			return {
-				membership: getCachedMembership(),
+				membership: cachedMembership,
 				membershipLoaded: false,
 				questionList: [],
 				practiceConfig: null,
@@ -298,7 +309,7 @@
 				sessionAnswers: {},
 				draftAnswers: {},
 				visitedQuestionIds: [],
-				answerMode: localPreferences.answerMode,
+				answerMode: getEffectiveAnswerMode(localPreferences.answerMode, cachedMembership.isMember),
 				nightMode: localPreferences.nightMode,
 				examSubmitted: false,
 				showExamResult: false,
@@ -403,7 +414,9 @@
 			this.progressSavedOnLeave = false
 			if (!this.membershipLoaded) return
 			try {
+				await this.loadMembershipState()
 				const preferences = await getPracticePreferences()
+				this.answerMode = getEffectiveAnswerMode(preferences.answerMode, this.membership.isMember)
 				this.nightMode = Boolean(preferences.nightMode)
 				this.applyNavigationTheme()
 			} catch (error) {
@@ -427,13 +440,26 @@
 			}
 		},
 		methods: {
-			questionTypeLabel(type) {
-				return getQuestionTypeLabel(type)
+			questionTypeLabel(question) {
+				return getQuestionTypeDisplayLabel(question)
 			},
 			async initializePractice() {
-				await this.loadMembershipState({
-					forceRefresh: this.membership.isMember
-				})
+				await this.loadMembershipState()
+				if ((this.mode === 'wrong' || this.mode === 'favorite')
+					&& !this.membership.isMember) {
+					const openedMembership = await showMembershipUpsell(
+						this.mode === 'wrong'
+							? '开通会员后即可使用错题集，集中巩固薄弱题目。'
+							: '开通会员后即可使用收藏夹，随时复习重点题目。',
+						{ replace: true }
+					)
+					if (!openedMembership) {
+						uni.navigateBack({
+							fail: () => uni.switchTab({ url: '/pages/exam/exam' })
+						})
+					}
+					return false
+				}
 				return this.loadQuestions()
 			},
 			async loadMembershipState(options) {
@@ -587,11 +613,9 @@
 			async loadAnswerPreferences() {
 				const preferences = await getPracticePreferences()
 				if (!this.membershipLoaded) {
-					await this.loadMembershipState({
-						forceRefresh: this.membership.isMember
-					})
+					await this.loadMembershipState()
 				}
-				this.answerMode = preferences.answerMode
+				this.answerMode = getEffectiveAnswerMode(preferences.answerMode, this.membership.isMember)
 				this.nightMode = Boolean(preferences.nightMode)
 				this.applyNavigationTheme()
 			},
@@ -692,41 +716,14 @@
 				this.isSharedExamResult = false
 				this.resetSwiperPosition()
 				try {
-					await this.loadAnswerPreferences()
+					const localPreferences = getLocalPracticePreferences()
+					this.answerMode = getEffectiveAnswerMode(
+						localPreferences.answerMode,
+						this.membership.isMember
+					)
+					this.nightMode = Boolean(localPreferences.nightMode)
+					this.applyNavigationTheme()
 					let questionVersion = ''
-					if (this.examDraftEnabled() && this.practiceConfig.examAction !== 'restart') {
-						const savedDraft = await getExamDraft(this.examDraftOptions())
-						if (savedDraft && examDraftHasProgress(savedDraft)) {
-							const entryAction = this.practiceConfig.examAction === 'continue'
-								? 'continue'
-								: await this.requestExamEntryAction(savedDraft)
-							if (entryAction === 'cancel') {
-								uni.navigateBack()
-								return
-							}
-							if (entryAction === 'restart') {
-								this.practiceConfig.examAction = 'restart'
-							} else {
-								const restored = await getQuestionsByIds({
-									subjectId: this.practiceConfig.subjectId,
-									questionIds: savedDraft.questionIds
-								})
-								if (restored.items.length) {
-									this.questionList = restored.items
-									questionVersion = restored.version || savedDraft.questionVersion || ''
-									this.examDraft = restored.items.length === savedDraft.questionIds.length
-										? savedDraft
-										: reconcileExamDraft(this.examDraftOptions({
-											roundId: savedDraft.roundId,
-											questionIds: restored.items.map(item => item.id)
-										}))
-									this.hydrateExamDraft(this.examDraft)
-								} else {
-									resetExamDraft(this.examDraftOptions({ roundId: savedDraft.roundId }))
-								}
-							}
-						}
-					}
 					if (!this.questionList.length) {
 						if (this.examDraftEnabled()) {
 							const result = await this.buildNewExamQuestionSet(forceRefresh)
@@ -743,14 +740,74 @@
 							this.questionList = await buildPracticeQuestions(this.practiceConfig)
 						}
 					}
+					let bootstrap = null
+					let snapshot = null
+					if (this.membership.isMember
+						&& ['smart', 'wrong', 'favorite'].indexOf(this.mode) === -1) {
+						const bootstrapIndex = this.resolveNewQuestionIndex()
+						bootstrap = await getPracticeBootstrap(Object.assign({}, this.examDraftOptions(), {
+							questionIds: this.getSessionSnapshotQuestionIds(bootstrapIndex)
+						}))
+						if (bootstrap && bootstrap.membership) {
+							this.membership = cacheMembershipSnapshot(bootstrap.membership)
+						}
+						if (bootstrap && bootstrap.preferences) {
+							this.answerMode = getEffectiveAnswerMode(
+								bootstrap.preferences.answerMode,
+								this.membership.isMember
+							)
+							this.nightMode = Boolean(bootstrap.preferences.nightMode)
+							this.applyNavigationTheme()
+						}
+						snapshot = bootstrap && bootstrap.snapshot
+					}
+					const resumableDraft = bootstrap && bootstrap.examDraft
+						? bootstrap.examDraft
+						: (!this.membership.isMember ? getLocalExamDraft(this.examDraftOptions()) : null)
+					if (this.examDraftEnabled()
+						&& this.practiceConfig.examAction !== 'restart'
+						&& resumableDraft
+						&& examDraftHasProgress(resumableDraft)) {
+						const savedDraft = resumableDraft
+						const entryAction = this.practiceConfig.examAction === 'continue'
+							? 'continue'
+							: await this.requestExamEntryAction(savedDraft)
+						if (entryAction === 'cancel') {
+							uni.navigateBack()
+							return
+						}
+						if (entryAction === 'restart') {
+							this.practiceConfig.examAction = 'restart'
+						} else {
+							const restored = await getQuestionsByIds({
+								subjectId: this.practiceConfig.subjectId,
+								questionIds: savedDraft.questionIds
+							})
+							if (restored.items.length) {
+								this.questionList = restored.items
+								questionVersion = restored.version || savedDraft.questionVersion || ''
+								this.examDraft = restored.items.length === savedDraft.questionIds.length
+									? savedDraft
+									: reconcileExamDraft(this.examDraftOptions({
+										roundId: savedDraft.roundId,
+										questionIds: restored.items.map(item => item.id)
+									}))
+								this.hydrateExamDraft(this.examDraft)
+							} else {
+								resetExamDraft(this.examDraftOptions({ roundId: savedDraft.roundId }))
+							}
+						}
+					}
 					let practiceRound = null
 					if (this.answerMode === 'practice'
 						&& ['chapter', 'section'].indexOf(this.mode) > -1) {
-						practiceRound = await getPracticeRound({
-							subjectId: this.practiceConfig.subjectId,
-							chapterId: this.practiceConfig.chapterId,
-							section: this.mode === 'section' ? this.practiceConfig.section : ''
-						})
+						practiceRound = bootstrap && bootstrap.practiceRound
+							? bootstrap.practiceRound
+							: await getPracticeRound({
+								subjectId: this.practiceConfig.subjectId,
+								chapterId: this.practiceConfig.chapterId,
+								section: this.mode === 'section' ? this.practiceConfig.section : ''
+							})
 						this.hydratePracticeRound(practiceRound)
 					} else if (!this.examDraft) {
 						this.resetSessionAnswers()
@@ -766,14 +823,23 @@
 							initialQuestionId: this.questionList[initialQuestionIndex].id
 						}))
 					}
-					let snapshot = null
 					try {
-						snapshot = await getPracticeStateSnapshot(this.practiceConfig.subjectId, {
-							localState: getPracticeState(),
-							questionIds: this.getSessionSnapshotQuestionIds(initialQuestionIndex),
-							includeAggregates: false,
-							includeProgress: false
-						})
+						if (!snapshot && this.membership.isMember
+							&& ['smart', 'wrong', 'favorite'].indexOf(this.mode) > -1) {
+							snapshot = {
+								favoriteQuestionIds: this.questionList
+									.filter(question => question.favorite)
+									.map(question => question.id)
+							}
+						}
+						if (!snapshot) {
+							snapshot = await getPracticeStateSnapshot(this.practiceConfig.subjectId, {
+								localState: getPracticeState(),
+								questionIds: this.getSessionSnapshotQuestionIds(initialQuestionIndex),
+								includeAggregates: false,
+								includeProgress: false
+							})
+						}
 						this.favoriteQuestionIds = snapshot.favoriteQuestionIds || []
 					} catch (syncError) {
 						this.favoriteQuestionIds = []
@@ -1232,6 +1298,11 @@
 	.knowledge-name { margin-top: 6rpx; font-size: 23rpx; color: #9a9fa7; }
 	.calculator-button { display: flex; align-items: center; justify-content: center; width: 62rpx; height: 62rpx; margin-left: 18rpx; border: 1rpx solid #cfe7fb; border-radius: 8rpx; background: #f4faff; }
 	.question-title { display: block; margin-top: 30rpx; font-size: 34rpx; font-weight: 500; line-height: 1.75; }
+	.material-block { display: flex; flex-direction: column; margin-top: 30rpx; padding: 24rpx; border: 1rpx solid #dce9f3; border-radius: 10rpx; background: #f6fbff; }
+	.material-text { font-size: 30rpx; line-height: 1.8; white-space: pre-wrap; }
+	.question-stem { margin-top: 30rpx; }
+	.question-stem.material-question-stem { padding-top: 24rpx; border-top: 1rpx solid #e8edf1; }
+	.question-stem .question-title { margin-top: 0; }
 	.option-list { margin-top: 34rpx; }
 	.option-item { display: flex; align-items: center; min-height: 104rpx; margin-top: 20rpx; padding: 18rpx 22rpx; border: 2rpx solid #dfe2e6; border-radius: 8rpx; box-sizing: border-box; background: #ffffff; }
 	.option-item.selected { border-color: #008cff; background: #eef7ff; }
@@ -1279,11 +1350,11 @@
 	.answer-number.answered { border-color: #008cff; background: #008cff; color: #ffffff; }
 	.answer-sheet-submit { width: 100%; height: 84rpx; margin: 24rpx 0 0; border-radius: 42rpx; background: #008cff; color: #ffffff; font-size: 29rpx; font-weight: 600; line-height: 84rpx; }
 	.answer-sheet-submit::after { border: 0; }
-	.calculator-sheet { height: 68vh; overflow: hidden; border-radius: 16rpx 16rpx 0 0; background: #ffffff; }
+	.calculator-sheet { height: 86vh; overflow: hidden; border-radius: 16rpx 16rpx 0 0; background: #ffffff; }
 	.calculator-sheet-header { display: flex; align-items: center; justify-content: space-between; height: 96rpx; padding: 0 20rpx 0 32rpx; border-bottom: 1rpx solid #e8ebef; box-sizing: border-box; }
 	.calculator-sheet-title { font-size: 32rpx; font-weight: 600; color: #2b2f34; }
 	.calculator-sheet-close { display: flex; align-items: center; justify-content: center; width: 72rpx; height: 72rpx; }
-	.calculator-sheet-scroll { height: calc(68vh - 96rpx - env(safe-area-inset-bottom)); padding-bottom: env(safe-area-inset-bottom); box-sizing: border-box; }
+	.calculator-sheet-scroll { height: calc(86vh - 96rpx); padding-bottom: env(safe-area-inset-bottom); box-sizing: border-box; }
 	.exam-result-page { height: 100vh; overflow: hidden; background: linear-gradient(155deg, #e9f5ff 0%, #f4faff 34%, #f4f5f7 68%); color: #2b2f34; }
 	.exam-result-scroll { height: 100%; }
 	.result-hero { position: relative; padding: 44rpx 44rpx 34rpx; overflow: hidden; box-sizing: border-box; }
@@ -1338,6 +1409,8 @@
 	.night-mode .answer-sheet,
 	.night-mode .calculator-sheet { background: #1b222a; }
 	.night-mode .type-badge { background: #17364d; color: #65baff; }
+	.night-mode .material-block { border-color: #31506a; background: #172e40; }
+	.night-mode .question-stem.material-question-stem { border-color: #303943; }
 	.night-mode .question-count,
 	.night-mode .chapter-name,
 	.night-mode .toolbar-command { color: #b6bec8; }

@@ -97,7 +97,8 @@
 				countdownTimer: null,
 				benefits: [
 					{ title: '屏蔽全部广告', desc: '学习和查看成绩时不再展示广告', icon: 'eye-slash' },
-					{ title: '云端学习数据同步', desc: '同一微信账号跨设备登录，答题记录与学习进度自动同步', icon: 'cloud-upload' }
+					{ title: '云端学习数据同步', desc: '同一微信账号跨设备登录，答题记录与学习进度自动同步', icon: 'cloud-upload' },
+					{ title: '解锁完整练习功能', desc: '使用错题集、收藏夹和背题模式，智能练习每组最高可设置50题', icon: 'vip-filled' }
 				]
 			}
 		},
