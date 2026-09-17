@@ -57,6 +57,7 @@ async function run() {
 	const modalOptions = []
 	const actionSheetOptions = []
 	let flushCalls = 0
+	let pendingPracticeEvents = 0
 	let progressSaveCalls = 0
 	let snapshotCalls = 0
 	let chapterPositionCalls = 0
@@ -199,8 +200,10 @@ async function run() {
 		},
 		flushPracticeEvents: async () => {
 			flushCalls += 1
+			pendingPracticeEvents = 0
 			return { synced: true }
 		},
+		pendingPracticeEventCount: () => pendingPracticeEvents,
 			getLocalPracticePreferences: () => preferenceResponse,
 			getPracticePreferences: async () => preferenceResponse,
 			getCachedPracticeSummary: () => null,
@@ -435,6 +438,8 @@ async function run() {
 		console,
 		setTimeout,
 		clearTimeout,
+		setInterval,
+		clearInterval,
 		Date,
 		Map,
 		Set,
@@ -1406,6 +1411,14 @@ async function run() {
 	})
 	home.applyTabBarTheme(false)
 	assert.equal(tabBarStyles.slice(-1)[0].backgroundColor, '#ffffff')
+	pendingPracticeEvents = 128
+	home.userDataError = '网络中断'
+	const flushCallsBeforeRetry = flushCalls
+	await home.retryUserData()
+	assert.equal(flushCalls, flushCallsBeforeRetry + 1)
+	assert.equal(home.userDataSyncing, false)
+	assert.equal(home.userDataPendingCount, 0)
+	assert.equal(home.userDataError, '')
 
 	membershipResponse = {
 		isMember: false,

@@ -1109,15 +1109,23 @@ async function loadCatalog(db, subjectId) {
 async function loadQuestionsForEvents(db, events) {
 	const catalogs = new Map()
 	const questions = new Map()
+	const rejectedEventIds = []
 	const bySubject = new Map()
 	events.forEach(event => {
-		if (!bySubject.has(event.subjectId)) bySubject.set(event.subjectId, new Set())
-		bySubject.get(event.subjectId).add(event.questionId)
+		if (!bySubject.has(event.subjectId)) bySubject.set(event.subjectId, [])
+		bySubject.get(event.subjectId).push(event)
 	})
-	for (const [subjectId, questionIdSet] of bySubject.entries()) {
-		const catalog = await loadCatalog(db, subjectId)
+	for (const [subjectId, subjectEvents] of bySubject.entries()) {
+		let catalog
+		try {
+			catalog = await loadCatalog(db, subjectId)
+		} catch (error) {
+			if (!error || error.errCode !== 'QUESTION_BANK_SUBJECT_NOT_FOUND') throw error
+			subjectEvents.forEach(item => rejectedEventIds.push(item.eventId))
+			continue
+		}
 		catalogs.set(subjectId, catalog)
-		const questionIds = Array.from(questionIdSet)
+		const questionIds = Array.from(new Set(subjectEvents.map(item => item.questionId)))
 		const response = await db.collection(QUESTION_COLLECTION)
 			.where({
 				subjectId,
@@ -1147,11 +1155,12 @@ async function loadQuestionsForEvents(db, events) {
 		})
 		questionIds.forEach(questionId => {
 			if (!questions.has(`${subjectId}|${questionId}`)) {
-				throw new QuestionBankUserError('QUESTION_BANK_QUESTION_NOT_FOUND', `题目${questionId}不存在或尚未启用`)
+				subjectEvents.filter(item => item.questionId === questionId)
+					.forEach(item => rejectedEventIds.push(item.eventId))
 			}
 		})
 	}
-	return { catalogs, questions }
+	return { catalogs, questions, rejectedEventIds }
 }
 
 async function withTransaction(db, handler) {
@@ -1242,8 +1251,17 @@ function createQuestionBankUserService(db, options) {
 			? null
 			: readProgress(event.progress, currentTime)
 		if (!rawEvents.length && !progress) invalidArgument('events和progress不能同时为空')
-		const events = rawEvents.map((item, index) => readSyncEvent(item, currentTime, index))
 		const rejectedEventIds = []
+		let events = []
+		rawEvents.forEach((item, index) => {
+			try {
+				events.push(readSyncEvent(item, currentTime, index))
+			} catch (error) {
+				const eventId = item && typeof item.eventId === 'string' ? item.eventId.trim() : ''
+				if (!eventId || !EVENT_ID_PATTERN.test(eventId) || eventId.length > 96) throw error
+				rejectedEventIds.push(eventId)
+			}
+		})
 		events.sort((left, right) => {
 			const timeDiff = left.occurredAt.getTime() - right.occurredAt.getTime()
 			return timeDiff || left.originalIndex - right.originalIndex
@@ -1253,7 +1271,10 @@ function createQuestionBankUserService(db, options) {
 		const legacyAnswerEvents = events.filter(item => item.type === 'answer' && !item.judgedLocally)
 		const loaded = legacyAnswerEvents.length
 			? await loadQuestionsForEvents(db, legacyAnswerEvents)
-			: { questions: new Map() }
+			: { questions: new Map(), rejectedEventIds: [] }
+		rejectedEventIds.push(...loaded.rejectedEventIds)
+		const rejectedEventIdSet = new Set(rejectedEventIds)
+		events = events.filter(item => !rejectedEventIdSet.has(item.eventId))
 		const todayKey = chinaDayKey(currentTime)
 
 		return withTransaction(db, async store => {
@@ -1512,7 +1533,7 @@ function createQuestionBankUserService(db, options) {
 			return {
 				acceptedEventIds,
 				duplicateEventIds,
-				rejectedEventIds,
+				rejectedEventIds: Array.from(new Set(rejectedEventIds)),
 				answerResults,
 				summaries,
 				progress: progressResult

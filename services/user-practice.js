@@ -14,7 +14,7 @@ const MEMBERSHIP_STORAGE_KEY = 'uni-learn-membership-v1'
 const MEMBERSHIP_LAST_USER_ID_KEY = 'uni-learn-membership-last-user-id-v1'
 const MIGRATION_KEY_PREFIX = 'uni-learn-practice-cloud-migration-v1:'
 const UNI_ID_STORAGE_KEYS = ['uni_id_token', 'uni_id_token_expired', 'uniIdToken', 'uniIdTokenExpired']
-const SYNC_BATCH_SIZE = 50
+const SYNC_BATCH_SIZE = 20
 const SNAPSHOT_CACHE_TTL = 2 * 60 * 1000
 const SUMMARY_CACHE_TTL = 10 * 60 * 1000
 const PROFILE_CACHE_TTL = 5 * 60 * 1000
@@ -1520,15 +1520,44 @@ function prepareLegacyMigration(userId, localState) {
 	if (!localState || !isObject(localState)) return
 	const migrationKey = `${MIGRATION_KEY_PREFIX}${userId}`
 	const migration = getStorage(migrationKey)
-	if (migration && (migration.prepared || migration.complete)) return
 	const state = localState
 	const events = readOutbox()
+	const answers = isObject(state.answers) ? state.answers : {}
+	let outboxChanged = false
+	events.forEach(event => {
+		if (!event || event.type !== 'answer'
+			|| typeof event.eventId !== 'string'
+			|| event.eventId.indexOf('legacy-state-') !== 0
+			|| event.judgedLocally === true) return
+		const answer = answers[event.questionId]
+		if (!answer || answer.subjectId !== event.subjectId
+			|| typeof answer.correct !== 'boolean'
+			|| answer.chapterId === undefined
+			|| answer.chapterId === null
+			|| !String(answer.chapterId)) return
+		event.judgedLocally = true
+		event.correct = answer.correct
+		event.chapterId = String(answer.chapterId)
+		event.section = answer.section || ''
+		event.knowledge = answer.knowledge || ''
+		const practiceModes = Array.isArray(answer.practiceModes) ? answer.practiceModes : []
+		const practiceMode = PRACTICE_ENTRY_MODES.indexOf(answer.practiceMode) > -1
+			? answer.practiceMode
+			: practiceModes.find(mode => PRACTICE_ENTRY_MODES.indexOf(mode) > -1)
+		if (practiceMode) event.practiceMode = practiceMode
+		outboxChanged = true
+	})
+	if (outboxChanged) saveOutbox(events)
+	if (migration && (migration.prepared || migration.complete)) return
 	const eventIds = new Set(events.map(item => item.eventId))
 
-	const answers = isObject(state.answers) ? state.answers : {}
 	Object.keys(answers).forEach(questionId => {
 		const answer = answers[questionId]
 		if (!answer || !answer.subjectId || !Array.isArray(answer.selected) || !answer.selected.length) return
+		const hasPendingAnswer = events.some(item => item.type === 'answer'
+			&& item.subjectId === answer.subjectId
+			&& item.questionId === questionId)
+		if (hasPendingAnswer) return
 		const answerKey = `${answer.subjectId}|${questionId}`
 		const timestamp = Number(answer.timestamp) || Date.now()
 		const event = {
@@ -1539,7 +1568,21 @@ function prepareLegacyMigration(userId, localState) {
 			selected: answer.selected.slice(),
 			occurredAt: timestamp
 		}
-		if (PRACTICE_ENTRY_MODES.indexOf(answer.practiceMode) > -1) event.practiceMode = answer.practiceMode
+		if (typeof answer.correct === 'boolean'
+			&& answer.chapterId !== undefined
+			&& answer.chapterId !== null
+			&& String(answer.chapterId)) {
+			event.judgedLocally = true
+			event.correct = answer.correct
+			event.chapterId = String(answer.chapterId)
+			event.section = answer.section || ''
+			event.knowledge = answer.knowledge || ''
+		}
+		const practiceModes = Array.isArray(answer.practiceModes) ? answer.practiceModes : []
+		const practiceMode = PRACTICE_ENTRY_MODES.indexOf(answer.practiceMode) > -1
+			? answer.practiceMode
+			: practiceModes.find(mode => PRACTICE_ENTRY_MODES.indexOf(mode) > -1)
+		if (practiceMode) event.practiceMode = practiceMode
 		if (!eventIds.has(event.eventId)) {
 			events.push(event)
 			eventIds.add(event.eventId)
@@ -1613,6 +1656,7 @@ export async function flushPracticeEvents(options) {
 		const user = await ensurePracticeUser()
 		if (config.localState) prepareLegacyMigration(user.uid, config.localState)
 		let events = readOutbox()
+		let rejectedEventCount = 0
 		while (events.length || (progressFlushRequested && readPendingProgresses().length)) {
 			const progress = progressFlushRequested ? readPendingProgresses()[0] : null
 			const batch = events.slice(0, SYNC_BATCH_SIZE)
@@ -1624,6 +1668,7 @@ export async function flushPracticeEvents(options) {
 				result && result.duplicateEventIds || [],
 				result && result.rejectedEventIds || []
 			))
+			rejectedEventCount += new Set(result && result.rejectedEventIds || []).size
 			if (batch.length && !completedIds.size) {
 				throw new UserPracticeServiceError('QUESTION_BANK_USER_INVALID_RESPONSE', '同步服务未确认任何记录')
 			}
@@ -1646,7 +1691,7 @@ export async function flushPracticeEvents(options) {
 			}
 		}
 		markMigrationComplete(user.uid, events)
-		return { synced: true, pending: 0 }
+		return { synced: true, pending: 0, rejectedEventCount }
 	})().then(result => {
 		const remainingEvents = readOutbox().length
 		const remainingProgress = readPendingProgresses().length
@@ -1991,15 +2036,58 @@ export async function getPracticeBootstrap(options) {
 	const questionIds = Array.isArray(input.questionIds)
 		? Array.from(new Set(input.questionIds.filter(Boolean))).slice(0, MAX_SNAPSHOT_QUESTION_IDS)
 		: []
-	const result = await executeCloudCall('getPracticeBootstrap', {
-		subjectId,
-		mode,
-		chapterId: input.chapterId,
-		section: input.section,
-		knowledge: input.knowledge,
-		keyword: input.keyword,
-		questionIds
-	})
+	let result
+	try {
+		result = await executeCloudCall('getPracticeBootstrap', {
+			subjectId,
+			mode,
+			chapterId: input.chapterId,
+			section: input.section,
+			knowledge: input.knowledge,
+			keyword: input.keyword,
+			questionIds
+		})
+	} catch (error) {
+		const errorMessage = error && (error.errMsg || error.message) || ''
+		const unsupported = error && error.errCode === 'QUESTION_BANK_USER_UNSUPPORTED_ACTION'
+			|| errorMessage.indexOf('不支持的action: getPracticeBootstrap') > -1
+		if (!unsupported) throw error
+		const preferences = await getPracticePreferences({
+			forceRefresh: true,
+			localFallback: false
+		})
+		const snapshotPromise = getPracticeStateSnapshot(subjectId, {
+			questionIds,
+			includeAggregates: false,
+			includeProgress: false,
+			forceRefresh: true
+		})
+		let sessionPromise = Promise.resolve(null)
+		let sessionType = ''
+		if (preferences.answerMode === 'practice'
+			&& ['chapter', 'section'].indexOf(mode) > -1) {
+			sessionType = 'practiceRound'
+			sessionPromise = getPracticeRound({
+				subjectId,
+				chapterId: input.chapterId,
+				section: mode === 'section' ? input.section : ''
+			})
+		} else if (preferences.answerMode === 'exam' && mode !== 'smart') {
+			sessionType = 'examDraft'
+			sessionPromise = getExamDraft(Object.assign({}, input, { subjectId, mode }))
+		}
+		const [snapshot, session] = await Promise.all([snapshotPromise, sessionPromise])
+		result = {
+			subjectId,
+			mode,
+			membership: null,
+			preferences,
+			snapshot,
+			practiceRound: sessionType === 'practiceRound' ? session : null,
+			examDraft: sessionType === 'examDraft' ? session : null,
+			_compatFallback: true
+		}
+	}
 	if (result && result.preferences) {
 		savePreferencesEntry(result.preferences, false, Date.now())
 		preferencesRefreshRequired = false

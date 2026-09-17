@@ -33,6 +33,7 @@ function loadService(environment) {
 		getLocalExamDraft,
 		getLocalExamDraftSummaries,
 		getLocalPracticePreferences,
+		getPracticeBootstrap,
 		getPracticeProgress,
 		getPracticePreferences,
 		getPracticeRound,
@@ -354,8 +355,8 @@ async function testBatchScheduling() {
 	assert.equal(immediateTimer.delay, 0)
 	immediateTimer.handler()
 	await service.flushPracticeEvents({ includeProgress: false })
-	assert.equal(calls.length, 1)
-	assert.equal(calls[0].data.events.length, 50)
+	assert.equal(calls.length, 3)
+	assert.deepEqual(calls.map(item => item.data.events.length), [20, 20, 10])
 	assert.equal(service.pendingPracticeEventCount(), 0)
 }
 
@@ -732,13 +733,18 @@ async function testMembershipActivationFlushesLocalQueue() {
 			getCurrentUserInfo: () => user,
 			async callFunction(request) {
 				cloudCalls += 1
+				const rejectedEventIds = request.data.events
+					.filter(item => item.eventId === 'upgrade-answer-invalid')
+					.map(item => item.eventId)
 				return {
 					result: {
 						errCode: 0,
 						data: {
-							acceptedEventIds: request.data.events.map(item => item.eventId),
+							acceptedEventIds: request.data.events
+								.filter(item => rejectedEventIds.indexOf(item.eventId) === -1)
+								.map(item => item.eventId),
 							duplicateEventIds: [],
-							rejectedEventIds: [],
+							rejectedEventIds,
 							summaries: {},
 							progress: null
 						}
@@ -774,11 +780,122 @@ async function testMembershipActivationFlushesLocalQueue() {
 		correct: true,
 		occurredAt: Date.now()
 	})
+	service.queuePracticeAnswer({
+		id: 'upgrade-invalid-question',
+		subjectId: 'junior-personal-finance',
+		chapterId: '1',
+		knowledge: '会员升级',
+		answer: ['A']
+	}, ['A'], {
+		eventId: 'upgrade-answer-invalid',
+		correct: true,
+		occurredAt: Date.now() + 1
+	})
 	assert.equal(cloudCalls, 0)
 	storage.set(`uni-learn-membership-v1:${user.uid}`, activeMembership())
-	await service.flushPracticeEvents({ includeProgress: false })
+	const syncResult = await service.flushPracticeEvents({ includeProgress: false })
 	assert.equal(cloudCalls, 1)
+	assert.equal(syncResult.rejectedEventCount, 1)
 	assert.equal(service.pendingPracticeEventCount(), 0)
+}
+
+async function testPracticeBootstrapFallsBackForOlderCloudFunction() {
+	const storage = new Map()
+	const user = { uid: 'bootstrap-compat-user', tokenExpired: Date.now() + 60 * 60 * 1000 }
+	const subjectId = 'junior-personal-finance'
+	storage.set(`uni-learn-membership-v1:${user.uid}`, activeMembership())
+	const actions = []
+	const environment = {
+		uni: {
+			getStorageSync: key => storage.get(key),
+			setStorageSync: (key, value) => storage.set(key, value),
+			removeStorageSync: key => storage.delete(key)
+		},
+		uniCloud: {
+			getCurrentUserInfo: () => user,
+			async callFunction(request) {
+				const action = request.data.action
+				actions.push(action)
+				if (action === 'getPracticeBootstrap') {
+					return {
+						result: {
+							errCode: 'QUESTION_BANK_USER_UNSUPPORTED_ACTION',
+							errMsg: '不支持的action: getPracticeBootstrap'
+						}
+					}
+				}
+				if (action === 'getPreferences') {
+					return {
+						result: {
+							errCode: 0,
+							data: { answerMode: 'practice', nightMode: false, updatedAt: 1 }
+						}
+					}
+				}
+				if (action === 'getStateSnapshot') {
+					return {
+						result: {
+							errCode: 0,
+							data: {
+								subjectId,
+								wrongQuestionIds: [],
+								favoriteQuestionIds: ['ipf-1'],
+								answerSelections: {}
+							}
+						}
+					}
+				}
+				if (action === 'getPracticeRound') {
+					return {
+						result: {
+							errCode: 0,
+							data: {
+								subjectId,
+								chapterId: '1',
+								section: '',
+								answers: [],
+								answeredQuestionIds: [],
+								positionQuestionId: ''
+							}
+						}
+					}
+				}
+				throw new Error(`unexpected action ${action}`)
+			}
+		},
+		console,
+		setTimeout,
+		clearTimeout,
+		Date,
+		Map,
+		Set,
+		Promise,
+		Math,
+		JSON,
+		Error,
+		Array,
+		Object,
+		Number,
+		String,
+		Boolean
+	}
+	const service = loadService(environment)
+	const result = await service.getPracticeBootstrap({
+		subjectId,
+		mode: 'chapter',
+		chapterId: '1',
+		questionIds: ['ipf-1']
+	})
+	assert.equal(result._compatFallback, true)
+	assert.equal(result.preferences.answerMode, 'practice')
+	assert.deepEqual(Array.from(result.snapshot.favoriteQuestionIds), ['ipf-1'])
+	assert.equal(result.practiceRound.chapterId, '1')
+	assert.deepEqual(actions, [
+		'getPracticeBootstrap',
+		'getPreferences',
+		'getStateSnapshot',
+		'getPracticeRound'
+	])
 }
 
 async function testServerRevocationClearsLocalMembership() {
@@ -1281,6 +1398,11 @@ async function run() {
 				'ipf-2': {
 					subjectId: question.subjectId,
 					selected: ['A'],
+					correct: true,
+					chapterId: question.chapterId,
+					section: question.section,
+					knowledge: question.knowledge,
+					practiceModes: ['chapter'],
 					timestamp: legacyTimestamp
 				}
 			},
@@ -1294,6 +1416,11 @@ async function run() {
 		Array.from(migrationCall.data.events.map(item => item.type)).sort(),
 		['answer', 'favorite']
 	)
+	const migratedAnswer = migrationCall.data.events.find(item => item.type === 'answer')
+	assert.equal(migratedAnswer.judgedLocally, true)
+	assert.equal(migratedAnswer.correct, true)
+	assert.equal(migratedAnswer.chapterId, question.chapterId)
+	assert.equal(migratedAnswer.practiceMode, 'chapter')
 	assert.equal(storage.get(`uni-learn-practice-cloud-migration-v1:${user.uid}`).complete, true)
 
 	const summary = await service.getPracticeSummary(question.subjectId)
@@ -1414,6 +1541,7 @@ async function run() {
 	await testEmptyFlushDoesNotLogin()
 	await testNonMemberLocalOnly()
 	await testMembershipActivationFlushesLocalQueue()
+	await testPracticeBootstrapFallsBackForOlderCloudFunction()
 	await testServerRevocationClearsLocalMembership()
 	await testForegroundRefreshesCachedPreferencesOnce()
 	await testPersistentSummaryAndForegroundRefresh()

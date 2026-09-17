@@ -1192,6 +1192,55 @@ async function run() {
 	assert.equal(favoriteRecords.items[0].question.type, question.type)
 	assert.equal(favoriteRecords.items[0].question.selectionMode, undefined)
 
+	const poisonUserId = 'user-poison-event'
+	environment.collections.question_bank_memberships.set(poisonUserId, {
+		_id: poisonUserId,
+		userId: poisonUserId,
+		status: 'active',
+		expiresAt: new Date('2027-08-28T04:00:00.000Z')
+	})
+	const partialSync = await service.execute({
+		action: 'syncEvents',
+		events: [{
+			type: 'answer',
+			eventId: 'invalid-answer-poison',
+			subjectId,
+			questionId: question.questionId,
+			selected: [],
+			occurredAt: currentTime.getTime()
+		}, {
+			type: 'favorite',
+			eventId: 'valid-favorite-after-poison',
+			subjectId,
+			questionId: question.questionId,
+			favorite: true,
+			occurredAt: currentTime.getTime() + 1
+		}]
+	}, poisonUserId)
+	assert.deepEqual(partialSync.rejectedEventIds, ['invalid-answer-poison'])
+	assert.deepEqual(partialSync.acceptedEventIds, ['valid-favorite-after-poison'])
+	assert.equal((await service.execute({ action: 'getSummary', subjectId }, poisonUserId)).favorite, 1)
+
+	const missingLegacyQuestion = await service.execute({
+		action: 'syncEvents',
+		events: [{
+			type: 'answer',
+			eventId: 'legacy-missing-question',
+			subjectId,
+			questionId: 'missing-question',
+			selected: ['A'],
+			occurredAt: currentTime.getTime() + 2
+		}]
+	}, poisonUserId)
+	assert.deepEqual(missingLegacyQuestion.rejectedEventIds, ['legacy-missing-question'])
+	assert.deepEqual(missingLegacyQuestion.acceptedEventIds, [])
+	for (const collectionName of ['question_bank_user_states', 'question_bank_user_stats']) {
+		for (const [id, document] of environment.collections[collectionName]) {
+			if (document.userId === poisonUserId) environment.collections[collectionName].delete(id)
+		}
+	}
+	environment.collections.question_bank_memberships.delete(poisonUserId)
+
 	environment.collections.question_bank_memberships.set('user-other-member', {
 		_id: 'user-other-member',
 		userId: 'user-other-member',

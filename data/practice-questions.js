@@ -12,6 +12,7 @@ import {
 	getSmartPracticeQuestions,
 	getEffectiveSmartPractice,
 	getLocalPracticePreferences,
+	pendingPracticeEventCount,
 	practiceCloudSyncEnabled
 } from '@/services/user-practice.js'
 
@@ -29,6 +30,41 @@ export async function getQuestionsBySubject(subjectId) {
 function applyLimit(list, limit) {
 	const value = Number(limit)
 	return value > 0 ? list.slice(0, value) : list
+}
+
+function getLocalSmartPracticeState(subjectId) {
+	const state = getPracticeState()
+	const localStates = Object.keys(state.answers).map(questionId => {
+		const answer = state.answers[questionId]
+		return { questionId, answer }
+	}).filter(item => item.answer && item.answer.subjectId === subjectId)
+		.sort((left, right) => {
+			return (Number(right.answer.timestamp) || 0) - (Number(left.answer.timestamp) || 0)
+		})
+	return {
+		answeredQuestionIds: localStates.slice(0, MAX_SMART_STATE_IDS)
+			.map(item => item.questionId),
+		wrongQuestionIds: localStates.filter(item => item.answer.correct === false)
+			.slice(0, MAX_SMART_STATE_IDS)
+			.map(item => item.questionId),
+		favoriteQuestionIds: Array.isArray(state.favorites) ? state.favorites.slice() : []
+	}
+}
+
+async function getLocalSmartPracticeQuestions(subjectId, pageSize, smartPractice) {
+	const state = getLocalSmartPracticeState(subjectId)
+	const result = await getPracticePage({
+		subjectId,
+		mode: 'smart',
+		smartPractice,
+		pageSize,
+		answeredQuestionIds: state.answeredQuestionIds,
+		wrongQuestionIds: state.wrongQuestionIds
+	}, {
+		versionFromResponse: true
+	})
+	result.favoriteQuestionIds = state.favoriteQuestionIds
+	return result
 }
 
 async function loadRecordedQuestions(subjectId, mode) {
@@ -58,49 +94,36 @@ export async function buildPracticeQuestions(options) {
 		const pageSize = effectiveLimit
 		let result
 		if (practiceCloudSyncEnabled()) {
-			if (hasCompleteQuestionBankCache(subjectId)) {
-				const state = await getSmartPracticeState(subjectId)
-				result = await getPracticePage({
-					subjectId,
-					mode: 'smart',
-					smartPractice,
-					pageSize,
-					answeredQuestionIds: state.answeredQuestionIds,
-					wrongQuestionIds: state.wrongQuestionIds
-				}, {
-					versionFromResponse: true
-				})
+			if (pendingPracticeEventCount() > 0) {
+				result = await getLocalSmartPracticeQuestions(subjectId, pageSize, smartPractice)
 			} else {
-				result = await getSmartPracticeQuestions({ subjectId, pageSize, smartPractice })
+				try {
+					if (hasCompleteQuestionBankCache(subjectId)) {
+						const state = await getSmartPracticeState(subjectId)
+						result = await getPracticePage({
+							subjectId,
+							mode: 'smart',
+							smartPractice,
+							pageSize,
+							answeredQuestionIds: state.answeredQuestionIds,
+							wrongQuestionIds: state.wrongQuestionIds
+						}, {
+							versionFromResponse: true
+						})
+					} else {
+						result = await getSmartPracticeQuestions({ subjectId, pageSize, smartPractice })
+					}
+				} catch (error) {
+					result = await getLocalSmartPracticeQuestions(subjectId, pageSize, smartPractice)
+					result._syncError = error && (error.errMsg || error.message) || '云端智能取题失败'
+				}
 			}
 			const favoriteIds = new Set(result.favoriteQuestionIds || [])
 			;(result.items || []).forEach(question => {
 				question.favorite = favoriteIds.has(question.id || question.questionId)
 			})
 		} else {
-			const state = getPracticeState()
-			const localStates = Object.keys(state.answers).map(questionId => {
-				const answer = state.answers[questionId]
-				return { questionId, answer }
-			}).filter(item => item.answer && item.answer.subjectId === subjectId)
-				.sort((left, right) => {
-					return (Number(right.answer.timestamp) || 0) - (Number(left.answer.timestamp) || 0)
-				})
-			const answeredQuestionIds = localStates.slice(0, MAX_SMART_STATE_IDS)
-				.map(item => item.questionId)
-			const wrongQuestionIds = localStates.filter(item => item.answer.correct === false)
-				.slice(0, MAX_SMART_STATE_IDS)
-				.map(item => item.questionId)
-			result = await getPracticePage({
-				subjectId,
-				mode: 'smart',
-				smartPractice,
-				pageSize,
-				answeredQuestionIds,
-				wrongQuestionIds
-			}, {
-				versionFromResponse: true
-			})
+			result = await getLocalSmartPracticeQuestions(subjectId, pageSize, smartPractice)
 		}
 		list = result.items
 		return list

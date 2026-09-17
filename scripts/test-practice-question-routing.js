@@ -24,6 +24,8 @@ async function run() {
 	let questionBankAllCalls = 0
 	let lastAllParams = null
 	let expectedSmartPageSize = 35
+	let pendingEvents = 0
+	let failMemberSmart = false
 	const environment = {
 		DAILY_GOAL: 20,
 		DEFAULT_SUBJECT_ID: 'junior-personal-finance',
@@ -44,6 +46,7 @@ async function run() {
 			assert.equal(params.smartPractice.strategy, 'balanced')
 			assert.equal(params.pageSize, expectedSmartPageSize)
 			cloudSmartCalls += 1
+			if (failMemberSmart) throw new Error('member smart unavailable')
 			return { items: [{ id: 'member-smart' }] }
 		},
 		getSmartPracticeState: async () => ({
@@ -69,6 +72,7 @@ async function run() {
 		getCatalog: async () => ({ knowledgeGroups: [] }),
 		getQuestionsByIds: async () => ({ items: [] }),
 		getPracticeRecordIds: async () => ({ questionIds: [] }),
+		pendingPracticeEventCount: () => pendingEvents,
 		Promise,
 		Object,
 		Array,
@@ -127,6 +131,25 @@ async function run() {
 	assert.equal(questionBankPageCalls, 2)
 	assert.equal(questionBankAllCalls, 2)
 	assert.equal(cloudSmartCalls, 1)
+
+	pendingEvents = 128
+	const pendingMemberItems = await module.buildPracticeQuestions({
+		subjectId: 'junior-personal-finance',
+		mode: 'smart'
+	})
+	assert.equal(pendingMemberItems[0].id, 'local-smart')
+	assert.equal(questionBankPageCalls, 3)
+	assert.equal(cloudSmartCalls, 1)
+
+	pendingEvents = 0
+	failMemberSmart = true
+	const failedMemberItems = await module.buildPracticeQuestions({
+		subjectId: 'junior-personal-finance',
+		mode: 'smart'
+	})
+	assert.equal(failedMemberItems[0].id, 'local-smart')
+	assert.equal(questionBankPageCalls, 4)
+	assert.equal(cloudSmartCalls, 2)
 
 	console.log('practice question routing tests passed')
 }

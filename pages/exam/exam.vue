@@ -102,9 +102,19 @@
 				<text>该科目题库正在整理，可先切换到初级个人理财。</text>
 			</view>
 
-			<view class="bank-note error" v-if="userDataError" @tap="retryUserData">
-				<uni-icons type="cloud-download" size="18" color="#d34d4d"></uni-icons>
-				<text>做题状态暂存本机，点击重试云同步</text>
+			<view
+				class="bank-note"
+				:class="{ error: !userDataSyncing }"
+				v-if="userDataSyncing || userDataError"
+				@tap="retryUserData"
+			>
+				<uni-icons
+					:type="userDataSyncing ? 'spinner-cycle' : 'cloud-download'"
+					size="18"
+					:color="userDataSyncing ? '#7a7e83' : '#d34d4d'"
+				></uni-icons>
+				<text v-if="userDataSyncing">{{ userDataSyncText }}</text>
+				<text v-else>{{ userDataErrorText }}</text>
 			</view>
 
 		<uni-popup
@@ -156,10 +166,12 @@
 	} from '@/data/practice.js'
 	import { getCatalog, getCatalogSummaries } from '@/services/question-bank.js'
 	import {
+		flushPracticeEvents,
 		getCachedPracticeSummary,
 		getLocalPracticePreferences,
 		getPracticePreferences,
-		getPracticeSummary
+		getPracticeSummary,
+		pendingPracticeEventCount
 	} from '@/services/user-practice.js'
 	import {
 		getCachedMembership,
@@ -181,6 +193,8 @@
 				nextCatalogSummariesRequestId: 0,
 				nextUserDataRequestId: 0,
 				userDataError: '',
+				userDataSyncing: false,
+				userDataPendingCount: pendingPracticeEventCount(),
 				stats: {
 					total: 0,
 					attempted: 0,
@@ -200,6 +214,14 @@
 			}
 		},
 		computed: {
+			userDataSyncText() {
+				const pending = this.userDataPendingCount
+				return `正在同步${pending ? `，剩余 ${pending} 条` : ''}，请保持小程序在前台`
+			},
+			userDataErrorText() {
+				const pending = this.userDataPendingCount
+				return `云同步失败${pending ? `，剩余 ${pending} 条` : ''}：${this.userDataError}，点击重试`
+			},
 			currentSubject() {
 				return getSubjectById(this.currentSubjectId)
 			},
@@ -242,6 +264,7 @@
 			}
 		},
 		async onShow() {
+			this.userDataPendingCount = pendingPracticeEventCount()
 			const membershipTask = this.refreshMembership()
 			try {
 				await this.refreshNightMode()
@@ -305,6 +328,7 @@
 			async loadCloudStats(subjectId) {
 				const requestId = ++this.nextUserDataRequestId
 				this.userDataError = ''
+				this.userDataPendingCount = pendingPracticeEventCount()
 				const cachedSummary = getCachedPracticeSummary(subjectId)
 				if (cachedSummary && subjectId === this.currentSubjectId) {
 					this.applyCloudSummary(cachedSummary)
@@ -315,8 +339,10 @@
 					})
 					if (requestId !== this.nextUserDataRequestId || subjectId !== this.currentSubjectId) return
 					this.applyCloudSummary(summary)
+					this.userDataPendingCount = pendingPracticeEventCount()
 				} catch (error) {
 					if (requestId !== this.nextUserDataRequestId || subjectId !== this.currentSubjectId) return
+					this.userDataPendingCount = pendingPracticeEventCount()
 					this.userDataError = (error && (error.errMsg || error.message)) || '做题记录同步失败'
 				}
 			},
@@ -333,8 +359,38 @@
 					percent: Math.min(100, Math.round(summary.todayAttempts / this.today.goal * 100))
 				})
 			},
-			retryUserData() {
-				this.loadCloudStats(this.currentSubjectId)
+			async retryUserData() {
+				if (this.userDataSyncing) return
+				this.userDataSyncing = true
+				this.userDataError = ''
+				this.userDataPendingCount = pendingPracticeEventCount()
+				const pendingTimer = setInterval(() => {
+					this.userDataPendingCount = pendingPracticeEventCount()
+				}, 300)
+				try {
+					const syncResult = await flushPracticeEvents({ localState: getPracticeState() })
+					this.userDataPendingCount = pendingPracticeEventCount()
+					const summary = await getPracticeSummary(this.currentSubjectId, {
+						forceRefresh: true,
+						localState: getPracticeState()
+					})
+					this.applyCloudSummary(summary)
+					if (syncResult && syncResult.rejectedEventCount) {
+						uni.showToast({
+							title: `同步完成，跳过 ${syncResult.rejectedEventCount} 条失效记录`,
+							icon: 'none'
+						})
+					} else {
+						uni.showToast({ title: '云同步完成', icon: 'success' })
+					}
+				} catch (error) {
+					this.userDataPendingCount = pendingPracticeEventCount()
+					this.userDataError = (error && (error.errMsg || error.message)) || '做题记录同步失败'
+					uni.showToast({ title: '同步失败，请稍后重试', icon: 'none' })
+				} finally {
+					clearInterval(pendingTimer)
+					this.userDataSyncing = false
+				}
 			},
 			async loadCatalogSummaries(options) {
 				const config = options || {}
