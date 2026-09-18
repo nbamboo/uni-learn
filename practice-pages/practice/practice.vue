@@ -188,6 +188,10 @@
 				<uni-icons type="bars" size="23" color="#69707a"></uni-icons>
 				<text>{{ currentIndex + 1 }}/{{ questionList.length }}</text>
 			</view>
+			<view class="toolbar-command" @tap="openQuestionFeedback">
+				<uni-icons type="compose" size="23" color="#69707a"></uni-icons>
+				<text>反馈</text>
+			</view>
 			<view class="toolbar-command" @tap="favoriteCurrent">
 				<uni-icons :type="favorite ? 'star-filled' : 'star'" size="24" :color="favorite ? '#e7a721' : '#69707a'"></uni-icons>
 				<text>{{ favorite ? '已收藏' : '收藏' }}</text>
@@ -223,6 +227,58 @@
 			</view>
 		</uni-popup>
 
+		<uni-popup ref="questionFeedbackPopup" type="bottom" :safe-area="false">
+			<view class="feedback-sheet">
+				<view class="feedback-sheet-header">
+					<view>
+						<text class="feedback-sheet-title">题目反馈</text>
+						<text class="feedback-sheet-caption">请选择发现的问题</text>
+					</view>
+					<view class="feedback-sheet-close" @tap="closeQuestionFeedback">
+						<uni-icons type="closeempty" size="24" color="#5f6570"></uni-icons>
+					</view>
+				</view>
+				<view class="feedback-field-label">
+					<text class="feedback-required">*</text>
+					<text>错误类型</text>
+				</view>
+				<view class="feedback-type-grid">
+					<view
+						class="feedback-type-item"
+						:class="{ selected: feedbackIssueType === item.value }"
+						v-for="item in feedbackIssueTypes"
+						:key="item.value"
+						@tap="selectFeedbackIssue(item.value)"
+					>
+						<view class="feedback-radio">
+							<view class="feedback-radio-dot" v-if="feedbackIssueType === item.value"></view>
+						</view>
+						<text>{{ item.label }}</text>
+					</view>
+				</view>
+				<view class="feedback-field-label feedback-description-label">
+					<text class="feedback-required" v-if="feedbackIssueType === 'other'">*</text>
+					<text>纠错或建议</text>
+				</view>
+				<view class="feedback-description-wrap">
+					<textarea
+						class="feedback-description"
+						v-model="feedbackDescription"
+						maxlength="500"
+						:placeholder="feedbackIssueType === 'other' ? '请填写问题或建议（必填，2～500字）' : '请简述题目问题或写下您的建议（选填）'"
+						placeholder-class="feedback-placeholder"
+					></textarea>
+					<text class="feedback-count">{{ feedbackDescription.length }}/500</text>
+				</view>
+				<button
+					class="feedback-submit-button"
+					:disabled="!canSubmitQuestionFeedback"
+					:loading="feedbackSubmitting"
+					@tap="submitCurrentQuestionFeedback"
+				>提交</button>
+			</view>
+		</uni-popup>
+
 		<uni-popup
 			ref="financeCalculatorPopup"
 			type="bottom"
@@ -252,7 +308,7 @@
 </template>
 
 <script>
-	import { buildPracticeQuestionSet, buildPracticeQuestions } from '@/data/practice-questions.js'
+	import { buildPracticeQuestionSet } from '@/data/practice-questions.js'
 	import { getQuestionTypeDisplayLabel } from '@/data/question-types.js'
 	import {
 		getPracticeState,
@@ -265,6 +321,7 @@
 	import { getAllPracticeQuestions, getQuestionsByIds } from '@/services/question-bank.js'
 	import {
 		completeExamDraft,
+		createPracticeEventId,
 		examDraftHasProgress,
 		flushPracticeEvents,
 		getEffectiveAnswerMode,
@@ -279,7 +336,8 @@
 		saveExamDraftAnswer,
 		saveExamDraftPosition,
 		savePracticeProgress,
-		startExamDraft
+		startExamDraft,
+		submitQuestionFeedback
 	} from '@/services/user-practice.js'
 	import {
 		cacheMembershipSnapshot,
@@ -300,6 +358,7 @@
 				membership: cachedMembership,
 				membershipLoaded: false,
 				questionList: [],
+				questionVersion: '',
 				practiceConfig: null,
 				currentIndex: 0,
 				selectedAnswers: [],
@@ -327,6 +386,16 @@
 				loading: true,
 				loadError: '',
 				favoriteQuestionIds: [],
+				feedbackIssueTypes: [
+					{ value: 'answer_error', label: '答案错误' },
+					{ value: 'explanation_error', label: '解析错误' },
+					{ value: 'text_error', label: '文字错误' },
+					{ value: 'other', label: '其他' }
+				],
+				feedbackIssueType: 'answer_error',
+				feedbackDescription: '',
+				feedbackSubmitting: false,
+				feedbackClientRequestId: '',
 				progressSavedOnLeave: false
 			}
 		},
@@ -374,6 +443,12 @@
 			},
 			examInProgress() {
 				return this.answerMode === 'exam' && !this.examSubmitted
+			},
+			canSubmitQuestionFeedback() {
+				if (this.feedbackSubmitting || !this.feedbackIssueType) return false
+				const descriptionLength = this.feedbackDescription.trim().length
+				return descriptionLength <= 500
+					&& (this.feedbackIssueType !== 'other' || descriptionLength >= 2)
 			},
 			swiperTouchDisabled() {
 				return this.questionList.length < 2
@@ -705,6 +780,7 @@
 				this.loading = true
 				this.loadError = ''
 				this.questionList = []
+				this.questionVersion = ''
 				this.currentIndex = 0
 				this.draftAnswers = {}
 				this.sessionAnswers = {}
@@ -736,8 +812,11 @@
 								forceRefresh: Boolean(forceRefresh)
 							})
 							this.questionList = result.items
+							questionVersion = result.version || ''
 						} else {
-							this.questionList = await buildPracticeQuestions(this.practiceConfig)
+							const result = await buildPracticeQuestionSet(this.practiceConfig)
+							this.questionList = result.items || []
+							questionVersion = result.version || ''
 						}
 					}
 					let bootstrap = null
@@ -823,6 +902,7 @@
 							initialQuestionId: this.questionList[initialQuestionIndex].id
 						}))
 					}
+					this.questionVersion = questionVersion
 					try {
 						if (!snapshot && this.membership.isMember
 							&& ['smart', 'wrong', 'favorite'].indexOf(this.mode) > -1) {
@@ -1235,6 +1315,88 @@
 				if (!this.favorite && index > -1) this.favoriteQuestionIds.splice(index, 1)
 				uni.showToast({ title: this.favorite ? '已加入收藏' : '已取消收藏', icon: 'none' })
 			},
+			openQuestionFeedback() {
+				if (!this.currentQuestion || !this.questionVersion) {
+					uni.showToast({ title: '题库版本信息缺失，请重新加载后再反馈', icon: 'none' })
+					return
+				}
+				this.feedbackIssueType = 'answer_error'
+				this.feedbackDescription = ''
+				this.feedbackSubmitting = false
+				this.feedbackClientRequestId = ''
+				this.$refs.questionFeedbackPopup.open()
+			},
+			closeQuestionFeedback() {
+				if (this.feedbackSubmitting) return
+				this.$refs.questionFeedbackPopup.close()
+			},
+			selectFeedbackIssue(issueType) {
+				if (!this.feedbackSubmitting) this.feedbackIssueType = issueType
+			},
+			getFeedbackClientContext() {
+				let systemInfo = {}
+				let accountInfo = {}
+				try {
+					systemInfo = uni.getSystemInfoSync() || {}
+				} catch (error) {
+					systemInfo = {}
+				}
+				try {
+					if (typeof wx !== 'undefined' && typeof wx.getAccountInfoSync === 'function') {
+						accountInfo = wx.getAccountInfoSync() || {}
+					}
+				} catch (error) {
+					accountInfo = {}
+				}
+				const miniProgram = accountInfo.miniProgram || {}
+				const answer = this.sessionAnswers[this.currentQuestion.id]
+				const draft = this.draftAnswers[this.currentQuestion.id]
+				return {
+					practiceMode: this.mode,
+					answerMode: this.answerMode,
+					selectedAnswers: answer
+						? answer.selected.slice()
+						: (draft ? draft.slice() : this.selectedAnswers.slice()),
+					revealed: this.answerMode === 'review'
+						|| (this.answerMode === 'exam' && this.examSubmitted)
+						|| Boolean(answer),
+					questionIndex: this.currentIndex + 1,
+					questionCount: this.questionList.length,
+					appVersion: String(miniProgram.version || systemInfo.appVersion || ''),
+					envVersion: String(miniProgram.envVersion || ''),
+					platform: String(systemInfo.platform || ''),
+					system: String(systemInfo.system || ''),
+					sdkVersion: String(systemInfo.SDKVersion || '')
+				}
+			},
+			async submitCurrentQuestionFeedback() {
+				if (!this.canSubmitQuestionFeedback || !this.currentQuestion) return
+				this.feedbackSubmitting = true
+				if (!this.feedbackClientRequestId) {
+					this.feedbackClientRequestId = createPracticeEventId('feedback')
+				}
+				try {
+					await submitQuestionFeedback({
+						clientRequestId: this.feedbackClientRequestId,
+						subjectId: this.practiceConfig.subjectId,
+						version: this.questionVersion,
+						questionId: this.currentQuestion.id,
+						issueType: this.feedbackIssueType,
+						description: this.feedbackDescription,
+						context: this.getFeedbackClientContext()
+					})
+					this.$refs.questionFeedbackPopup.close()
+					this.feedbackClientRequestId = ''
+					uni.showToast({ title: '感谢反馈，我们会尽快核查', icon: 'none' })
+				} catch (error) {
+					uni.showToast({
+						title: error && (error.errMsg || error.message) || '反馈提交失败，请稍后重试',
+						icon: 'none'
+					})
+				} finally {
+					this.feedbackSubmitting = false
+				}
+			},
 			openAnswerSheet() {
 				this.$refs.answerSheet.open()
 			},
@@ -1289,17 +1451,17 @@
 	.question-scroll { width: 100%; height: 100%; }
 	.question-shell { margin: 24rpx; padding: 28rpx 28rpx 48rpx; border-radius: 8rpx; background: #ffffff; box-sizing: border-box; }
 	.question-header, .question-meta, .answer-sheet-header { display: flex; align-items: center; justify-content: space-between; }
-	.type-badge { padding: 10rpx 20rpx; border-left: 6rpx solid #008cff; border-radius: 4rpx; background: #eaf5ff; color: #0074d4; font-size: 27rpx; font-weight: 600; }
-	.question-count { font-size: 30rpx; color: #4e545d; }
-	.question-count text { color: #008cff; font-size: 40rpx; font-weight: 600; }
+	.type-badge { padding: 10rpx 20rpx; border-left: 6rpx solid #008cff; border-radius: 4rpx; background: #eaf5ff; color: #0074d4; font-size: 28rpx; font-weight: 600; }
+	.question-count { font-size: 31rpx; color: #4e545d; }
+	.question-count text { color: #008cff; font-size: 41rpx; font-weight: 600; }
 	.question-meta { margin-top: 30rpx; padding-top: 24rpx; border-top: 1rpx solid #edf0f3; }
 	.meta-copy { display: flex; flex: 1; flex-direction: column; min-width: 0; }
-	.chapter-name { overflow: hidden; font-size: 24rpx; color: #767c85; text-overflow: ellipsis; white-space: nowrap; }
-	.knowledge-name { margin-top: 6rpx; font-size: 23rpx; color: #9a9fa7; }
+	.chapter-name { overflow: hidden; font-size: 25rpx; color: #767c85; text-overflow: ellipsis; white-space: nowrap; }
+	.knowledge-name { margin-top: 6rpx; font-size: 24rpx; color: #9a9fa7; }
 	.calculator-button { display: flex; align-items: center; justify-content: center; width: 62rpx; height: 62rpx; margin-left: 18rpx; border: 1rpx solid #cfe7fb; border-radius: 8rpx; background: #f4faff; }
-	.question-title { display: block; margin-top: 30rpx; font-size: 34rpx; font-weight: 500; line-height: 1.75; }
+	.question-title { display: block; margin-top: 30rpx; font-size: 35rpx; font-weight: 500; line-height: 1.75; }
 	.material-block { display: flex; flex-direction: column; margin-top: 30rpx; padding: 24rpx; border: 1rpx solid #dce9f3; border-radius: 10rpx; background: #f6fbff; }
-	.material-text { font-size: 30rpx; line-height: 1.8; white-space: pre-wrap; }
+	.material-text { font-size: 31rpx; line-height: 1.8; white-space: pre-wrap; }
 	.question-stem { margin-top: 30rpx; }
 	.question-stem.material-question-stem { padding-top: 24rpx; border-top: 1rpx solid #e8edf1; }
 	.question-stem .question-title { margin-top: 0; }
@@ -1309,85 +1471,107 @@
 	.option-item.correct { border-color: #62bd8b; background: #eff9f4; }
 	.option-item.wrong { border-color: #e78080; background: #fff2f2; }
 	.option-item.disabled { color: #737983; }
-	.option-alias { display: flex; align-items: center; justify-content: center; width: 54rpx; height: 54rpx; flex: 0 0 54rpx; margin-right: 20rpx; border: 2rpx solid #c9cdd2; border-radius: 50%; color: #4f555e; font-size: 27rpx; font-weight: 600; box-sizing: border-box; }
+	.option-alias { display: flex; align-items: center; justify-content: center; width: 54rpx; height: 54rpx; flex: 0 0 54rpx; margin-right: 20rpx; border: 2rpx solid #c9cdd2; border-radius: 50%; color: #4f555e; font-size: 28rpx; font-weight: 600; box-sizing: border-box; }
 	.selected .option-alias { border-color: #008cff; background: #008cff; color: #ffffff; }
 	.correct .option-alias { border-color: #28a665; background: #28a665; color: #ffffff; }
 	.wrong .option-alias { border-color: #e45151; background: #e45151; color: #ffffff; }
-	.option-text { flex: 1; font-size: 30rpx; line-height: 1.6; }
+	.option-text { flex: 1; font-size: 31rpx; line-height: 1.6; }
 	.question-nav button::after, .confirm-answer-button::after, .empty-state button::after { border: 0; }
-	.confirm-answer-button { height: 82rpx; margin: 30rpx 0 0; border: 0; border-radius: 8rpx; background: #008cff; color: #ffffff; font-size: 28rpx; line-height: 82rpx; }
+	.confirm-answer-button { height: 82rpx; margin: 30rpx 0 0; border: 0; border-radius: 8rpx; background: #008cff; color: #ffffff; font-size: 29rpx; line-height: 82rpx; }
 	.confirm-answer-button[disabled] { background: #c9d0d8; color: #ffffff; }
 	.analysis-panel { margin-top: 36rpx; padding-top: 28rpx; border-top: 1rpx solid #e6e9ed; }
-	.result-line { display: flex; align-items: center; gap: 8rpx; font-size: 30rpx; font-weight: 600; }
+	.result-line { display: flex; align-items: center; gap: 8rpx; font-size: 31rpx; font-weight: 600; }
 	.correct-text { color: #28a665; }
 	.wrong-text { color: #e45151; }
 	.answer-line { display: flex; align-items: center; margin-top: 24rpx; }
-	.analysis-label { font-size: 27rpx; font-weight: 600; color: #33383f; }
-	.answer-value { margin-left: 20rpx; color: #008cff; font-size: 31rpx; font-weight: 600; }
+	.analysis-label { font-size: 28rpx; font-weight: 600; color: #33383f; }
+	.answer-value { margin-left: 20rpx; color: #008cff; font-size: 32rpx; font-weight: 600; }
 	.explanation-block { display: flex; flex-direction: column; margin-top: 28rpx; }
-	.explanation-text { margin-top: 14rpx; font-size: 27rpx; color: #565c65; line-height: 1.8; white-space: pre-wrap; }
+	.explanation-text { margin-top: 14rpx; font-size: 28rpx; color: #565c65; line-height: 1.8; white-space: pre-wrap; }
 	.question-nav { display: grid; grid-template-columns: 1fr 1.4fr; gap: 18rpx; margin-top: 34rpx; }
-	.question-nav button { height: 82rpx; margin: 0; border-radius: 8rpx; font-size: 28rpx; line-height: 82rpx; }
+	.question-nav button { height: 82rpx; margin: 0; border-radius: 8rpx; font-size: 29rpx; line-height: 82rpx; }
 	.previous-button { border: 2rpx solid #cfd3d8; background: #ffffff; color: #5f6570; }
 	.next-button { background: #008cff; color: #ffffff; }
-	.bottom-toolbar { position: fixed; right: 0; bottom: 0; left: 0; z-index: 20; display: grid; grid-template-columns: 0.75fr 0.75fr 1.2fr 1.2fr; height: calc(100rpx + env(safe-area-inset-bottom)); padding: 0 12rpx env(safe-area-inset-bottom); border-top: 1rpx solid #e0e3e7; box-sizing: border-box; background: #ffffff; }
-	.bottom-toolbar.exam-toolbar { grid-template-columns: 0.8fr 0.8fr 1fr 1fr 1fr; }
-	.toolbar-stat, .toolbar-command { display: flex; align-items: center; justify-content: center; gap: 8rpx; font-size: 26rpx; }
+	.bottom-toolbar { position: fixed; right: 0; bottom: 0; left: 0; z-index: 20; display: grid; grid-template-columns: 0.7fr 0.7fr 1fr 0.9fr 0.9fr; height: calc(100rpx + env(safe-area-inset-bottom)); padding: 0 12rpx env(safe-area-inset-bottom); border-top: 1rpx solid #e0e3e7; box-sizing: border-box; background: #ffffff; }
+	.bottom-toolbar.exam-toolbar { grid-template-columns: 0.7fr 0.7fr 0.9fr 0.8fr 0.8fr 0.9fr; }
+	.toolbar-stat, .toolbar-command { display: flex; align-items: center; justify-content: center; gap: 8rpx; font-size: 27rpx; }
 	.toolbar-command { color: #4f555d; }
 	.answered-text { color: #008cff; }
 	.unanswered-text { color: #7c838c; }
-	.toolbar-submit { display: flex; align-items: center; justify-content: center; align-self: center; height: 66rpx; border-radius: 34rpx; background: #008cff; color: #ffffff; font-size: 27rpx; font-weight: 600; }
+	.toolbar-submit { display: flex; align-items: center; justify-content: center; align-self: center; height: 66rpx; border-radius: 34rpx; background: #008cff; color: #ffffff; font-size: 28rpx; font-weight: 600; }
 	.answer-sheet { padding: 28rpx 28rpx calc(28rpx + env(safe-area-inset-bottom)); border-radius: 16rpx 16rpx 0 0; background: #ffffff; }
 	.answer-sheet-header { padding-bottom: 24rpx; border-bottom: 1rpx solid #edf0f3; }
 	.answer-sheet-header > view:first-child { display: flex; flex-direction: column; }
-	.answer-sheet-title { font-size: 34rpx; font-weight: 600; }
-	.answer-sheet-caption { margin-top: 5rpx; font-size: 23rpx; color: #858b93; }
+	.answer-sheet-title { font-size: 35rpx; font-weight: 600; }
+	.answer-sheet-caption { margin-top: 5rpx; font-size: 24rpx; color: #858b93; }
 	.sheet-close { padding: 12rpx; }
 	.answer-sheet-scroll { max-height: 60vh; }
 	.answer-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 20rpx; padding: 28rpx 4rpx 12rpx; }
-	.answer-number { display: flex; align-items: center; justify-content: center; width: 80rpx; height: 80rpx; border: 2rpx solid #d5d9de; border-radius: 50%; box-sizing: border-box; color: #5e646d; font-size: 26rpx; }
+	.answer-number { display: flex; align-items: center; justify-content: center; width: 80rpx; height: 80rpx; border: 2rpx solid #d5d9de; border-radius: 50%; box-sizing: border-box; color: #5e646d; font-size: 27rpx; }
 	.answer-number.current { border-color: #008cff; color: #008cff; box-shadow: 0 0 0 4rpx #eaf5ff; }
 	.answer-number.answered { border-color: #008cff; background: #008cff; color: #ffffff; }
-	.answer-sheet-submit { width: 100%; height: 84rpx; margin: 24rpx 0 0; border-radius: 42rpx; background: #008cff; color: #ffffff; font-size: 29rpx; font-weight: 600; line-height: 84rpx; }
+	.answer-sheet-submit { width: 100%; height: 84rpx; margin: 24rpx 0 0; border-radius: 42rpx; background: #008cff; color: #ffffff; font-size: 30rpx; font-weight: 600; line-height: 84rpx; }
 	.answer-sheet-submit::after { border: 0; }
+	.feedback-sheet { padding: 28rpx 32rpx calc(32rpx + env(safe-area-inset-bottom)); border-radius: 20rpx 20rpx 0 0; background: #ffffff; }
+	.feedback-sheet-header { display: flex; align-items: center; justify-content: space-between; padding-bottom: 24rpx; border-bottom: 1rpx solid #edf0f3; }
+	.feedback-sheet-header > view:first-child { display: flex; flex-direction: column; }
+	.feedback-sheet-title { color: #2b2f34; font-size: 35rpx; font-weight: 600; }
+	.feedback-sheet-caption { margin-top: 6rpx; color: #858b93; font-size: 24rpx; }
+	.feedback-sheet-close { display: flex; align-items: center; justify-content: center; width: 68rpx; height: 68rpx; }
+	.feedback-field-label { display: flex; align-items: center; margin-top: 26rpx; color: #4c525a; font-size: 27rpx; font-weight: 600; }
+	.feedback-required { margin-right: 6rpx; color: #e45151; }
+	.feedback-description-label { margin-top: 2rpx; margin-bottom: 16rpx; }
+	.feedback-type-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18rpx 24rpx; padding: 18rpx 0 26rpx; }
+	.feedback-type-item { display: flex; align-items: center; min-height: 72rpx; padding: 0 18rpx; border: 2rpx solid #e1e5e9; border-radius: 10rpx; color: #4f555d; font-size: 29rpx; box-sizing: border-box; }
+	.feedback-type-item.selected { border-color: #008cff; background: #eef7ff; color: #087dcc; }
+	.feedback-radio { display: flex; align-items: center; justify-content: center; width: 34rpx; height: 34rpx; flex: 0 0 34rpx; margin-right: 14rpx; border: 2rpx solid #c8cdd3; border-radius: 50%; box-sizing: border-box; }
+	.feedback-type-item.selected .feedback-radio { border-color: #008cff; }
+	.feedback-radio-dot { width: 18rpx; height: 18rpx; border-radius: 50%; background: #008cff; }
+	.feedback-description-wrap { position: relative; padding: 20rpx 20rpx 48rpx; border: 2rpx solid #dfe3e7; border-radius: 10rpx; background: #ffffff; }
+	.feedback-description { width: 100%; height: 210rpx; color: #343940; font-size: 28rpx; line-height: 1.6; box-sizing: border-box; }
+	.feedback-placeholder { color: #a1a7ae; }
+	.feedback-count { position: absolute; right: 20rpx; bottom: 14rpx; color: #9aa0a8; font-size: 23rpx; }
+	.feedback-submit-button { height: 84rpx; margin: 28rpx 0 0; border-radius: 42rpx; background: #008cff; color: #ffffff; font-size: 30rpx; font-weight: 600; line-height: 84rpx; }
+	.feedback-submit-button::after { border: 0; }
+	.feedback-submit-button[disabled] { background: #c8d0d8; color: #ffffff; }
 	.calculator-sheet { height: 86vh; overflow: hidden; border-radius: 16rpx 16rpx 0 0; background: #ffffff; }
 	.calculator-sheet-header { display: flex; align-items: center; justify-content: space-between; height: 96rpx; padding: 0 20rpx 0 32rpx; border-bottom: 1rpx solid #e8ebef; box-sizing: border-box; }
-	.calculator-sheet-title { font-size: 32rpx; font-weight: 600; color: #2b2f34; }
+	.calculator-sheet-title { font-size: 33rpx; font-weight: 600; color: #2b2f34; }
 	.calculator-sheet-close { display: flex; align-items: center; justify-content: center; width: 72rpx; height: 72rpx; }
 	.calculator-sheet-scroll { height: calc(86vh - 96rpx); padding-bottom: env(safe-area-inset-bottom); box-sizing: border-box; }
 	.exam-result-page { height: 100vh; overflow: hidden; background: linear-gradient(155deg, #e9f5ff 0%, #f4faff 34%, #f4f5f7 68%); color: #2b2f34; }
 	.exam-result-scroll { height: 100%; }
 	.result-hero { position: relative; padding: 44rpx 44rpx 34rpx; overflow: hidden; box-sizing: border-box; }
 	.result-meta-list { position: relative; z-index: 2; display: flex; flex-direction: column; gap: 30rpx; }
-	.result-meta-row { display: flex; align-items: center; color: #3d4249; font-size: 29rpx; line-height: 1.5; }
-	.result-meta-icon { display: flex; align-items: center; justify-content: center; width: 42rpx; height: 42rpx; flex: 0 0 42rpx; margin-right: 18rpx; border-radius: 50%; background: rgba(90, 178, 239, 0.72); color: #ffffff; font-size: 20rpx; font-weight: 600; }
+	.result-meta-row { display: flex; align-items: center; color: #3d4249; font-size: 30rpx; line-height: 1.5; }
+	.result-meta-icon { display: flex; align-items: center; justify-content: center; width: 42rpx; height: 42rpx; flex: 0 0 42rpx; margin-right: 18rpx; border-radius: 50%; background: rgba(90, 178, 239, 0.72); color: #ffffff; font-size: 21rpx; font-weight: 600; }
 	.result-summary-card { margin: 0 28rpx; padding: 56rpx 24rpx 42rpx; border-radius: 34rpx; background: rgba(255, 255, 255, 0.96); box-shadow: 0 22rpx 60rpx rgba(72, 82, 96, 0.08); }
 	.accuracy-ring { display: flex; align-items: center; justify-content: center; width: 340rpx; height: 340rpx; margin: 0 auto; border-radius: 50%; }
 	.accuracy-ring-inner { display: flex; align-items: center; flex-direction: column; justify-content: center; width: 270rpx; height: 270rpx; border-radius: 50%; background: #ffffff; box-shadow: 0 0 0 2rpx rgba(239, 241, 244, 0.7); }
 	.accuracy-value-line { display: flex; align-items: baseline; color: #008cff; }
-	.accuracy-value { font-size: 72rpx; font-weight: 500; line-height: 1; }
-	.accuracy-unit { margin-left: 5rpx; font-size: 34rpx; }
-	.accuracy-label { margin-top: 24rpx; color: #0074d4; font-size: 31rpx; font-weight: 600; }
+	.accuracy-value { font-size: 73rpx; font-weight: 500; line-height: 1; }
+	.accuracy-unit { margin-left: 5rpx; font-size: 35rpx; }
+	.accuracy-label { margin-top: 24rpx; color: #0074d4; font-size: 32rpx; font-weight: 600; }
 	.result-stats-grid { display: grid; grid-template-columns: repeat(3, 1fr); margin-top: 48rpx; }
 	.result-stat-item { display: flex; align-items: center; flex-direction: column; min-width: 0; }
-	.result-stat-value { font-size: 45rpx; line-height: 1.2; }
-	.result-stat-label { margin-top: 14rpx; color: #565c64; font-size: 24rpx; text-align: center; white-space: nowrap; }
+	.result-stat-value { font-size: 46rpx; line-height: 1.2; }
+	.result-stat-label { margin-top: 14rpx; color: #565c64; font-size: 25rpx; text-align: center; white-space: nowrap; }
 	.correct-stat .result-stat-value { color: #36bf62; }
 	.wrong-stat .result-stat-value { color: #df4937; }
 	.total-stat .result-stat-value { color: #42474e; }
-	.result-unanswered-note { margin: 38rpx 18rpx 0; padding: 20rpx 24rpx; border-radius: 12rpx; background: #eef7ff; color: #2677b8; font-size: 25rpx; text-align: center; }
+	.result-unanswered-note { margin: 38rpx 18rpx 0; padding: 20rpx 24rpx; border-radius: 12rpx; background: #eef7ff; color: #2677b8; font-size: 26rpx; text-align: center; }
 	.result-actions { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14rpx; padding: 32rpx 28rpx 24rpx; }
 	.result-actions.shared-result-actions { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-	.result-actions button { height: 88rpx; margin: 0; border-radius: 44rpx; font-size: 28rpx; line-height: 88rpx; }
+	.result-actions button { height: 88rpx; margin: 0; border-radius: 44rpx; font-size: 29rpx; line-height: 88rpx; }
 	.result-actions button::after { border: 0; }
 	.result-back-button { border: 2rpx solid #cfd5dc; background: rgba(255, 255, 255, 0.86); color: #535a63; }
 	.result-retry-button { background: linear-gradient(135deg, #33a8ff, #008cff); color: #ffffff; box-shadow: 0 14rpx 30rpx rgba(0, 140, 255, 0.2); }
 	.result-share-button { border: 2rpx solid #79bff0; background: #e9f6ff; color: #087dc9; }
 	.result-ad-container { min-height: 1rpx; margin: 0 28rpx; padding: 8rpx 0 calc(38rpx + env(safe-area-inset-bottom)); overflow: hidden; border-radius: 16rpx; }
-	.empty-state { display: flex; align-items: center; flex-direction: column; justify-content: center; min-height: 70vh; padding: 40rpx; color: #858b93; font-size: 28rpx; }
+	.empty-state { display: flex; align-items: center; flex-direction: column; justify-content: center; min-height: 70vh; padding: 40rpx; color: #858b93; font-size: 29rpx; }
 	.loading-state { display: flex; align-items: center; justify-content: center; min-height: 70vh; }
 	.empty-state text { margin-top: 20rpx; }
-	.empty-state button { margin-top: 30rpx; border-radius: 40rpx; background: #008cff; color: #ffffff; font-size: 28rpx; }
+	.empty-state button { margin-top: 30rpx; border-radius: 40rpx; background: #008cff; color: #ffffff; font-size: 29rpx; }
 	.error-state { color: #bd3f3f; }
 	.loading-state.night-mode,
 	.empty-state.night-mode { min-height: 100vh; background: #12171d; color: #aeb7c1; box-sizing: border-box; }
@@ -1407,6 +1591,7 @@
 	.night-mode .question-shell,
 	.night-mode .bottom-toolbar,
 	.night-mode .answer-sheet,
+	.night-mode .feedback-sheet,
 	.night-mode .calculator-sheet { background: #1b222a; }
 	.night-mode .type-badge { background: #17364d; color: #65baff; }
 	.night-mode .material-block { border-color: #31506a; background: #172e40; }
@@ -1419,6 +1604,7 @@
 	.night-mode .question-meta,
 	.night-mode .analysis-panel,
 	.night-mode .answer-sheet-header,
+	.night-mode .feedback-sheet-header,
 	.night-mode .calculator-sheet-header { border-color: #303943; }
 	.night-mode .calculator-button { border-color: #29506e; background: #172e40; }
 	.night-mode .option-item { border-color: #3a444f; background: #202832; }
@@ -1428,7 +1614,17 @@
 	.night-mode .option-item.disabled { color: #929ca7; }
 	.night-mode .option-alias { border-color: #596470; color: #cbd2da; }
 	.night-mode .analysis-label,
+	.night-mode .feedback-sheet-title,
 	.night-mode .calculator-sheet-title { color: #e4e8ed; }
+	.night-mode .feedback-sheet-caption { color: #89939e; }
+	.night-mode .feedback-field-label { color: #c4cbd3; }
+	.night-mode .feedback-type-item { border-color: #3a444f; color: #c4cbd3; }
+	.night-mode .feedback-type-item.selected { border-color: #168ee5; background: #17364d; color: #66baff; }
+	.night-mode .feedback-radio { border-color: #596470; }
+	.night-mode .feedback-description-wrap { border-color: #3a444f; background: #202832; }
+	.night-mode .feedback-description { color: #e1e5e9; }
+	.night-mode .feedback-placeholder,
+	.night-mode .feedback-count { color: #7f8994; }
 	.night-mode .explanation-text { color: #bec6cf; }
 	.night-mode .previous-button { border-color: #4a5561; background: #202832; color: #c7ced6; }
 	.night-mode .bottom-toolbar { border-color: #303943; }

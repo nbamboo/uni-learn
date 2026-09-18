@@ -65,7 +65,15 @@ async function run() {
 	let knowledgePositionCalls = 0
 	let catalogCalls = 0
 	let catalogSummaryCalls = 0
+	let catalogSummaryResponse = null
+	let forcedCatalogSummaryResponse = null
 	let favoriteToggleCalls = 0
+	const questionFeedbackCalls = []
+	let questionFeedbackError = null
+	const toastOptions = []
+	let leaveAlertEnableCalls = 0
+	let leaveAlertDisableCalls = 0
+	let leaveAlertMessage = ''
 	let interstitialCreateCalls = 0
 	let interstitialShowCalls = 0
 	let interstitialDestroyCalls = 0
@@ -88,6 +96,8 @@ async function run() {
 	}
 	let allPracticeQuestions = []
 	let preferenceResponse = { answerMode: 'practice', nightMode: false }
+	let preferenceUpdateError = null
+	const preferenceUpdateCalls = []
 	let practiceAnswers = {}
 	const practiceProgressEvent = 'uni-learn-practice-progress-updated'
 	const eventListeners = new Map()
@@ -117,6 +127,16 @@ async function run() {
 		FinanceCalculator: {},
 		MyUnit: {},
 		wx: {
+			getAccountInfoSync() {
+				return { miniProgram: { version: '1.2.3', envVersion: 'trial' } }
+			},
+			enableAlertBeforeUnload(options) {
+				leaveAlertEnableCalls += 1
+				leaveAlertMessage = options.message
+			},
+			disableAlertBeforeUnload() {
+				leaveAlertDisableCalls += 1
+			},
 			createInterstitialAd(options) {
 				interstitialCreateCalls += 1
 				assert.equal(options.adUnitId, 'adunit-4ea7a830fe0d7db2')
@@ -136,7 +156,13 @@ async function run() {
 		PRACTICE_PROGRESS_UPDATED_EVENT: practiceProgressEvent,
 		buildPracticeQuestions: async () => [],
 		buildPracticeQuestionSet: async () => ({ version: 'test-version', items: allPracticeQuestions }),
-		getAllPracticeQuestions: async () => ({ items: allPracticeQuestions }),
+		getAllPracticeQuestions: async () => ({ version: 'test-version', items: allPracticeQuestions }),
+		createPracticeEventId: prefix => `${prefix}-client-test-one`,
+		submitQuestionFeedback: async input => {
+			questionFeedbackCalls.push(JSON.parse(JSON.stringify(input)))
+			if (questionFeedbackError) throw questionFeedbackError
+			return { feedbackId: 'feedback-one', merged: false, reportCount: 1, status: 'pending' }
+		},
 		getPracticeState: () => ({
 			currentSubjectId: 'junior-personal-finance',
 			answers: practiceAnswers
@@ -221,7 +247,13 @@ async function run() {
 			cacheMembershipSnapshot: value => value,
 			showMembershipUpsell: async () => true,
 		updatePracticePreferences: async preferences => {
+			preferenceUpdateCalls.push(JSON.parse(JSON.stringify(preferences)))
 			preferenceResponse = Object.assign({}, preferenceResponse, preferences, { updatedAt: Date.now() })
+			if (preferenceUpdateError) {
+				preferenceResponse._syncPending = true
+				throw preferenceUpdateError
+			}
+			delete preferenceResponse._syncPending
 			return preferenceResponse
 		},
 		getChapterPracticePosition: () => {
@@ -394,9 +426,9 @@ async function run() {
 				knowledgeGroups: [{ chapterId: '1', chapter: '第一章', name: '测试知识点', count: 5 }]
 			}
 		},
-		getCatalogSummaries: async () => {
+		getCatalogSummaries: async options => {
 			catalogSummaryCalls += 1
-			return [{
+			const defaultResponse = [{
 				subjectId: 'junior-law',
 				activeVersion: '2026-09-01',
 				questionCount: 1250
@@ -405,6 +437,11 @@ async function run() {
 				activeVersion: '2026-08-21',
 				questionCount: 822
 			}]
+			return JSON.parse(JSON.stringify(
+				options && options.forceRefresh && forcedCatalogSummaryResponse !== null
+					? forcedCatalogSummaryResponse
+					: (catalogSummaryResponse === null ? defaultResponse : catalogSummaryResponse)
+			))
 		},
 		savePracticeProgress: () => {
 			progressSaveCalls += 1
@@ -424,7 +461,12 @@ async function run() {
 				eventListeners.set(name, listeners.filter(item => item !== listener))
 			},
 			$emit: emitEvent,
-			getSystemInfoSync: () => ({ windowWidth: 375 }),
+			getSystemInfoSync: () => ({
+				windowWidth: 375,
+				platform: 'android',
+				system: 'Android 16',
+				SDKVersion: '3.10.0'
+			}),
 			setNavigationBarColor: options => navigationColors.push(options),
 			setNavigationBarTitle: options => navigationTitles.push(options.title),
 			setTabBarStyle: options => tabBarStyles.push(options),
@@ -433,7 +475,7 @@ async function run() {
 			navigateBack: () => {},
 			showModal: options => modalOptions.push(options),
 			showActionSheet: options => actionSheetOptions.push(options),
-			showToast: () => {}
+			showToast: options => toastOptions.push(options)
 		},
 		console,
 		setTimeout,
@@ -522,6 +564,49 @@ async function run() {
 	assert.equal(recordCalls.length, callsBeforeMaterialConfirm + 1)
 	assert.equal(materialPractice.sessionAnswers[material.id].correct, true)
 	assert.equal(materialPractice.questionTypeLabel(material), '材料题，第 1/1 小题')
+
+	const feedbackPractice = createContext('practice', [material])
+	feedbackPractice.practiceConfig = {
+		subjectId: 'junior-personal-finance',
+		chapterId: '1',
+		section: '',
+		knowledge: ''
+	}
+	feedbackPractice.questionVersion = '2026-09-19-v3'
+	feedbackPractice.loadQuestion(0)
+	let feedbackOpened = 0
+	let feedbackClosed = 0
+	feedbackPractice.$refs = {
+		questionFeedbackPopup: {
+			open: () => { feedbackOpened += 1 },
+			close: () => { feedbackClosed += 1 }
+		}
+	}
+	feedbackPractice.openQuestionFeedback()
+	assert.equal(feedbackOpened, 1)
+	assert.equal(feedbackPractice.feedbackIssueType, 'answer_error')
+	assert.equal(feedbackPractice.canSubmitQuestionFeedback, true)
+	feedbackPractice.selectFeedbackIssue('other')
+	assert.equal(feedbackPractice.canSubmitQuestionFeedback, false)
+	feedbackPractice.feedbackDescription = '题目条件存在歧义'
+	assert.equal(feedbackPractice.canSubmitQuestionFeedback, true)
+	questionFeedbackError = new Error('网络暂时不可用')
+	await feedbackPractice.submitCurrentQuestionFeedback()
+	const failedRequestId = feedbackPractice.feedbackClientRequestId
+	assert.equal(feedbackPractice.feedbackDescription, '题目条件存在歧义')
+	assert.equal(feedbackClosed, 0)
+	assert.match(toastOptions.slice(-1)[0].title, /网络暂时不可用/)
+	questionFeedbackError = null
+	await feedbackPractice.submitCurrentQuestionFeedback()
+	assert.equal(questionFeedbackCalls.slice(-1)[0].clientRequestId, failedRequestId)
+	assert.equal(questionFeedbackCalls.slice(-1)[0].version, '2026-09-19-v3')
+	assert.equal(questionFeedbackCalls.slice(-1)[0].questionId, material.id)
+	assert.equal(questionFeedbackCalls.slice(-1)[0].context.practiceMode, 'sequence')
+	assert.equal(questionFeedbackCalls.slice(-1)[0].context.questionCount, 1)
+	assert.equal(questionFeedbackCalls.slice(-1)[0].context.appVersion, '1.2.3')
+	assert.equal(feedbackClosed, 1)
+	assert.equal(feedbackPractice.feedbackClientRequestId, '')
+	assert.match(toastOptions.slice(-1)[0].title, /感谢反馈/)
 
 	const callsBeforeV3ExamInteraction = recordCalls.length
 	const judgmentExam = createContext('exam', [judgment, single])
@@ -1331,13 +1416,20 @@ async function run() {
 	}
 	assert.equal(settingsComponent.computed.showAds.call(settings), true)
 	settings.membership = activeMembership
+	const preferenceUpdatesBeforeDraft = preferenceUpdateCalls.length
+	const preferenceResponseBeforeDraft = JSON.parse(JSON.stringify(preferenceResponse))
+	const leaveAlertsBeforeDraft = leaveAlertEnableCalls
+	const leaveAlertDisablesBeforeDraft = leaveAlertDisableCalls
 	settings.applyPreferences({ answerMode: 'practice', nightMode: false })
-	await settings.persistPreferences({ answerMode: 'exam' })
+	await settings.selectAnswerMode('exam')
 	assert.equal(settings.answerMode, 'exam')
-	assert.equal(preferenceResponse.answerMode, 'exam')
-	await settings.persistPreferences({ nightMode: true })
+	assert.deepEqual(JSON.parse(JSON.stringify(preferenceResponse)), preferenceResponseBeforeDraft)
+	assert.equal(settings.hasUnsavedChanges, true)
+	assert.equal(leaveAlertEnableCalls, leaveAlertsBeforeDraft + 1)
+	assert.equal(leaveAlertMessage, '答题设置尚未保存，确定放弃修改并离开吗？')
+	settings.toggleNightMode()
 	assert.equal(settings.nightMode, true)
-	assert.equal(preferenceResponse.nightMode, true)
+	assert.deepEqual(JSON.parse(JSON.stringify(preferenceResponse)), preferenceResponseBeforeDraft)
 	assert.equal(settings.smartPractice.strategy, 'fresh')
 	assert.equal(settings.smartPractice.questionCount, 20)
 	await settings.adjustSmartQuestionCount(5)
@@ -1367,12 +1459,42 @@ async function run() {
 	const ratiosBeforeMasteredAdjustment = JSON.stringify(settings.smartPractice.custom)
 	await settings.adjustSmartRatio('mastered', -5)
 	assert.equal(JSON.stringify(settings.smartPractice.custom), ratiosBeforeMasteredAdjustment)
-	await settings.persistPreferences({ nightMode: true })
+	assert.equal(preferenceUpdateCalls.length, preferenceUpdatesBeforeDraft)
 	assert.equal(settings.smartPractice.custom.wrong, 25)
 	assert.deepEqual(JSON.parse(JSON.stringify(navigationColors.slice(-1)[0])), {
 		frontColor: '#ffffff',
 		backgroundColor: '#171c22'
 	})
+	await settings.savePreferences()
+	assert.equal(preferenceUpdateCalls.length, preferenceUpdatesBeforeDraft + 1)
+	assert.equal(preferenceUpdateCalls.slice(-1)[0].answerMode, 'exam')
+	assert.equal(preferenceUpdateCalls.slice(-1)[0].nightMode, true)
+	assert.equal(preferenceUpdateCalls.slice(-1)[0].smartPractice.questionCount, 25)
+	assert.equal(preferenceResponse.answerMode, 'exam')
+	assert.equal(preferenceResponse.nightMode, true)
+	assert.equal(settings.hasUnsavedChanges, false)
+	assert.equal(leaveAlertDisableCalls, leaveAlertDisablesBeforeDraft + 1)
+	await settings.savePreferences()
+	assert.equal(preferenceUpdateCalls.length, preferenceUpdatesBeforeDraft + 1)
+	settings.toggleNightMode()
+	assert.equal(settings.hasUnsavedChanges, true)
+	assert.equal(leaveAlertEnableCalls, leaveAlertsBeforeDraft + 2)
+	settings.toggleNightMode()
+	assert.equal(settings.hasUnsavedChanges, false)
+	assert.equal(leaveAlertDisableCalls, leaveAlertDisablesBeforeDraft + 2)
+	const preferenceResponseBeforeFailedSave = JSON.parse(JSON.stringify(preferenceResponse))
+	settings.toggleNightMode()
+	preferenceUpdateError = new Error('network unavailable')
+	await settings.savePreferences()
+	preferenceUpdateError = null
+	assert.equal(preferenceUpdateCalls.length, preferenceUpdatesBeforeDraft + 2)
+	assert.equal(settings.nightMode, false)
+	assert.equal(settings.hasUnsavedChanges, false)
+	assert.equal(settings.syncError, '设置已保存本机，云端同步失败')
+	assert.equal(leaveAlertDisableCalls, leaveAlertDisablesBeforeDraft + 3)
+	settingsComponent.onUnload.call(settings)
+	assert.equal(leaveAlertDisableCalls, leaveAlertDisablesBeforeDraft + 3)
+	preferenceResponse = preferenceResponseBeforeFailedSave
 
 	const homeComponent = loadComponent(environment, '../pages/exam/exam.vue')
 	const home = Object.assign(homeComponent.data(), homeComponent.methods, {
@@ -1397,6 +1519,35 @@ async function run() {
 	assert.equal(home.subjectCatalogStatusText('junior-risk'), '待导入')
 	await home.openSubjectPicker()
 	assert.equal(catalogSummaryCalls, 2)
+	home.currentSubjectId = 'junior-personal-finance'
+	home.catalogStates = Object.assign({}, home.catalogStates, {
+		'junior-personal-finance': {
+			loading: false,
+			loaded: true,
+			questionCount: 780,
+			activeVersion: '2026-09-14-v2',
+			source: 'catalog',
+			error: ''
+		}
+	})
+	home.refreshStats(780)
+	catalogSummaryResponse = []
+	forcedCatalogSummaryResponse = [{
+		subjectId: 'junior-personal-finance',
+		activeVersion: '2026-09-14-v2',
+		questionCount: 780
+	}]
+	const summaryCallsBeforeStaleRecovery = catalogSummaryCalls
+	await home.openSubjectPicker()
+	assert.equal(catalogSummaryCalls, summaryCallsBeforeStaleRecovery + 2)
+	assert.equal(home.subjectCatalogStatusText('junior-personal-finance'), '780题')
+	assert.equal(home.stats.total, 780)
+	forcedCatalogSummaryResponse = []
+	await home.loadCatalogSummaries({ forceRefresh: true })
+	assert.equal(home.subjectCatalogStatusText('junior-personal-finance'), '780题')
+	assert.equal(home.stats.total, 780)
+	catalogSummaryResponse = null
+	forcedCatalogSummaryResponse = null
 	const catalogCallsBeforeSubjectChange = catalogCalls
 	await home.changeSubject('junior-law')
 	assert.equal(catalogCalls, catalogCallsBeforeSubjectChange + 1)
@@ -1462,6 +1613,16 @@ async function run() {
 	assert.equal(pagesConfig.pages.some(page => page.path === 'pages/privacy/privacy'), false)
 	const aboutPageSource = fs.readFileSync(path.resolve(__dirname, '../pages/about/about.vue'), 'utf8')
 	const practicePageSource = fs.readFileSync(path.resolve(__dirname, '../practice-pages/practice/practice.vue'), 'utf8')
+	assert.match(practicePageSource, /@tap="openQuestionFeedback"/)
+	assert.ok(
+		practicePageSource.indexOf('@tap="openQuestionFeedback"')
+			< practicePageSource.indexOf('@tap="favoriteCurrent"'),
+		'反馈按钮应位于收藏按钮左侧'
+	)
+	assert.match(practicePageSource, /答案错误/)
+	assert.match(practicePageSource, /解析错误/)
+	assert.match(practicePageSource, /文字错误/)
+	assert.doesNotMatch(practicePageSource, /图片缺失/)
 	assert.doesNotMatch(practicePageSource, /loadMembershipState\(\{\s*forceRefresh:/)
 	assert.doesNotMatch(practicePageSource, /forceRefresh:\s*this\.membership\.isMember/)
 	const membershipEntry = aboutPageSource.match(/<uni-list-item[\s\S]*?title="会员中心"[\s\S]*?\/>/)
@@ -1480,16 +1641,21 @@ async function run() {
 	assert.match(settingsPageSource, /v-if="showAds"/)
 	assert.match(settingsPageSource, /class="mode-segments"/)
 	assert.match(settingsPageSource, /class="strategy-segments"/)
-	assert.match(settingsPageSource, /class="section-heading smart-heading"/)
-	assert.match(settingsPageSource, /class="smart-question-count-control"/)
-	assert.doesNotMatch(settingsPageSource, />每组题量</)
-	assert.match(settingsPageSource, /PREFERENCES_SYNC_DEBOUNCE_MS = 800/)
-	assert.match(settingsPageSource, /updatePracticePreferences\(changes, \{ deferSync: true \}\)/)
-	assert.match(settingsPageSource, /onHide\(\)[\s\S]*flushPendingPreferences\(\{ notify: false \}\)/)
-	assert.match(settingsPageSource, /onUnload\(\)[\s\S]*flushPendingPreferences\(\{ notify: false \}\)/)
+	assert.match(settingsPageSource, /class="smart-summary-list"/)
+	assert.match(settingsPageSource, /class="smart-summary-row adjustable" @tap="openSmartEditor"/)
+	assert.match(settingsPageSource, />每组题量</)
+	assert.match(settingsPageSource, /ref="smartEditorPopup"/)
+	assert.match(settingsPageSource, /class="smart-editor-step"/)
+	assert.match(settingsPageSource, /@tap="closeSmartEditor"/)
+	assert.match(settingsPageSource, /class="save-button"[^>]*!hasUnsavedChanges[^>]*@tap="savePreferences"/)
+	assert.match(settingsPageSource, /修改后需点击页面底部保存/)
+	assert.match(settingsPageSource, /enableAlertBeforeUnload/)
+	assert.match(settingsPageSource, /disableAlertBeforeUnload/)
+	assert.match(settingsPageSource, /updatePracticePreferences\(cloneStoredPreferences\(this\.storedPreferences\)\)/)
+	assert.doesNotMatch(settingsPageSource, /PREFERENCES_SYNC_DEBOUNCE_MS|deferSync|flushPendingPreferences/)
 	assert.match(settingsPageSource, /smartPractice\.questionCount <= smartQuestionCountMin/)
 	assert.match(settingsPageSource, /smartPractice\.questionCount >= smartQuestionCountMax/)
-	assert.match(settingsPageSource, />预计组成</)
+	assert.match(settingsPageSource, /'自定义组成' : '预计组成'/)
 	assert.match(settingsPageSource, /未答\{\{ smartQuotas\.fresh \}\}题/)
 	assert.doesNotMatch(settingsPageSource, /ratio-summary-item|ratio-summary-name|class="ratio-summary-value"|某类题目不足时自动补充其他类型/)
 	assert.doesNotMatch(settingsPageSource, /自动优先|strategy === 'auto'|strategy !== 'auto'/)
@@ -1497,6 +1663,8 @@ async function run() {
 	assert.match(settingsPageSource, /item\.key === 'mastered'/)
 	assert.doesNotMatch(settingsPageSource, /mastered-result|已答对题自动补足/)
 	assert.doesNotMatch(settingsPageSource, /class="smart-options"/)
+	assert.match(settingsPageSource, /\.smart-editor-step \{[^}]*width: 112rpx;[^}]*height: 88rpx;/)
+	assert.match(settingsPageSource, /\.smart-editor-ratio-control \.smart-editor-step \{[^}]*width: 88rpx;[^}]*height: 88rpx;/)
 	assert.match(settingsPageSource, /class="settings-section other-section"/)
 	assert.ok(
 		settingsPageSource.indexOf('class="settings-ad-container"')

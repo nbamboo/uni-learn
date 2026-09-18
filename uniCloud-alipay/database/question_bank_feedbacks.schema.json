@@ -1,0 +1,131 @@
+{
+  "bsonType": "object",
+  "description": "登录用户提交的题目问题反馈及可信题目快照，仅允许云函数读写",
+  "required": [
+    "_id", "clientRequestIds", "userId", "userSnapshot", "subjectId", "version",
+    "questionId", "chapterId", "chapter", "section", "knowledge", "sortOrder",
+    "questionSnapshot", "issueType", "description", "descriptionHistory", "reportCount",
+    "context", "status", "firstReportedAt", "lastReportedAt", "createdAt", "updatedAt"
+  ],
+  "permission": {
+    "read": false,
+    "create": false,
+    "update": false,
+    "delete": false,
+    "count": false
+  },
+  "properties": {
+    "_id": { "bsonType": "string", "minLength": 8, "maxLength": 64 },
+    "clientRequestIds": {
+      "bsonType": "array",
+      "arrayType": "string",
+      "minLength": 1,
+      "maxLength": 1000,
+      "description": "客户端请求ID，用于超时重试幂等",
+      "items": { "bsonType": "string", "minLength": 8, "maxLength": 96 }
+    },
+    "userId": { "bsonType": "string", "minLength": 1, "maxLength": 64 },
+    "userSnapshot": {
+      "bsonType": "object",
+      "required": ["nickname", "weixinBound", "isMember"],
+      "properties": {
+        "nickname": { "bsonType": "string", "maxLength": 128 },
+        "weixinBound": { "bsonType": "bool" },
+        "isMember": { "bsonType": "bool" },
+        "membershipExpiresAt": { "bsonType": "date" }
+      }
+    },
+    "subjectId": { "bsonType": "string", "minLength": 1, "maxLength": 64, "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" },
+    "version": { "bsonType": "string", "minLength": 1, "maxLength": 64 },
+    "questionId": { "bsonType": "string", "minLength": 1, "maxLength": 64, "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" },
+    "chapterId": { "bsonType": "string", "maxLength": 32 },
+    "chapter": { "bsonType": "string", "maxLength": 128 },
+    "section": { "bsonType": "string", "maxLength": 128 },
+    "knowledge": { "bsonType": "string", "maxLength": 128 },
+    "sortOrder": { "bsonType": "int", "minimum": 0 },
+    "questionSnapshot": {
+      "bsonType": "object",
+      "required": ["type", "selectionMode", "title", "options", "answer", "explanation"],
+      "properties": {
+        "type": { "bsonType": "string", "enum": ["single", "judgment", "multiple", "material"] },
+        "selectionMode": { "bsonType": "string", "enum": ["single", "multiple"] },
+        "title": { "bsonType": "string", "minLength": 1, "maxLength": 2048 },
+        "options": {
+          "bsonType": "array",
+          "arrayType": "object",
+          "minLength": 2,
+          "maxLength": 6,
+          "items": {
+            "bsonType": "object",
+            "required": ["alias", "text"],
+            "properties": {
+              "alias": { "bsonType": "string", "enum": ["A", "B", "C", "D", "E", "F"] },
+              "text": { "bsonType": "string", "minLength": 1, "maxLength": 2048 }
+            }
+          }
+        },
+        "answer": {
+          "bsonType": "array",
+          "arrayType": "string",
+          "minLength": 1,
+          "maxLength": 6,
+          "items": { "bsonType": "string", "enum": ["A", "B", "C", "D", "E", "F"] }
+        },
+        "explanation": { "bsonType": "string", "minLength": 1, "maxLength": 10000 },
+        "materialGroupId": { "bsonType": "string", "minLength": 1, "maxLength": 64 },
+        "materialText": { "bsonType": "string", "minLength": 1, "maxLength": 10000 },
+        "materialQuestionIndex": { "bsonType": "int", "minimum": 1 },
+        "materialQuestionCount": { "bsonType": "int", "minimum": 1 }
+      }
+    },
+    "issueType": { "bsonType": "string", "enum": ["answer_error", "explanation_error", "text_error", "other"] },
+    "description": { "bsonType": "string", "maxLength": 500 },
+    "descriptionHistory": {
+      "bsonType": "array",
+      "arrayType": "object",
+      "maxLength": 20,
+      "items": {
+        "bsonType": "object",
+        "required": ["description", "reportedAt", "clientRequestId"],
+        "properties": {
+          "description": { "bsonType": "string", "minLength": 1, "maxLength": 500 },
+          "reportedAt": { "bsonType": "date" },
+          "clientRequestId": { "bsonType": "string", "minLength": 8, "maxLength": 96 }
+        }
+      }
+    },
+    "reportCount": { "bsonType": "int", "minimum": 1 },
+    "context": {
+      "bsonType": "object",
+      "required": ["practiceMode", "answerMode", "selectedAnswers", "revealed", "questionIndex", "questionCount", "appVersion", "envVersion", "platform", "system", "sdkVersion"],
+      "properties": {
+        "practiceMode": { "bsonType": "string", "enum": ["smart", "chapter", "section", "knowledge", "wrong", "favorite", "search", "sequence"] },
+        "answerMode": { "bsonType": "string", "enum": ["exam", "practice", "review"] },
+        "selectedAnswers": {
+          "bsonType": "array",
+          "arrayType": "string",
+          "maxLength": 6,
+          "items": { "bsonType": "string", "enum": ["A", "B", "C", "D", "E", "F"] }
+        },
+        "revealed": { "bsonType": "bool" },
+        "questionIndex": { "bsonType": "int", "minimum": 1, "maximum": 5000 },
+        "questionCount": { "bsonType": "int", "minimum": 1, "maximum": 5000 },
+        "appVersion": { "bsonType": "string", "maxLength": 32 },
+        "envVersion": { "bsonType": "string", "maxLength": 32 },
+        "platform": { "bsonType": "string", "maxLength": 32 },
+        "system": { "bsonType": "string", "maxLength": 128 },
+        "sdkVersion": { "bsonType": "string", "maxLength": 32 }
+      }
+    },
+    "status": { "bsonType": "string", "enum": ["pending", "processing", "resolved", "rejected"] },
+    "handledBy": { "bsonType": "string", "maxLength": 64 },
+    "handledAt": { "bsonType": "date" },
+    "resolutionType": { "bsonType": "string", "maxLength": 64 },
+    "resolutionNote": { "bsonType": "string", "maxLength": 1000 },
+    "resolvedVersion": { "bsonType": "string", "maxLength": 64 },
+    "firstReportedAt": { "bsonType": "date" },
+    "lastReportedAt": { "bsonType": "date" },
+    "createdAt": { "bsonType": "date" },
+    "updatedAt": { "bsonType": "date" }
+  }
+}

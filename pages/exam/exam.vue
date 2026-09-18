@@ -230,6 +230,8 @@
 					loading: false,
 					loaded: false,
 					questionCount: 0,
+					activeVersion: '',
+					source: '',
 					error: ''
 				}
 			},
@@ -404,6 +406,8 @@
 					const previous = loadingStates[subject.id] || {
 						loaded: false,
 						questionCount: 0,
+						activeVersion: '',
+						source: '',
 						error: ''
 					}
 					loadingStates[subject.id] = Object.assign({}, previous, {
@@ -415,6 +419,24 @@
 				try {
 					const summaries = await getCatalogSummaries(config)
 					if (requestId !== this.nextCatalogSummariesRequestId) return
+					const currentState = this.catalogStates[this.currentSubjectId]
+					const currentSummary = (summaries || []).find(item => (
+						item && item.subjectId === this.currentSubjectId
+					))
+					const currentSummaryCount = Number(currentSummary && currentSummary.questionCount)
+					const summaryConflictsWithCatalog = currentState
+						&& currentState.loaded
+						&& currentState.source === 'catalog'
+						&& currentState.questionCount > 0
+						&& (!currentSummary
+							|| !Number.isInteger(currentSummaryCount)
+							|| currentSummaryCount <= 0
+							|| currentState.activeVersion
+								&& (currentSummary.activeVersion !== currentState.activeVersion
+									|| currentSummaryCount !== currentState.questionCount))
+					if (!config.forceRefresh && summaryConflictsWithCatalog) {
+						return this.loadCatalogSummaries({ forceRefresh: true })
+					}
 					const summaryBySubject = {}
 					;(summaries || []).forEach(item => {
 						if (item && item.subjectId) summaryBySubject[item.subjectId] = item
@@ -423,12 +445,30 @@
 					subjects.forEach(subject => {
 						const summary = summaryBySubject[subject.id]
 						const parsedCount = Number(summary && summary.questionCount)
+						const previous = nextStates[subject.id] || {}
+						const preserveCatalog = previous.loaded
+							&& previous.source === 'catalog'
+							&& previous.questionCount > 0
+							&& (!summary
+								|| !Number.isInteger(parsedCount)
+								|| parsedCount <= 0
+								|| (previous.activeVersion
+									&& summary.activeVersion === previous.activeVersion))
+						if (preserveCatalog) {
+							nextStates[subject.id] = Object.assign({}, previous, {
+								loading: false,
+								error: ''
+							})
+							return
+						}
 						nextStates[subject.id] = {
 							loading: false,
 							loaded: true,
 							questionCount: Number.isInteger(parsedCount) && parsedCount >= 0
 								? parsedCount
 								: 0,
+							activeVersion: summary && summary.activeVersion || '',
+							source: 'summary',
 							error: ''
 						}
 					})
@@ -453,6 +493,8 @@
 				const previous = this.catalogStates[subjectId] || {
 					loaded: false,
 					questionCount: 0,
+					activeVersion: '',
+					source: '',
 					error: ''
 				}
 				const requestId = ++this.nextCatalogRequestId
@@ -476,6 +518,8 @@
 							loading: false,
 							loaded: true,
 							questionCount,
+							activeVersion: catalog && catalog.activeVersion || '',
+							source: 'catalog',
 							error: ''
 						}
 					})
@@ -493,12 +537,12 @@
 						? 0
 						: (previous.loaded ? previous.questionCount : 0)
 					this.catalogStates = Object.assign({}, this.catalogStates, {
-						[subjectId]: {
+						[subjectId]: Object.assign({}, previous, {
 							loading: false,
 							loaded: unavailable || previous.loaded,
 							questionCount,
 							error: errorMessage
-						}
+						})
 					})
 					if (this.currentSubjectId === subjectId) {
 						this.refreshStats(questionCount)
@@ -602,49 +646,49 @@
 	.practice-home { min-height: 100vh; padding-bottom: calc(24rpx + env(safe-area-inset-bottom)); background: #f5f6f8; }
 	.subject-bar { display: flex; align-items: center; min-height: 104rpx; padding: 18rpx 24rpx; border-bottom: 1rpx solid #edf0f3; box-sizing: border-box; background: #ffffff; }
 	.subject-copy { display: flex; flex: 1; flex-direction: column; min-width: 0; margin-left: 24rpx; }
-	.subject-label, .sheet-caption { color: #7a828c; font-size: 24rpx; }
-	.subject-name { margin-top: 5rpx; font-size: 32rpx; font-weight: 600; line-height: 1.3; }
-	.subject-switch { display: flex; align-items: center; gap: 4rpx; padding: 10rpx 12rpx; border-radius: 12rpx; background: #f1f8fe; color: #008cff; font-size: 26rpx; }
+	.subject-label, .sheet-caption { color: #7a828c; font-size: 25rpx; }
+	.subject-name { margin-top: 5rpx; font-size: 33rpx; font-weight: 600; line-height: 1.3; }
+	.subject-switch { display: flex; align-items: center; gap: 4rpx; padding: 10rpx 12rpx; border-radius: 12rpx; background: #f1f8fe; color: #008cff; font-size: 27rpx; }
 	.overview-card,
 	.practice-card { margin: 16rpx 24rpx 0; padding: 24rpx; border: 1rpx solid #e4eaf0; border-radius: 18rpx; background: #ffffff; box-shadow: 0 5rpx 18rpx rgba(31, 48, 65, 0.04); }
 	.overview-card { margin-top: 20rpx; }
 	.card-heading, .completion-heading, .sheet-header { display: flex; align-items: center; justify-content: space-between; }
-	.card-title { font-size: 32rpx; font-weight: 600; }
+	.card-title { font-size: 33rpx; font-weight: 600; }
 	.completion-heading { margin-top: 24rpx; }
 	.completion-copy, .sheet-header > view:first-child { display: flex; flex-direction: column; }
-	.overview-subtitle { color: #7a828c; font-size: 26rpx; }
-	.completion-value { color: #008cff; font-size: 40rpx; font-weight: 600; line-height: 1; }
+	.overview-subtitle { color: #7a828c; font-size: 27rpx; }
+	.completion-value { color: #008cff; font-size: 41rpx; font-weight: 600; line-height: 1; }
 	.completion-progress { height: 12rpx; margin-top: 18rpx; overflow: hidden; border-radius: 6rpx; background: #e9edf1; }
 	.completion-progress-fill { height: 100%; border-radius: 6rpx; background: #008cff; transition: width 0.2s ease; }
 	.stat-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12rpx; margin-top: 22rpx; padding-top: 22rpx; border-top: 1rpx solid #eef1f4; }
 	.stat-item { display: flex; align-items: center; flex-direction: column; justify-content: center; min-height: 88rpx; border-radius: 12rpx; background: #f5f9fc; text-align: center; }
-	.stat-value { color: #2f3944; font-size: 30rpx; font-weight: 600; line-height: 1.1; }
-	.stat-label { margin-top: 8rpx; color: #7f8892; font-size: 24rpx; }
-	.search-entry { display: flex; align-items: center; height: 82rpx; margin-top: 16rpx; padding: 0 20rpx; border: 1rpx solid #d6e7f4; border-radius: 14rpx; box-sizing: border-box; background: #f7fbfe; color: #56616d; font-size: 28rpx; }
+	.stat-value { color: #2f3944; font-size: 31rpx; font-weight: 600; line-height: 1.1; }
+	.stat-label { margin-top: 8rpx; color: #7f8892; font-size: 25rpx; }
+	.search-entry { display: flex; align-items: center; height: 82rpx; margin-top: 16rpx; padding: 0 20rpx; border: 1rpx solid #d6e7f4; border-radius: 14rpx; box-sizing: border-box; background: #f7fbfe; color: #56616d; font-size: 29rpx; }
 	.search-entry text { flex: 1; margin-left: 14rpx; white-space: nowrap; }
 	.feature-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14rpx; margin-top: 16rpx; }
 	.feature-item { display: flex; align-items: center; min-height: 126rpx; padding: 20rpx; border: 1rpx solid #edf1f4; border-radius: 14rpx; box-sizing: border-box; background: #f8fafc; }
 	.feature-icon { position: relative; display: flex; align-items: center; justify-content: center; width: 72rpx; height: 72rpx; flex: 0 0 72rpx; border-radius: 12rpx; background: #eaf5ff; }
-	.feature-badge { position: absolute; top: -10rpx; right: -14rpx; min-width: 34rpx; height: 34rpx; padding: 0 8rpx; border: 3rpx solid #ffffff; border-radius: 18rpx; box-sizing: border-box; background: #e65757; color: #ffffff; font-size: 17rpx; line-height: 31rpx; }
-	.feature-member-badge { position: absolute; top: -14rpx; right: -22rpx; height: 34rpx; padding: 0 10rpx; border: 3rpx solid #ffffff; border-radius: 18rpx; box-sizing: border-box; background: #30465f; color: #ffffff; font-size: 18rpx; line-height: 30rpx; white-space: nowrap; }
+	.feature-badge { position: absolute; top: -10rpx; right: -14rpx; min-width: 34rpx; height: 34rpx; padding: 0 8rpx; border: 3rpx solid #ffffff; border-radius: 18rpx; box-sizing: border-box; background: #e65757; color: #ffffff; font-size: 18rpx; line-height: 31rpx; }
+	.feature-member-badge { position: absolute; top: -14rpx; right: -22rpx; height: 34rpx; padding: 0 10rpx; border: 3rpx solid #ffffff; border-radius: 18rpx; box-sizing: border-box; background: #30465f; color: #ffffff; font-size: 19rpx; line-height: 30rpx; white-space: nowrap; }
 	.feature-copy { display: flex; flex: 1; flex-direction: column; min-width: 0; margin-left: 18rpx; }
-	.feature-title { font-size: 28rpx; font-weight: 600; line-height: 1.25; }
-	.feature-desc { margin-top: 7rpx; color: #8c949d; font-size: 24rpx; line-height: 1.35; }
-	.bank-note { display: flex; align-items: center; gap: 10rpx; margin: 10rpx 32rpx 0; padding: 20rpx 22rpx; border-radius: 8rpx; background: #f5f6f8; font-size: 24rpx; color: #6f747d; }
+	.feature-title { font-size: 29rpx; font-weight: 600; line-height: 1.25; }
+	.feature-desc { margin-top: 7rpx; color: #8c949d; font-size: 25rpx; line-height: 1.35; }
+	.bank-note { display: flex; align-items: center; gap: 10rpx; margin: 10rpx 32rpx 0; padding: 20rpx 22rpx; border-radius: 8rpx; background: #f5f6f8; font-size: 25rpx; color: #6f747d; }
 	.bank-note.error { background: #fff2f2; color: #bd3f3f; }
 	.subject-sheet { padding: 28rpx; border-radius: 16rpx 16rpx 0 0; background: #ffffff; }
 	.sheet-header { padding: 0 4rpx 24rpx; border-bottom: 1rpx solid #edf0f3; }
-	.sheet-title { font-size: 32rpx; font-weight: 600; }
+	.sheet-title { font-size: 33rpx; font-weight: 600; }
 	.sheet-caption { margin-top: 6rpx; }
 	.sheet-close { padding: 12rpx; }
 	.subject-scroll { max-height: 68vh; }
 	.subject-group { padding: 26rpx 4rpx 4rpx; }
-	.group-title { font-size: 30rpx; font-weight: 600; }
+	.group-title { font-size: 31rpx; font-weight: 600; }
 	.subject-options { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16rpx; margin-top: 18rpx; }
-	.subject-option { display: flex; align-items: flex-start; flex-direction: column; justify-content: center; min-height: 82rpx; padding: 12rpx 18rpx; border: 2rpx solid transparent; border-radius: 8rpx; box-sizing: border-box; background: #f3f4f6; font-size: 28rpx; }
+	.subject-option { display: flex; align-items: flex-start; flex-direction: column; justify-content: center; min-height: 82rpx; padding: 12rpx 18rpx; border: 2rpx solid transparent; border-radius: 8rpx; box-sizing: border-box; background: #f3f4f6; font-size: 29rpx; }
 	.subject-option.active { border-color: #008cff; background: #eaf5ff; color: #0074d4; }
 	.subject-option.unavailable:not(.active) { color: #7d828a; }
-	.subject-status { margin-top: 4rpx; font-size: 22rpx; color: #979ca5; }
+	.subject-status { margin-top: 4rpx; font-size: 23rpx; color: #979ca5; }
 
 	.practice-home.night-mode { background: #12171d; color: #e6e9ed; }
 	.night-mode .subject-bar { border-color: #303943; background: #171c22; }

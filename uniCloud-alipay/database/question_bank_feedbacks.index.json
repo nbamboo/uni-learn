@@ -1,0 +1,40 @@
+[
+  {
+    "IndexName": "user_question_issue_status",
+    "MgoKeySchema": {
+      "MgoIndexKeys": [
+        { "Name": "userId", "Direction": "1", "Type": "varchar" },
+        { "Name": "subjectId", "Direction": "1", "Type": "varchar" },
+        { "Name": "version", "Direction": "1", "Type": "varchar" },
+        { "Name": "questionId", "Direction": "1", "Type": "varchar" },
+        { "Name": "issueType", "Direction": "1", "Type": "varchar" },
+        { "Name": "status", "Direction": "1", "Type": "varchar" }
+      ],
+      "MgoIsUnique": false,
+      "MgoIsSparse": false
+    }
+  },
+  {
+    "IndexName": "status_last_reported",
+    "MgoKeySchema": {
+      "MgoIndexKeys": [
+        { "Name": "status", "Direction": "1", "Type": "varchar" },
+        { "Name": "lastReportedAt", "Direction": "-1", "Type": "date" }
+      ],
+      "MgoIsUnique": false,
+      "MgoIsSparse": false
+    }
+  },
+  {
+    "IndexName": "subject_question_reported",
+    "MgoKeySchema": {
+      "MgoIndexKeys": [
+        { "Name": "subjectId", "Direction": "1", "Type": "varchar" },
+        { "Name": "questionId", "Direction": "1", "Type": "varchar" },
+        { "Name": "lastReportedAt", "Direction": "-1", "Type": "date" }
+      ],
+      "MgoIsUnique": false,
+      "MgoIsSparse": false
+    }
+  }
+]

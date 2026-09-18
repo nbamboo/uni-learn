@@ -1,6 +1,6 @@
 # questionBankUser
 
-会员专用的题库用户数据云函数。`userId` 始终由 `uni-id-common` 校验客户端 token 后取得，客户端不能指定其他用户。除安全资料摘要外，所有 action 都要求有效会员；自然到期享有最多 6 小时宽限，`revoked` 或退款撤销不享有宽限。非会员的做题数据只保存在本机。
+题库用户数据云函数。`userId` 始终由 `uni-id-common` 校验客户端 token 后取得，客户端不能指定其他用户。学习数据同步 action 要求有效会员；自然到期享有最多 6 小时宽限，`revoked` 或退款撤销不享有宽限。`getUserProfile` 与 `submitQuestionFeedback` 只要求登录，非会员也可以提交题目反馈；非会员的做题数据仍只保存在本机。
 
 支持的 action：
 
@@ -15,6 +15,7 @@
 - `getSmartPractice`：从最多 100 个随机题目候选和近期错题中生成智能练习，不扫描整科题号或整科用户状态。
 - `getRecords`：分页读取会员的错题集或收藏夹。第一页从单科统计文档读取总数，避免对用户题目状态执行集合 `count()`；后续页通过多取一条判断 `hasMore`。
 - `getUserProfile`：读取当前登录用户的安全资料摘要，仅返回 UID、昵称、头像、微信绑定状态和时间信息。
+- `submitQuestionFeedback`：登录用户提交题目问题。云端按科目、题库版本和题目 ID 读取可信题目快照；同用户、同版本、同题、同问题类型的未处理记录会合并，并通过 `clientRequestId` 保证重试幂等。该 action 不要求会员。
 - `getPreferences`：读取会员的答题模式、夜间模式及所有科目共用的 `smartPractice` 组题偏好。
 - `updatePreferences`：校验并保存答题偏好，用户 ID 只取自已验证 token；旧客户端未传 `smartPractice` 时保留云端原值。
 - `clearCurrentSubjectData`：答题设置中的数据清理入口，仅接受固定确认值，并按 token 用户和 `subjectId` 删除该科目的长期状态、统计、练习轮次、考试草稿及知识点进度；不会删除答题偏好或任何 `uni-id` 账号信息。

@@ -14,6 +14,7 @@ function matches(document, condition) {
 	return Object.keys(condition || {}).every(key => {
 		const expected = condition[key]
 		if (expected && expected.__command === 'in') return expected.values.indexOf(document[key]) > -1
+		if (Array.isArray(document[key])) return document[key].indexOf(expected) > -1
 		return valueOf(document[key]) === valueOf(expected)
 	})
 }
@@ -207,6 +208,7 @@ function loadSeed() {
 		question_bank_user_rounds: [],
 		question_bank_exam_drafts: [],
 		question_bank_user_preferences: [],
+		question_bank_feedbacks: [],
 		question_bank_memberships: [{
 			_id: 'user-one',
 			userId: 'user-one',
@@ -228,6 +230,164 @@ async function run() {
 	const userId = 'user-one'
 	const wrongAlias = question.options.map(item => item.alias)
 		.find(alias => question.answer.indexOf(alias) === -1)
+	const feedbackContext = {
+		practiceMode: 'chapter',
+		answerMode: 'practice',
+		selectedAnswers: question.answer.slice(),
+		revealed: true,
+		questionIndex: 1,
+		questionCount: 20,
+		appVersion: '1.0.0',
+		envVersion: 'trial',
+		platform: 'android',
+		system: 'Android 16',
+		sdkVersion: '3.10.0'
+	}
+
+	const firstFeedback = await service.execute({
+		action: 'submitQuestionFeedback',
+		clientRequestId: 'feedback-request-one',
+		subjectId,
+		version: question.version,
+		questionId: question.questionId,
+		issueType: 'answer_error',
+		description: '',
+		context: feedbackContext,
+		userId: 'forged-user'
+	}, 'user-two')
+	assert.equal(firstFeedback.merged, false)
+	assert.equal(firstFeedback.reportCount, 1)
+	assert.equal(firstFeedback.status, 'pending')
+	const savedFeedback = environment.collections.question_bank_feedbacks.get(firstFeedback.feedbackId)
+	assert.equal(savedFeedback.userId, 'user-two')
+	assert.equal(savedFeedback.userSnapshot.nickname, '保留用户')
+	assert.equal(savedFeedback.userSnapshot.weixinBound, false)
+	assert.equal(savedFeedback.userSnapshot.isMember, false)
+	assert.equal(savedFeedback.questionSnapshot.title, question.title)
+	assert.deepEqual(savedFeedback.questionSnapshot.answer, question.answer)
+	assert.equal(savedFeedback.context.appVersion, '1.0.0')
+
+	const duplicateFeedback = await service.execute({
+		action: 'submitQuestionFeedback',
+		clientRequestId: 'feedback-request-one',
+		subjectId,
+		version: question.version,
+		questionId: question.questionId,
+		issueType: 'answer_error',
+		description: '同一次请求不应重复计数',
+		context: feedbackContext
+	}, 'user-two')
+	assert.equal(duplicateFeedback.feedbackId, firstFeedback.feedbackId)
+	assert.equal(duplicateFeedback.reportCount, 1)
+
+	const mergedFeedback = await service.execute({
+		action: 'submitQuestionFeedback',
+		clientRequestId: 'feedback-request-two',
+		subjectId,
+		version: question.version,
+		questionId: question.questionId,
+		issueType: 'answer_error',
+		description: '正确答案似乎有误',
+		context: feedbackContext
+	}, 'user-two')
+	assert.equal(mergedFeedback.feedbackId, firstFeedback.feedbackId)
+	assert.equal(mergedFeedback.merged, true)
+	assert.equal(mergedFeedback.reportCount, 2)
+	const mergedDocument = environment.collections.question_bank_feedbacks.get(firstFeedback.feedbackId)
+	assert.equal(mergedDocument.description, '正确答案似乎有误')
+	assert.equal(mergedDocument.descriptionHistory.length, 1)
+	mergedDocument.status = 'resolved'
+	environment.collections.question_bank_feedbacks.set(mergedDocument._id, mergedDocument)
+	const resolvedRetry = await service.execute({
+		action: 'submitQuestionFeedback',
+		clientRequestId: 'feedback-request-two',
+		subjectId,
+		version: question.version,
+		questionId: question.questionId,
+		issueType: 'answer_error',
+		description: '正确答案似乎有误',
+		context: feedbackContext
+	}, 'user-two')
+	assert.equal(resolvedRetry.feedbackId, firstFeedback.feedbackId)
+	assert.equal(resolvedRetry.reportCount, 2)
+	assert.equal(resolvedRetry.status, 'resolved')
+	assert.equal(environment.collections.question_bank_feedbacks.size, 1)
+	const reopenedFeedback = await service.execute({
+		action: 'submitQuestionFeedback',
+		clientRequestId: 'feedback-request-three',
+		subjectId,
+		version: question.version,
+		questionId: question.questionId,
+		issueType: 'answer_error',
+		description: '',
+		context: feedbackContext
+	}, 'user-two')
+	assert.notEqual(reopenedFeedback.feedbackId, firstFeedback.feedbackId)
+	assert.equal(environment.collections.question_bank_feedbacks.size, 2)
+	await assert.rejects(
+		() => service.execute({
+			action: 'submitQuestionFeedback',
+			clientRequestId: 'feedback-request-four',
+			subjectId,
+			version: question.version,
+			questionId: question.questionId,
+			issueType: 'other',
+			description: ' ',
+			context: feedbackContext
+		}, 'user-two'),
+		error => error && error.errCode === 'QUESTION_BANK_USER_INVALID_ARGUMENT'
+	)
+	await assert.rejects(
+		() => service.execute({
+			action: 'submitQuestionFeedback',
+			clientRequestId: 'feedback-request-five',
+			subjectId,
+			version: 'missing-version',
+			questionId: question.questionId,
+			issueType: 'text_error',
+			description: '',
+			context: feedbackContext
+		}, 'user-two'),
+		error => error && error.errCode === 'QUESTION_BANK_QUESTION_NOT_FOUND'
+	)
+	await assert.rejects(
+		() => service.execute({
+			action: 'submitQuestionFeedback',
+			clientRequestId: 'feedback-request-six',
+			subjectId,
+			version: question.version,
+			questionId: question.questionId,
+			issueType: 'text_error',
+			description: '',
+			context: Object.assign({}, feedbackContext, { selectedAnswers: ['Z'] })
+		}, 'user-two'),
+		error => error && error.errCode === 'QUESTION_BANK_USER_INVALID_ARGUMENT'
+	)
+	const materialFeedbackQuestion = Array.from(environment.collections.question_bank_questions.values())
+		.find(item => item.subjectId === subjectId && item.type === 'material')
+	if (materialFeedbackQuestion) {
+		const materialFeedback = await service.execute({
+			action: 'submitQuestionFeedback',
+			clientRequestId: 'feedback-material-one',
+			subjectId,
+			version: materialFeedbackQuestion.version,
+			questionId: materialFeedbackQuestion.questionId,
+			issueType: 'explanation_error',
+			description: '材料题解析需要核查',
+			context: Object.assign({}, feedbackContext, { practiceMode: 'smart' })
+		}, userId)
+		const materialFeedbackDocument = environment.collections.question_bank_feedbacks
+			.get(materialFeedback.feedbackId)
+		assert.equal(materialFeedbackDocument.userSnapshot.isMember, true)
+		assert.equal(
+			materialFeedbackDocument.questionSnapshot.materialGroupId,
+			materialFeedbackQuestion.materialGroupId
+		)
+		assert.equal(
+			materialFeedbackDocument.questionSnapshot.materialQuestionIndex,
+			materialFeedbackQuestion.materialQuestionIndex
+		)
+	}
 
 	const defaultPreferences = await service.execute({ action: 'getPreferences' }, userId)
 	assert.deepEqual(defaultPreferences, {

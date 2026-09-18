@@ -56,6 +56,7 @@ function loadService(environment) {
 		saveExamDraftPosition,
 		savePracticeProgress,
 		startExamDraft,
+		submitQuestionFeedback,
 		updatePracticePreferences
 	}`
 	vm.createContext(environment)
@@ -1229,6 +1230,20 @@ async function run() {
 						}
 					}
 				}
+				if (request.data.action === 'submitQuestionFeedback') {
+					return {
+						result: {
+							errCode: 0,
+							data: {
+								feedbackId: 'feedback-cloud-one',
+								merged: false,
+								reportCount: 1,
+								status: 'pending',
+								submittedAt: Date.now()
+							}
+						}
+					}
+				}
 				if (request.data.action === 'getProgress') {
 					return {
 						result: {
@@ -1481,6 +1496,44 @@ async function run() {
 	assert.equal(profile.nickname, '理财学员')
 	assert.equal(cachedProfile.weixinBound, true)
 	assert.equal(calls.filter(item => item.data.action === 'getUserProfile').length, 1)
+	storage.delete(`uni-learn-membership-v1:${user.uid}`)
+	const feedback = await service.submitQuestionFeedback({
+		clientRequestId: 'feedback-client-one',
+		subjectId: question.subjectId,
+		version: '2026-09-19-v3',
+		questionId: question.id,
+		issueType: 'answer_error',
+		description: '',
+		context: {
+			practiceMode: 'chapter',
+			answerMode: 'practice',
+			selectedAnswers: ['B'],
+			revealed: true,
+			questionIndex: 1,
+			questionCount: 20,
+			appVersion: '1.0.0',
+			envVersion: 'trial',
+			platform: 'android',
+			system: 'Android 16',
+			sdkVersion: '3.10.0'
+		}
+	})
+	assert.equal(feedback.feedbackId, 'feedback-cloud-one')
+	const feedbackCall = calls.find(item => item.data.action === 'submitQuestionFeedback')
+	assert.equal(feedbackCall.data.clientRequestId, 'feedback-client-one')
+	assert.equal(feedbackCall.data.version, '2026-09-19-v3')
+	assert.equal(feedbackCall.data.userId, undefined)
+	storage.set(`uni-learn-membership-v1:${user.uid}`, activeMembership())
+	await assert.rejects(
+		() => service.submitQuestionFeedback({
+			subjectId: question.subjectId,
+			version: '2026-09-19-v3',
+			questionId: question.id,
+			issueType: 'other',
+			description: ' '
+		}),
+		error => error && error.errCode === 'QUESTION_BANK_USER_INVALID_ARGUMENT'
+	)
 	const progress = await service.getPracticeProgress({
 		subjectId: question.subjectId,
 		mode: 'chapter',

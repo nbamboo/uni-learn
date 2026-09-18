@@ -19,6 +19,7 @@ const PRACTICE_ROUND_COLLECTION = 'question_bank_user_rounds'
 const EXAM_DRAFT_COLLECTION = 'question_bank_exam_drafts'
 const PREFERENCES_COLLECTION = 'question_bank_user_preferences'
 const MEMBERSHIP_COLLECTION = 'question_bank_memberships'
+const FEEDBACK_COLLECTION = 'question_bank_feedbacks'
 const MAX_SYNC_EVENTS = 50
 const MAX_STATE_ROWS = 2000
 const MAX_PROGRESS_ROWS = 500
@@ -39,6 +40,8 @@ const PROGRESS_MODES = ['chapter', 'section', 'knowledge']
 const ANSWER_MODES = ['exam', 'practice', 'review']
 const PRACTICE_ENTRY_MODES = ['smart', 'chapter', 'section', 'knowledge', 'wrong', 'favorite', 'search', 'sequence']
 const EXAM_DRAFT_MODES = ['chapter', 'section', 'knowledge', 'wrong', 'favorite', 'search', 'sequence']
+const FEEDBACK_ISSUE_TYPES = ['answer_error', 'explanation_error', 'text_error', 'other']
+const FEEDBACK_OPEN_STATUSES = ['pending', 'processing']
 const QUESTION_SELECTION_MODES = Object.freeze({
 	single: 'single',
 	judgment: 'single',
@@ -241,6 +244,45 @@ function readExamSelected(value) {
 	}
 	if (!value.length) return []
 	return readSelected(value)
+}
+
+function readFeedbackContext(value) {
+	const context = value === undefined || value === null
+		? {}
+		: requireObject(value, 'context')
+	const selectedAnswers = context.selectedAnswers === undefined
+		? []
+		: readExamSelected(context.selectedAnswers)
+	const questionIndex = readInteger(context.questionIndex, 'context.questionIndex', {
+		minimum: 1,
+		maximum: 5000
+	})
+	const questionCount = readInteger(context.questionCount, 'context.questionCount', {
+		minimum: 1,
+		maximum: 5000
+	})
+	if (!Number.isInteger(questionIndex) || !Number.isInteger(questionCount)) {
+		invalidArgument('context.questionIndex和context.questionCount不能为空')
+	}
+	return {
+		practiceMode: readString(context.practiceMode, 'context.practiceMode', {
+			required: true,
+			values: PRACTICE_ENTRY_MODES
+		}),
+		answerMode: readString(context.answerMode, 'context.answerMode', {
+			required: true,
+			values: ANSWER_MODES
+		}),
+		selectedAnswers,
+		revealed: readBoolean(context.revealed, 'context.revealed'),
+		questionIndex,
+		questionCount,
+		appVersion: readString(context.appVersion, 'context.appVersion', { maxLength: 32 }),
+		envVersion: readString(context.envVersion, 'context.envVersion', { maxLength: 32 }),
+		platform: readString(context.platform, 'context.platform', { maxLength: 32 }),
+		system: readString(context.system, 'context.system', { maxLength: 128 }),
+		sdkVersion: readString(context.sdkVersion, 'context.sdkVersion', { maxLength: 32 })
+	}
 }
 
 function readOccurredAt(value, currentTime) {
@@ -1565,6 +1607,180 @@ function createQuestionBankUserService(db, options) {
 		}
 	}
 
+	async function submitQuestionFeedback(event, userId) {
+		const clientRequestId = readEventId(event.clientRequestId)
+		const subjectId = readSubjectId(event.subjectId)
+		const version = readString(event.version, 'version', { required: true, maxLength: 64 })
+		const questionId = readQuestionId(event.questionId)
+		const issueType = readString(event.issueType, 'issueType', {
+			required: true,
+			values: FEEDBACK_ISSUE_TYPES
+		})
+		const description = readString(event.description, 'description', { maxLength: 500 })
+		if (issueType === 'other' && description.length < 2) {
+			invalidArgument('选择其他时请填写2～500字的问题说明')
+		}
+		const context = readFeedbackContext(event.context)
+		if (context.questionIndex > context.questionCount) {
+			invalidArgument('context.questionIndex不能大于context.questionCount')
+		}
+
+		const [questionResponse, user, membership] = await Promise.all([
+			db.collection(QUESTION_COLLECTION)
+				.where({ subjectId, version, questionId })
+				.limit(1)
+				.get(),
+			getDocument(db, USER_COLLECTION, userId),
+			getDocument(db, MEMBERSHIP_COLLECTION, userId)
+		])
+		const question = getRows(questionResponse)[0]
+		if (!question) {
+			throw new QuestionBankUserError(
+				'QUESTION_BANK_QUESTION_NOT_FOUND',
+				'指定版本中的题目不存在'
+			)
+		}
+		requireQuestionSchema(question, true)
+		if (!user) {
+			throw new QuestionBankUserError('QUESTION_BANK_USER_NOT_FOUND', '当前登录用户不存在')
+		}
+
+		const currentTime = now()
+		const membershipExpiresAt = getDateValue(membership && membership.expiresAt)
+		const userSnapshot = {
+			nickname: typeof user.nickname === 'string' ? user.nickname.slice(0, 128) : '',
+			weixinBound: hasWeixinAccount(user),
+			isMember: Boolean(
+				membership
+				&& membership.status !== 'revoked'
+				&& membershipExpiresAt + MEMBER_EXPIRY_GRACE_MS > currentTime.getTime()
+			)
+		}
+		if (membershipExpiresAt) userSnapshot.membershipExpiresAt = new Date(membershipExpiresAt)
+
+		const questionSnapshot = {
+			type: question.type,
+			selectionMode: question.selectionMode,
+			title: question.title,
+			options: question.options.map(option => ({ alias: option.alias, text: option.text })),
+			answer: question.answer.slice(),
+			explanation: question.explanation
+		}
+		if (question.type === 'material') {
+			questionSnapshot.materialGroupId = question.materialGroupId
+			questionSnapshot.materialText = question.materialText
+			questionSnapshot.materialQuestionIndex = question.materialQuestionIndex
+			questionSnapshot.materialQuestionCount = question.materialQuestionCount
+		}
+
+		return withTransaction(db, async store => {
+			const duplicateResponse = await store.collection(FEEDBACK_COLLECTION)
+				.where({
+					userId,
+					subjectId,
+					version,
+					questionId,
+					issueType,
+					clientRequestIds: clientRequestId
+				})
+				.limit(1)
+				.get()
+			const duplicate = getRows(duplicateResponse)[0] || null
+			if (duplicate) {
+				return {
+					feedbackId: duplicate._id,
+					merged: true,
+					reportCount: Number(duplicate.reportCount) || 1,
+					status: duplicate.status,
+					submittedAt: getDateValue(duplicate.lastReportedAt)
+				}
+			}
+			const existingResponse = await store.collection(FEEDBACK_COLLECTION)
+				.where({
+					userId,
+					subjectId,
+					version,
+					questionId,
+					issueType,
+					status: db.command.in(FEEDBACK_OPEN_STATUSES)
+				})
+				.orderBy('lastReportedAt', 'desc')
+				.limit(1)
+				.get()
+			const existing = getRows(existingResponse)[0] || null
+			if (existing) {
+				const clientRequestIds = Array.isArray(existing.clientRequestIds)
+					? existing.clientRequestIds.slice()
+					: []
+				clientRequestIds.push(clientRequestId)
+				const descriptionHistory = Array.isArray(existing.descriptionHistory)
+					? existing.descriptionHistory.slice(-20)
+					: []
+				if (description) {
+					if (descriptionHistory.length >= 20) descriptionHistory.shift()
+					descriptionHistory.push({ description, reportedAt: serverDate(), clientRequestId })
+				}
+				const updated = Object.assign({}, existing, {
+					clientRequestIds,
+					userSnapshot,
+					questionSnapshot,
+					description,
+					descriptionHistory,
+					context,
+					reportCount: (Number(existing.reportCount) || 1) + 1,
+					lastReportedAt: serverDate(),
+					updatedAt: serverDate()
+				})
+				await setDocument(store, FEEDBACK_COLLECTION, existing._id, updated)
+				return {
+					feedbackId: existing._id,
+					merged: true,
+					reportCount: updated.reportCount,
+					status: updated.status,
+					submittedAt: currentTime.getTime()
+				}
+			}
+
+			const feedbackId = `feedback-${crypto.randomBytes(16).toString('hex')}`
+			const createdAt = serverDate()
+			const document = {
+				_id: feedbackId,
+				clientRequestIds: [clientRequestId],
+				userId,
+				userSnapshot,
+				subjectId,
+				version,
+				questionId,
+				chapterId: String(question.chapterId || ''),
+				chapter: question.chapter || '',
+				section: question.section || '',
+				knowledge: question.knowledge || '',
+				sortOrder: Number(question.sortOrder) || 0,
+				questionSnapshot,
+				issueType,
+				description,
+				descriptionHistory: description
+					? [{ description, reportedAt: createdAt, clientRequestId }]
+					: [],
+				reportCount: 1,
+				context,
+				status: 'pending',
+				firstReportedAt: createdAt,
+				lastReportedAt: createdAt,
+				createdAt,
+				updatedAt: createdAt
+			}
+			await setDocument(store, FEEDBACK_COLLECTION, feedbackId, document)
+			return {
+				feedbackId,
+				merged: false,
+				reportCount: 1,
+				status: 'pending',
+				submittedAt: currentTime.getTime()
+			}
+		})
+	}
+
 	async function getPreferences(event, userId) {
 		const saved = await getDocument(db, PREFERENCES_COLLECTION, userId)
 		if (!saved) return defaultPreferences()
@@ -2317,6 +2533,7 @@ function createQuestionBankUserService(db, options) {
 		getSmartPracticeState,
 		getRecords,
 		getUserProfile,
+		submitQuestionFeedback,
 		getPreferences,
 		updatePreferences,
 		clearCurrentSubjectData

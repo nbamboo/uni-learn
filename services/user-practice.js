@@ -28,6 +28,7 @@ const RETRY_DELAY = 180
 const ANSWER_MODES = ['exam', 'practice', 'review']
 const PRACTICE_ENTRY_MODES = ['smart', 'chapter', 'section', 'knowledge', 'wrong', 'favorite', 'search', 'sequence']
 const EXAM_DRAFT_MODES = ['chapter', 'section', 'knowledge', 'wrong', 'favorite', 'search', 'sequence']
+const FEEDBACK_ISSUE_TYPES = ['answer_error', 'explanation_error', 'text_error', 'other']
 const MAX_EXAM_DRAFT_QUESTIONS = 5000
 const MAX_PERSISTED_SUMMARIES = 20
 export const FREE_SMART_QUESTION_COUNT_MAX = 30
@@ -2342,6 +2343,44 @@ export async function getPracticeUserProfile(options) {
 	return setCached(userProfileCache, user.uid, profile, PROFILE_CACHE_TTL)
 }
 
+export async function submitQuestionFeedback(options) {
+	const input = isObject(options) ? options : {}
+	const subjectId = typeof input.subjectId === 'string' ? input.subjectId.trim() : ''
+	const version = typeof input.version === 'string' ? input.version.trim() : ''
+	const questionId = typeof input.questionId === 'string' ? input.questionId.trim() : ''
+	const issueType = typeof input.issueType === 'string' ? input.issueType.trim() : ''
+	const description = typeof input.description === 'string' ? input.description.trim() : ''
+	if (!subjectId || !version || !questionId) {
+		throw new UserPracticeServiceError(
+			'QUESTION_BANK_USER_INVALID_ARGUMENT',
+			'题目反馈缺少科目、版本或题目标识'
+		)
+	}
+	if (FEEDBACK_ISSUE_TYPES.indexOf(issueType) === -1) {
+		throw new UserPracticeServiceError(
+			'QUESTION_BANK_USER_INVALID_ARGUMENT',
+			'请选择有效的问题类型'
+		)
+	}
+	if (description.length > 500 || (issueType === 'other' && description.length < 2)) {
+		throw new UserPracticeServiceError(
+			'QUESTION_BANK_USER_INVALID_ARGUMENT',
+			issueType === 'other'
+				? '选择其他时请填写2～500字的问题说明'
+				: '问题说明不能超过500字'
+		)
+	}
+	return executeCloudCall('submitQuestionFeedback', {
+		clientRequestId: input.clientRequestId || createPracticeEventId('feedback'),
+		subjectId,
+		version,
+		questionId,
+		issueType,
+		description,
+		context: isObject(input.context) ? cloneValue(input.context) : {}
+	})
+}
+
 function removeSubjectPracticePositions(storageKey, subjectId) {
 	const positions = readPracticePositions(storageKey)
 	Object.keys(positions).forEach(key => {
@@ -2572,5 +2611,6 @@ export default {
 	saveExamDraftPosition,
 	savePracticeProgress,
 	startExamDraft,
+	submitQuestionFeedback,
 	updatePracticePreferences
 }
