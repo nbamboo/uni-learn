@@ -37,7 +37,15 @@ async function authenticate(event, context) {
 		throw new VirtualPaymentError('VIRTUAL_PAYMENT_LOGIN_REQUIRED', '请先登录微信账号')
 	}
 	const instance = uniID.createInstance({ context })
-	const payload = await instance.checkToken(event.uniIdToken)
+	let payload
+	try {
+		payload = await instance.checkToken(event.uniIdToken)
+	} catch (error) {
+		throw new VirtualPaymentError(
+			'VIRTUAL_PAYMENT_LOGIN_REQUIRED',
+			'登录状态已失效，请重新登录'
+		)
+	}
 	if (!payload || payload.errCode) {
 		throw new VirtualPaymentError(
 			'VIRTUAL_PAYMENT_LOGIN_REQUIRED',

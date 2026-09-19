@@ -1457,7 +1457,8 @@ async function loginByWeixin() {
 	return user
 }
 
-export async function ensurePracticeUser() {
+export async function ensurePracticeUser(options) {
+	if (options && options.forceRefresh) clearPracticeLogin()
 	if (practiceUserLoggedIn()) return getCurrentPracticeUser()
 	if (loginRequest) return loginRequest
 	loginRequest = loginByWeixin().then(user => {

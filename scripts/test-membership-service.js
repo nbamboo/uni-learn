@@ -29,15 +29,23 @@ async function run() {
 	const user = { uid: 'member-user', tokenExpired: Date.now() + 60 * 60 * 1000 }
 	let queryShouldFail = true
 	let paymentCalls = 0
+	let paymentTokenFailureOnce = false
+	let createOrderCalls = 0
+	let weixinLoginCalls = 0
 	let queryCalls = 0
 	let membershipCalls = 0
 	let syncScheduleCalls = 0
+	let forcedLoginCalls = 0
+	let tokenFailureOnce = false
 	let cloudMembership = {
 		isMember: true,
 		expiresAt: Date.now() + 30 * 24 * 60 * 60 * 1000
 	}
 	const environment = {
-		ensurePracticeUser: async () => user,
+		ensurePracticeUser: async options => {
+			if (options && options.forceRefresh) forcedLoginCalls += 1
+			return user
+		},
 		getCurrentPracticeUser: () => user,
 		markPracticePreferencesRefreshRequired: () => {},
 		markPracticeRecordsRefreshRequired: () => {},
@@ -50,6 +58,7 @@ async function run() {
 			getStorageSync: key => storage.get(key),
 			setStorageSync: (key, value) => storage.set(key, value),
 			login(options) {
+				weixinLoginCalls += 1
 				options.success({ code: 'payment-login-code' })
 			}
 		},
@@ -57,6 +66,10 @@ async function run() {
 			async callFunction(request) {
 				if (request.data.action === 'getMembership') {
 					membershipCalls += 1
+					if (tokenFailureOnce) {
+						tokenFailureOnce = false
+						return { result: { errCode: 'uni-id-check-token-failed', errMsg: 'token校验未通过' } }
+					}
 					return {
 						result: {
 							errCode: 0,
@@ -65,6 +78,7 @@ async function run() {
 					}
 				}
 				if (request.data.action === 'createOrder') {
+					createOrderCalls += 1
 					assert.equal(request.data.productId, 'membership_1m')
 					assert.equal(request.data.code, 'payment-login-code')
 					return {
@@ -105,6 +119,11 @@ async function run() {
 			canIUse: () => true,
 			requestVirtualPayment(options) {
 				paymentCalls += 1
+				if (paymentTokenFailureOnce) {
+					paymentTokenFailureOnce = false
+					options.fail({ errCode: -15005, errMsg: 'requestVirtualPayment:fail token校验未通过' })
+					return
+				}
 				options.success({ errMsg: 'requestVirtualPayment:ok' })
 			}
 		},
@@ -178,6 +197,8 @@ async function run() {
 	assert.equal(revoked.entitlements.adFree, false)
 	assert.equal(revoked.entitlements.practiceRecords, false)
 	assert.equal(revoked.entitlements.advancedAnswerModes, false)
+	assert.equal(revoked.entitlements.reviewMode, false)
+	assert.equal(revoked.entitlements.smartPracticeOver30, false)
 	assert.equal(service.getCachedMembership().isMember, false)
 
 	user.uid = 'second-member-user'
@@ -195,6 +216,23 @@ async function run() {
 	assert.equal(membershipCalls, callsBeforeAccountSwitch + 1)
 	await service.getMembership()
 	assert.equal(membershipCalls, callsBeforeAccountSwitch + 1)
+
+	const callsBeforeTokenRetry = membershipCalls
+	tokenFailureOnce = true
+	const refreshedAfterInvalidToken = await service.getMembership({ forceRefresh: true })
+	assert.equal(refreshedAfterInvalidToken.isMember, true)
+	assert.equal(membershipCalls, callsBeforeTokenRetry + 2)
+	assert.equal(forcedLoginCalls, 1)
+
+	const paymentCallsBeforeRetry = paymentCalls
+	const createOrderCallsBeforeRetry = createOrderCalls
+	const loginCallsBeforeRetry = weixinLoginCalls
+	paymentTokenFailureOnce = true
+	const purchasedAfterPaymentTokenRetry = await service.purchaseMembership('membership_1m')
+	assert.equal(purchasedAfterPaymentTokenRetry.order.status, 'delivered')
+	assert.equal(paymentCalls, paymentCallsBeforeRetry + 2)
+	assert.equal(createOrderCalls, createOrderCallsBeforeRetry + 2)
+	assert.equal(weixinLoginCalls, loginCallsBeforeRetry + 2)
 
 	console.log('membership service tests passed')
 }

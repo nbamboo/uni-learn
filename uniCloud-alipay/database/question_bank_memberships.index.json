@@ -1,0 +1,23 @@
+[
+  {
+    "IndexName": "memberships_user_unique",
+    "MgoKeySchema": {
+      "MgoIndexKeys": [
+        { "Name": "userId", "Direction": "1", "Type": "varchar" }
+      ],
+      "MgoIsUnique": true,
+      "MgoIsSparse": false
+    }
+  },
+  {
+    "IndexName": "memberships_status_expires",
+    "MgoKeySchema": {
+      "MgoIndexKeys": [
+        { "Name": "status", "Direction": "1", "Type": "varchar" },
+        { "Name": "expiresAt", "Direction": "1", "Type": "date" }
+      ],
+      "MgoIsUnique": false,
+      "MgoIsSparse": true
+    }
+  }
+]

@@ -18,6 +18,7 @@ REL_NS = "http://schemas.openxmlformats.org/officeDocument/2006/relationships"
 PACKAGE_REL_NS = "http://schemas.openxmlformats.org/package/2006/relationships"
 NS = {"x": MAIN_NS, "r": REL_NS}
 OPTION_COLUMNS = (("A", "J"), ("B", "K"), ("C", "L"), ("D", "M"), ("E", "N"), ("F", "O"))
+ANSWER_ALIASES = {alias for alias, _column in OPTION_COLUMNS}
 IMAGE_PATTERN = re.compile(r"\[图片:\s*(https?://[^\]]+)\]")
 SUBJECT_ID_PATTERN = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
 QUESTION_ID_PATTERN = SUBJECT_ID_PATTERN
@@ -46,6 +47,8 @@ QUESTION_SELECTION_MODES = {
     3: "multiple",
     4: "multiple",
 }
+AI_REVIEW_STATUSES = {"draft", "approved", "rejected"}
+AI_SUPPORTED_TYPES = {"single", "judgment", "multiple"}
 SECTION_ORDINAL_PATTERN = re.compile(
     r"^第\s*([0-9一二三四五六七八九十百零〇两]+)\s*(?:节|部分)"
 )
@@ -510,6 +513,349 @@ def build_candidate(row, config, version):
     }
 
 
+def read_jsonl(path):
+    records = []
+    with path.open("r", encoding="utf-8") as source:
+        for line_number, raw_line in enumerate(source, 1):
+            line = raw_line.strip()
+            if not line:
+                continue
+            try:
+                value = json.loads(line)
+            except json.JSONDecodeError as error:
+                raise ValueError(
+                    f"AI题源JSONL解析失败: {path}:{line_number}: {error.msg}"
+                ) from error
+            if not isinstance(value, dict):
+                raise ValueError(
+                    f"AI题源每行必须是JSON对象: {path}:{line_number}"
+                )
+            records.append((line_number, value))
+    return records
+
+
+def json_text(value):
+    return clean_text(value) if isinstance(value, str) else ""
+
+
+def build_ai_candidate(record, source_path, line_number, config, version):
+    raw_options = record.get("options")
+    options = []
+    option_shape_valid = isinstance(raw_options, list)
+    if option_shape_valid:
+        for raw_option in raw_options:
+            if not isinstance(raw_option, dict):
+                option_shape_valid = False
+                continue
+            options.append(
+                {
+                    "alias": json_text(raw_option.get("alias")),
+                    "text": json_text(raw_option.get("text")),
+                }
+            )
+
+    raw_answers = record.get("answer")
+    answers = (
+        [json_text(answer) for answer in raw_answers]
+        if isinstance(raw_answers, list)
+        else []
+    )
+    question_type = json_text(record.get("type"))
+    fields = {
+        "questionId": json_text(record.get("questionId")),
+        "subjectId": json_text(record.get("subjectId")),
+        "version": version,
+        "chapterId": json_text(record.get("chapterId")),
+        "chapter": json_text(record.get("chapter")),
+        "section": json_text(record.get("section")),
+        "knowledge": json_text(record.get("knowledge")),
+        "type": question_type,
+        "selectionMode": json_text(record.get("selectionMode")),
+        "title": json_text(record.get("title")),
+        "options": options,
+        "answer": answers,
+        "explanation": json_text(record.get("explanation")),
+    }
+    reasons = []
+    expected_prefix = f"{config['questionPrefix']}-ai-"
+    if not fields["questionId"]:
+        reasons.append("missing_question_id")
+    elif QUESTION_ID_PATTERN.fullmatch(fields["questionId"]) is None:
+        reasons.append("invalid_question_id")
+    elif not fields["questionId"].startswith(expected_prefix):
+        reasons.append("invalid_ai_question_prefix")
+    if fields["subjectId"] != config["subjectId"]:
+        reasons.append("subject_id_mismatch")
+    for key in ("chapterId", "chapter", "section", "knowledge", "title", "explanation"):
+        if not fields[key]:
+            reasons.append(f"missing_{key}")
+    for key, limit in FIELD_LIMITS.items():
+        if len(fields.get(key, "")) > limit:
+            reasons.append(f"{key}_too_long")
+
+    if question_type not in AI_SUPPORTED_TYPES:
+        reasons.append("unsupported_ai_question_type")
+    expected_selection_mode = (
+        "multiple" if question_type == "multiple" else "single"
+    )
+    if fields["selectionMode"] != expected_selection_mode:
+        reasons.append("selection_mode_mismatch")
+    if not option_shape_valid:
+        reasons.append("invalid_options")
+    if not 2 <= len(options) <= 6:
+        reasons.append("invalid_option_count")
+    option_aliases = [option["alias"] for option in options]
+    if any(alias not in ANSWER_ALIASES for alias in option_aliases):
+        reasons.append("invalid_option_alias")
+    if len(option_aliases) != len(set(option_aliases)):
+        reasons.append("duplicate_option_alias")
+    if any(not option["text"] for option in options):
+        reasons.append("missing_option_text")
+    if any(len(option["text"]) > 2048 for option in options):
+        reasons.append("option_text_too_long")
+    if not isinstance(raw_answers, list) or not answers:
+        reasons.append("missing_answer")
+    if len(answers) != len(set(answers)):
+        reasons.append("duplicate_answer_alias")
+    if any(answer not in set(option_aliases) for answer in answers):
+        reasons.append("invalid_answer_alias")
+    if question_type == "single" and (
+        len(options) == 2 or len(answers) != 1
+    ):
+        reasons.append("invalid_single_question_shape")
+    if question_type == "judgment" and (
+        len(options) != 2 or len(answers) != 1 or answers[0] not in {"A", "B"}
+    ):
+        reasons.append("invalid_judgment_question_shape")
+    if question_type == "multiple" and (
+        len(options) == 2 or len(answers) < 2
+    ):
+        reasons.append("invalid_multiple_question_shape")
+
+    anchor_question_id = json_text(record.get("insertAfterQuestionId"))
+    if not anchor_question_id:
+        reasons.append("missing_insert_after_question_id")
+    elif QUESTION_ID_PATTERN.fullmatch(anchor_question_id) is None:
+        reasons.append("invalid_insert_after_question_id")
+    insert_order = record.get("insertOrder")
+    if type(insert_order) is not int or insert_order <= 0:
+        reasons.append("invalid_insert_order")
+
+    provenance = record.get("provenance")
+    if not isinstance(provenance, dict):
+        reasons.append("missing_provenance")
+    else:
+        if json_text(provenance.get("type")) != "ai":
+            reasons.append("invalid_provenance_type")
+        for key in ("provider", "model", "createdAt", "sourceNote"):
+            if not json_text(provenance.get(key)):
+                reasons.append(f"missing_provenance_{key}")
+
+    content_values = [fields["title"], fields["explanation"]]
+    content_values.extend(option["text"] for option in options)
+    if any("[图片:" in value for value in content_values):
+        reasons.append("contains_image")
+
+    return {
+        "sourceType": "ai",
+        "sourceFile": str(source_path),
+        "sourceLine": line_number,
+        "insertAfterQuestionId": anchor_question_id,
+        "resolvedAnchorQuestionId": anchor_question_id,
+        "insertOrder": insert_order,
+        "fields": fields,
+        "reasons": list(dict.fromkeys(reasons)),
+        "warnings": [],
+    }
+
+
+def load_ai_candidates(path, config, version):
+    candidates = []
+    skipped = []
+    source_records = read_jsonl(path)
+    for line_number, record in source_records:
+        review_status = json_text(record.get("reviewStatus"))
+        enabled = record.get("enabled")
+        if review_status not in AI_REVIEW_STATUSES:
+            raise ValueError(
+                f"AI题源reviewStatus无效: {path}:{line_number}: {review_status or '<empty>'}"
+            )
+        if type(enabled) is not bool:
+            raise ValueError(
+                f"AI题源enabled必须是布尔值: {path}:{line_number}"
+            )
+        if review_status != "approved" or not enabled:
+            skipped.append(
+                {
+                    "sourceLine": line_number,
+                    "questionId": json_text(record.get("questionId")),
+                    "reviewStatus": review_status,
+                    "enabled": enabled,
+                }
+            )
+            continue
+        candidates.append(
+            build_ai_candidate(record, path, line_number, config, version)
+        )
+    return candidates, skipped, len(source_records)
+
+
+def normalized_title(value):
+    return re.sub(r"\s+", "", clean_text(value)).casefold()
+
+
+def merge_ai_candidates(crawled_candidates, ai_candidates, config):
+    crawled_by_id = {
+        candidate["fields"]["questionId"]: candidate
+        for candidate in crawled_candidates
+    }
+    crawled_title_keys = {
+        normalized_title(candidate["fields"]["title"])
+        for candidate in crawled_candidates
+    }
+    ai_id_counts = Counter(
+        candidate["fields"]["questionId"] for candidate in ai_candidates
+    )
+    ai_title_counts = Counter(
+        normalized_title(candidate["fields"]["title"])
+        for candidate in ai_candidates
+    )
+    material_group_last_question = {}
+    for candidate in crawled_candidates:
+        if candidate["fields"]["type"] == "material":
+            material_group_last_question[
+                candidate["fields"]["materialGroupId"]
+            ] = candidate["fields"]["questionId"]
+
+    for candidate in ai_candidates:
+        fields = candidate["fields"]
+        question_id = fields["questionId"]
+        if question_id in crawled_by_id or ai_id_counts[question_id] > 1:
+            candidate["reasons"].append("duplicate_question_id")
+        title_key = normalized_title(fields["title"])
+        if title_key in crawled_title_keys or ai_title_counts[title_key] > 1:
+            candidate["reasons"].append("duplicate_question_title")
+
+        anchor = crawled_by_id.get(candidate["insertAfterQuestionId"])
+        if anchor is None:
+            candidate["reasons"].append("anchor_not_found")
+            continue
+        anchor_fields = anchor["fields"]
+        if (
+            fields["subjectId"] != config["subjectId"]
+            or fields["chapterId"] != anchor_fields["chapterId"]
+            or fields["chapter"] != anchor_fields["chapter"]
+            or fields["section"] != anchor_fields["section"]
+        ):
+            candidate["reasons"].append("anchor_scope_mismatch")
+        if fields["knowledge"] != anchor_fields["knowledge"]:
+            candidate["warnings"].append("anchor_knowledge_mismatch")
+        if anchor_fields["type"] == "material":
+            candidate["resolvedAnchorQuestionId"] = material_group_last_question[
+                anchor_fields["materialGroupId"]
+            ]
+
+    placement_counts = Counter(
+        (candidate["resolvedAnchorQuestionId"], candidate["insertOrder"])
+        for candidate in ai_candidates
+        if candidate["resolvedAnchorQuestionId"] in crawled_by_id
+    )
+    for candidate in ai_candidates:
+        placement_key = (
+            candidate["resolvedAnchorQuestionId"],
+            candidate["insertOrder"],
+        )
+        if placement_counts[placement_key] > 1:
+            candidate["reasons"].append("duplicate_insert_order")
+        candidate["reasons"] = list(dict.fromkeys(candidate["reasons"]))
+
+    invalid = [candidate for candidate in ai_candidates if candidate["reasons"]]
+    if invalid:
+        details = "\n".join(
+            f"- {candidate['sourceFile']}:{candidate['sourceLine']} "
+            f"{candidate['fields']['questionId'] or '<missing-id>'}: "
+            f"{', '.join(candidate['reasons'])}"
+            for candidate in invalid
+        )
+        raise ValueError(f"AI题源校验失败:\n{details}")
+
+    candidates_by_anchor = {}
+    for candidate in ai_candidates:
+        candidates_by_anchor.setdefault(
+            candidate["resolvedAnchorQuestionId"], []
+        ).append(candidate)
+    for candidates in candidates_by_anchor.values():
+        candidates.sort(
+            key=lambda item: (
+                item["insertOrder"],
+                item["fields"]["questionId"],
+            )
+        )
+
+    merged = []
+    for candidate in crawled_candidates:
+        merged.append(candidate)
+        merged.extend(
+            candidates_by_anchor.get(candidate["fields"]["questionId"], [])
+        )
+
+    checks = {
+        "aiJsonlValid": True,
+        "aiQuestionIdsUnique": len(ai_id_counts) == len(ai_candidates),
+        "aiQuestionPrefixesMatch": all(
+            candidate["fields"]["questionId"].startswith(
+                f"{config['questionPrefix']}-ai-"
+            )
+            for candidate in ai_candidates
+        ),
+        "aiQuestionsReviewed": True,
+        "aiAnchorsExist": all(
+            candidate["insertAfterQuestionId"] in crawled_by_id
+            for candidate in ai_candidates
+        ),
+        "aiAnchorsAreCrawledQuestions": True,
+        "aiAnchorScopesMatch": all(
+            candidate["fields"]["chapterId"]
+            == crawled_by_id[candidate["insertAfterQuestionId"]]["fields"]["chapterId"]
+            and candidate["fields"]["chapter"]
+            == crawled_by_id[candidate["insertAfterQuestionId"]]["fields"]["chapter"]
+            and candidate["fields"]["section"]
+            == crawled_by_id[candidate["insertAfterQuestionId"]]["fields"]["section"]
+            for candidate in ai_candidates
+        ),
+        "aiInsertOrdersUnique": len(placement_counts) == len(ai_candidates),
+        "aiQuestionTypesMatch": all(
+            candidate["fields"]["type"] in AI_SUPPORTED_TYPES
+            for candidate in ai_candidates
+        ),
+        "aiSelectionModesMatch": all(
+            candidate["fields"]["selectionMode"]
+            == (
+                "multiple"
+                if candidate["fields"]["type"] == "multiple"
+                else "single"
+            )
+            for candidate in ai_candidates
+        ),
+        "aiAnswersValid": all(
+            set(candidate["fields"]["answer"]).issubset(
+                {
+                    option["alias"]
+                    for option in candidate["fields"]["options"]
+                }
+            )
+            for candidate in ai_candidates
+        ),
+        "aiQuestionsNotDuplicated": all(
+            candidate["fields"]["questionId"] not in crawled_by_id
+            and normalized_title(candidate["fields"]["title"])
+            not in crawled_title_keys
+            for candidate in ai_candidates
+        ) and len(ai_title_counts) == len(ai_candidates),
+    }
+    return merged, checks
+
+
 def normalize_published_material_groups(candidates):
     groups = OrderedDict()
     for candidate in candidates:
@@ -927,6 +1273,11 @@ def main():
     parser.add_argument("input", type=Path, help="题目整理 Excel 文件路径")
     parser.add_argument("--output-root", type=Path, default=Path("outputs/question-bank"))
     parser.add_argument("--version", help="题库版本；默认根据工作簿生成日期生成 YYYY-MM-DD-v1")
+    parser.add_argument(
+        "--ai-questions",
+        type=Path,
+        help="AI题源JSONL文件或包含questions.jsonl的科目目录；不传则不合并AI题",
+    )
     args = parser.parse_args()
 
     workbook_path = args.input.resolve()
@@ -943,6 +1294,13 @@ def main():
     version = args.version or default_version(info)
     if len(version) > FIELD_LIMITS["version"]:
         raise ValueError("version 长度超过 64")
+    ai_source_path = None
+    if args.ai_questions:
+        ai_source_path = args.ai_questions.resolve()
+        if ai_source_path.is_dir():
+            ai_source_path = ai_source_path / "questions.jsonl"
+        if not ai_source_path.is_file():
+            raise FileNotFoundError(f"找不到AI题源文件: {ai_source_path}")
 
     question_rows = workbook["全部题目"]
     if not question_rows:
@@ -970,15 +1328,29 @@ def main():
             candidate["reasons"].append("duplicate_source_question_id")
             candidate["reasons"] = list(dict.fromkeys(candidate["reasons"]))
 
-    accepted_candidates = order_candidates_by_scope(
+    accepted_crawled_candidates = order_candidates_by_scope(
         [candidate for candidate in candidates if not candidate["reasons"]]
     )
-    normalize_published_material_groups(accepted_candidates)
+    normalize_published_material_groups(accepted_crawled_candidates)
     rejected_candidates = [candidate for candidate in candidates if candidate["reasons"]]
+    ai_candidates = []
+    ai_skipped = []
+    ai_source_records = 0
+    if ai_source_path:
+        ai_candidates, ai_skipped, ai_source_records = load_ai_candidates(
+            ai_source_path,
+            config,
+            version,
+        )
+    merged_candidates, ai_checks = merge_ai_candidates(
+        accepted_crawled_candidates,
+        ai_candidates,
+        config,
+    )
     updated_at = date_value(version)
     questions = [
         question_document(candidate, index, updated_at)
-        for index, candidate in enumerate(accepted_candidates, 1)
+        for index, candidate in enumerate(merged_candidates, 1)
     ]
     catalog = catalog_document(questions, config, version, updated_at)
     checks = validate_outputs(
@@ -986,6 +1358,7 @@ def main():
         catalog,
         question_types_match=question_types_match,
     )
+    checks.update(ai_checks)
 
     output_dir = (args.output_root / config["subjectId"] / version).resolve()
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -1000,6 +1373,7 @@ def main():
     write_jsonl(catalog_path, [catalog])
     write_jsonl(rejected_path, [
         {
+            "sourceType": "excel",
             "excelRow": candidate["excelRow"],
             "sourceOrder": candidate["sourceOrder"],
             "sourceQuestionId": candidate["sourceQuestionId"],
@@ -1022,7 +1396,7 @@ def main():
     ])
 
     reason_counts = Counter(reason for candidate in rejected_candidates for reason in candidate["reasons"])
-    title_counts = Counter(candidate["fields"]["title"] for candidate in accepted_candidates)
+    title_counts = Counter(candidate["fields"]["title"] for candidate in merged_candidates)
     duplicate_title_groups = sum(1 for count in title_counts.values() if count > 1)
     visible_material_groups = Counter(
         candidate["fields"].get("materialGroupId")
@@ -1031,7 +1405,7 @@ def main():
     )
     accepted_material_groups = Counter(
         candidate["fields"].get("materialGroupId")
-        for candidate in accepted_candidates
+        for candidate in merged_candidates
         if candidate["fields"]["type"] == "material"
     )
     partial_material_groups = sum(
@@ -1041,6 +1415,7 @@ def main():
     report = {
         "status": "passed_with_rejections" if rejected_candidates else "passed",
         "input": str(workbook_path),
+        "aiInput": str(ai_source_path) if ai_source_path else None,
         "sourceSubject": source_subject,
         "subject": config,
         "version": version,
@@ -1048,6 +1423,10 @@ def main():
             "sourceRows": len(question_rows) - 1,
             "visibleRows": len(visible_rows),
             "permissionSkippedRows": len(question_rows) - 1 - len(visible_rows),
+            "crawledAcceptedQuestions": len(accepted_crawled_candidates),
+            "aiSourceRecords": ai_source_records,
+            "aiAcceptedQuestions": len(ai_candidates),
+            "aiSkippedQuestions": len(ai_skipped),
             "acceptedQuestions": len(questions),
             "rejectedQuestions": len(rejected_candidates),
             "chapters": len(catalog["chapters"]),
@@ -1064,6 +1443,14 @@ def main():
         "rejectionReasons": dict(reason_counts),
         "warnings": {
             "duplicateTitleGroups": duplicate_title_groups,
+            "aiKnowledgeAnchorMismatches": [
+                {
+                    "questionId": candidate["fields"]["questionId"],
+                    "insertAfterQuestionId": candidate["insertAfterQuestionId"],
+                }
+                for candidate in ai_candidates
+                if "anchor_knowledge_mismatch" in candidate["warnings"]
+            ],
             "note": "相同题干但选项不同不按重复题处理；可结合 rejected.json 和源数据人工复核。",
         },
         "chapterCounts": catalog["chapters"],
@@ -1077,7 +1464,24 @@ def main():
         "subjectId": config["subjectId"],
         "version": version,
         "questionCount": len(questions),
-        "files": [file_metadata(path) for path in (questions_path, catalog_path, rejected_path, report_path)],
+        "sources": {
+            "workbook": dict(file_metadata(workbook_path), path=str(workbook_path)),
+            "aiQuestions": (
+                dict(
+                    file_metadata(ai_source_path),
+                    path=str(ai_source_path),
+                    records=ai_source_records,
+                    accepted=len(ai_candidates),
+                    skipped=len(ai_skipped),
+                )
+                if ai_source_path
+                else None
+            ),
+        },
+        "files": [
+            file_metadata(path)
+            for path in (questions_path, catalog_path, rejected_path, report_path)
+        ],
         "generatedAt": report["generatedAt"],
     }
     write_json(manifest_path, manifest)
@@ -1087,6 +1491,9 @@ def main():
         "subjectId": config["subjectId"],
         "version": version,
         "accepted": len(questions),
+        "crawledAccepted": len(accepted_crawled_candidates),
+        "aiAccepted": len(ai_candidates),
+        "aiSkipped": len(ai_skipped),
         "rejected": len(rejected_candidates),
         "chapters": len(catalog["chapters"]),
         "knowledgeGroups": len(catalog["knowledgeGroups"]),

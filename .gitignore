@@ -3,6 +3,12 @@ unpackage/
 .DS_Store
 outputs/
 resources/
+!resources/
+resources/*
+!resources/question-bank/
+resources/question-bank/*
+!resources/question-bank/ai/
+!resources/question-bank/ai/**
 
 # Codex 临时工作文件
 .codex-tmp/

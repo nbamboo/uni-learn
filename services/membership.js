@@ -134,22 +134,63 @@ async function executeCloudCall(action, payload) {
 	if (typeof uniCloud === 'undefined' || typeof uniCloud.callFunction !== 'function') {
 		throw new MembershipServiceError('VIRTUAL_PAYMENT_CLOUD_UNAVAILABLE', '当前环境不支持会员服务')
 	}
-	const response = await uniCloud.callFunction({
-		name: CLOUD_FUNCTION_NAME,
-		data: Object.assign({ action }, payload || {})
-	})
-	const result = response && response.result
-	if (!result || typeof result !== 'object') {
-		throw new MembershipServiceError('VIRTUAL_PAYMENT_INVALID_RESPONSE', '会员服务返回格式不正确')
+	for (let attempt = 0; attempt < 2; attempt += 1) {
+		let response
+		try {
+			response = await uniCloud.callFunction({
+				name: CLOUD_FUNCTION_NAME,
+				data: Object.assign({ action }, payload || {})
+			})
+		} catch (error) {
+			if (membershipLoginRequired(error && error.errCode, error && (error.errMsg || error.message))) {
+				if (attempt === 0) {
+					await ensurePracticeUser({ forceRefresh: true })
+					continue
+				}
+				throw membershipLoginError()
+			}
+			throw error
+		}
+		const result = response && response.result
+		if (!result || typeof result !== 'object') {
+			throw new MembershipServiceError('VIRTUAL_PAYMENT_INVALID_RESPONSE', '会员服务返回格式不正确')
+		}
+		if (result.errCode !== 0) {
+			if (membershipLoginRequired(result.errCode, result.errMsg)) {
+				if (attempt === 0) {
+					await ensurePracticeUser({ forceRefresh: true })
+					continue
+				}
+				throw membershipLoginError({ requestId: result.requestId || response.requestId })
+			}
+			throw new MembershipServiceError(
+				result.errCode || 'VIRTUAL_PAYMENT_CLOUD_ERROR',
+				result.errMsg || '会员服务请求失败',
+				{ requestId: result.requestId || response.requestId }
+			)
+		}
+		return result.data
 	}
-	if (result.errCode !== 0) {
-		throw new MembershipServiceError(
-			result.errCode || 'VIRTUAL_PAYMENT_CLOUD_ERROR',
-			result.errMsg || '会员服务请求失败',
-			{ requestId: result.requestId || response.requestId }
-		)
-	}
-	return result.data
+	throw new MembershipServiceError('VIRTUAL_PAYMENT_LOGIN_REQUIRED', '登录状态已失效，请重新进入小程序后重试')
+}
+
+function membershipLoginError(options) {
+	return new MembershipServiceError(
+		'VIRTUAL_PAYMENT_LOGIN_REQUIRED',
+		'登录状态已失效，请关闭并重新进入小程序后重试',
+		options
+	)
+}
+
+function membershipLoginRequired(errCode, errMsg) {
+	return [
+		'VIRTUAL_PAYMENT_LOGIN_REQUIRED',
+		'QUESTION_BANK_LOGIN_REQUIRED',
+		'uni-id-token-expired',
+		'uni-id-check-token-failed',
+		30202,
+		30203
+	].indexOf(errCode) > -1 || /token校验未通过|登录状态.*(失效|过期)/i.test(String(errMsg || ''))
 }
 
 export async function getMembership(options) {
@@ -219,7 +260,10 @@ function assertPaymentAvailable() {
 
 function getWeixinLoginCode() {
 	return new Promise((resolve, reject) => {
-		uni.login({
+		const login = typeof wx !== 'undefined' && typeof wx.login === 'function'
+			? wx.login.bind(wx)
+			: uni.login.bind(uni)
+		login({
 			provider: 'weixin',
 			success: result => result && result.code
 				? resolve(result.code)
@@ -232,15 +276,42 @@ function getWeixinLoginCode() {
 	})
 }
 
+function paymentErrorDetails(error) {
+	const errCode = Number(error && error.errCode)
+	const errMsg = error && error.errMsg || ''
+	if (errCode === -2 || errCode === 700601) {
+		return { errCode: 'VIRTUAL_PAYMENT_CANCELLED', errMsg: '已取消支付' }
+	}
+	if (errCode === -15005 || errCode === -15007 || /token校验|登录态.*(失效|过期)/i.test(errMsg)) {
+		return {
+			errCode: 'VIRTUAL_PAYMENT_LOGIN_TOKEN_INVALID',
+			errMsg: '支付登录态校验失败，请重新进入小程序后重试'
+		}
+	}
+	if (errCode === -15006 || /支付签名|pay[_ ]?sig/i.test(errMsg)) {
+		return {
+			errCode: 'VIRTUAL_PAYMENT_SIGNATURE_INVALID',
+			errMsg: '支付签名校验失败，请联系管理员检查现网AppKey配置'
+		}
+	}
+	return {
+		errCode: 'VIRTUAL_PAYMENT_FAILED',
+		errMsg: errMsg || '支付失败'
+	}
+}
+
 function requestVirtualPayment(payData) {
 	return new Promise((resolve, reject) => {
 		wx.requestVirtualPayment(Object.assign({}, payData, {
 			success: resolve,
-			fail: error => reject(new MembershipServiceError(
-				error && error.errCode === -2 ? 'VIRTUAL_PAYMENT_CANCELLED' : 'VIRTUAL_PAYMENT_FAILED',
-				error && error.errCode === -2 ? '已取消支付' : error && error.errMsg || '支付失败',
-				{ paymentError: error }
-			))
+			fail: error => {
+				const details = paymentErrorDetails(error)
+				reject(new MembershipServiceError(
+					details.errCode,
+					details.errMsg,
+					{ paymentError: error }
+				))
+			}
 		}))
 	})
 }
@@ -265,17 +336,26 @@ export async function queryMembershipOrder(outTradeNo, options) {
 export async function purchaseMembership(productId) {
 	assertPaymentAvailable()
 	await ensurePracticeUser()
-	const code = await getWeixinLoginCode()
-	const created = await executeCloudCall('createOrder', { productId, code })
-	if (!created || !created.order || !created.payData) {
-		throw new MembershipServiceError('VIRTUAL_PAYMENT_INVALID_RESPONSE', '下单结果不完整')
+	let created = null
+	for (let attempt = 0; attempt < 2; attempt += 1) {
+		const code = await getWeixinLoginCode()
+		created = await executeCloudCall('createOrder', { productId, code })
+		if (!created || !created.order || !created.payData) {
+			throw new MembershipServiceError('VIRTUAL_PAYMENT_INVALID_RESPONSE', '下单结果不完整')
+		}
+		storageSet(userScopedStorageKey(LAST_ORDER_KEY), {
+			outTradeNo: created.order.outTradeNo,
+			productId: created.order.productId,
+			createdAt: Date.now()
+		})
+		try {
+			await requestVirtualPayment(created.payData)
+			break
+		} catch (error) {
+			if (attempt === 0 && error && error.errCode === 'VIRTUAL_PAYMENT_LOGIN_TOKEN_INVALID') continue
+			throw error
+		}
 	}
-	storageSet(userScopedStorageKey(LAST_ORDER_KEY), {
-		outTradeNo: created.order.outTradeNo,
-		productId: created.order.productId,
-		createdAt: Date.now()
-	})
-	await requestVirtualPayment(created.payData)
 	try {
 		return await queryMembershipOrder(created.order.outTradeNo, { attempts: 5, interval: 1500 })
 	} catch (error) {
