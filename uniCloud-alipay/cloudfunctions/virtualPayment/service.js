@@ -16,7 +16,7 @@ const MISSING_ORDER_CLOSE_AGE_MS = 30 * 60 * 1000
 const MEMBER_EXPIRY_GRACE_MS = 6 * 60 * 60 * 1000
 
 const PRODUCTS = Object.freeze({
-	'membership_1m': Object.freeze({ productId: 'membership_1m', name: '全科31天', months: 1, days: 31, priceFen: 800, regularPriceFen: 1200, showRegularPrice: true }),
+	'membership_1m': Object.freeze({ productId: 'membership_1m', name: '全科31天', months: 1, days: 31, priceFen: 10, regularPriceFen: 1200, showRegularPrice: true }),
 	'membership_3m': Object.freeze({ productId: 'membership_3m', name: '全科93天', months: 3, days: 93, priceFen: 1900, regularPriceFen: 2900 }),
 	'membership_6m': Object.freeze({ productId: 'membership_6m', name: '全科186天', months: 6, days: 186, priceFen: 3500, regularPriceFen: 5200 }),
 	'membership_12m': Object.freeze({ productId: 'membership_12m', name: '全科366天', months: 12, days: 366, priceFen: 5900, regularPriceFen: 8900 })

@@ -70,7 +70,7 @@
 	} from '@/services/membership.js'
 
 	const FALLBACK_PLANS = [
-		{ productId: 'membership_1m', name: '全科31天', months: 1, days: 31, priceFen: 800, regularPriceFen: 1200, showRegularPrice: true },
+		{ productId: 'membership_1m', name: '全科31天', months: 1, days: 31, priceFen: 10, regularPriceFen: 1200, showRegularPrice: true },
 		{ productId: 'membership_3m', name: '全科93天', months: 3, days: 93, priceFen: 1900, regularPriceFen: 2900 },
 		{ productId: 'membership_6m', name: '全科186天', months: 6, days: 186, priceFen: 3500, regularPriceFen: 5200 },
 		{ productId: 'membership_12m', name: '全科366天', months: 12, days: 366, priceFen: 5900, regularPriceFen: 8900 }

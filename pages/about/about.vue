@@ -15,42 +15,31 @@
 		</view>
 
 		<view class="about-menu-card">
-			<uni-list :border="false">
-				<uni-list-item
-					:showExtraIcon="true"
-					:showArrow="true"
-					:extraIcon="{ type: 'vip-filled', color: '#008cff', size: '25' }"
-					title="会员中心"
-					:rightText="membershipText"
-					to="/pages/membership/membership"
-				/>
-				<uni-list-item
-					:showExtraIcon="true"
-					:showArrow="true"
-					:extraIcon="{ type: 'map', color: '#008cff', size: '25' }"
-					to="/pages/course/course"
-					@click="onClick"
-					title="图文教程"
-				/>
-				<view class="feedback-list-wrapper">
-					<uni-list-item
-						:showExtraIcon="true"
-						:showArrow="true"
-						:extraIcon="{ type: 'paperplane', color: '#008cff', size: '25' }"
-						title="分享好友"
-					/>
-					<button class="feedback-overlay-btn" open-type="share"></button>
-				</view>
-				<view class="feedback-list-wrapper">
-					<uni-list-item
-						:showExtraIcon="true"
-						:showArrow="true"
-						:extraIcon="{ type: 'email', color: '#008cff', size: '25' }"
-						title="问题反馈"
-					/>
-					<button class="feedback-overlay-btn" open-type="feedback"></button>
-				</view>
-			</uni-list>
+			<view class="about-menu-row" hover-class="about-menu-row--hover"
+				@tap="openPage('/pages/membership/membership')">
+				<view class="about-menu-icon"><uni-icons type="vip-filled" size="25" color="#008cff"></uni-icons></view>
+				<text class="about-menu-title">会员中心</text>
+				<text class="about-menu-extra">{{ membershipText }}</text>
+				<uni-icons class="about-menu-arrow" type="arrowright" size="18" color="#aeb6bf"></uni-icons>
+			</view>
+			<view class="about-menu-row" hover-class="about-menu-row--hover"
+				@tap="openPage('/pages/course/course')">
+				<view class="about-menu-icon"><uni-icons type="map" size="25" color="#008cff"></uni-icons></view>
+				<text class="about-menu-title">图文教程</text>
+				<uni-icons class="about-menu-arrow" type="arrowright" size="18" color="#aeb6bf"></uni-icons>
+			</view>
+			<view class="about-menu-row feedback-list-wrapper" hover-class="about-menu-row--hover">
+				<view class="about-menu-icon"><uni-icons type="paperplane" size="25" color="#008cff"></uni-icons></view>
+				<text class="about-menu-title">分享好友</text>
+				<uni-icons class="about-menu-arrow" type="arrowright" size="18" color="#aeb6bf"></uni-icons>
+				<button class="feedback-overlay-btn" open-type="share"></button>
+			</view>
+			<view class="about-menu-row feedback-list-wrapper" hover-class="about-menu-row--hover">
+				<view class="about-menu-icon"><uni-icons type="email" size="25" color="#008cff"></uni-icons></view>
+				<text class="about-menu-title">问题反馈</text>
+				<uni-icons class="about-menu-arrow" type="arrowright" size="18" color="#aeb6bf"></uni-icons>
+				<button class="feedback-overlay-btn" open-type="feedback"></button>
+			</view>
 		</view>
 	</view>
 </template>
@@ -100,8 +89,8 @@
 						this.pendingCount = pendingPracticeEventCount()
 					}
 				},
-				onClick(e) {
-					console.log('执行click事件', e.data)
+				openPage(url) {
+					uni.navigateTo({ url })
 				}
 			}
 		}
@@ -143,7 +132,7 @@
 			border: 4rpx solid rgba(255, 255, 255, 0.55);
 			border-radius: 50%;
 			background: rgba(255, 255, 255, 0.2);
-			font-size: 34rpx;
+			font-size: 33rpx;
 			font-weight: 600;
 		}
 
@@ -156,14 +145,14 @@
 		}
 
 		.account-name {
-			font-size: 34rpx;
+			font-size: 33rpx;
 			font-weight: 600;
 		}
 
 		.account-status,
 		.account-pending {
 			margin-top: 8rpx;
-			font-size: 26rpx;
+			font-size: 25rpx;
 			color: rgba(255, 255, 255, 0.82);
 			line-height: 1.4;
 		}
@@ -181,12 +170,61 @@
 		box-shadow: 0 5rpx 18rpx rgba(31, 48, 65, 0.04);
 	}
 
+	.about-menu-row {
+		position: relative;
+		display: flex;
+		align-items: center;
+		min-height: 112rpx;
+		padding: 20rpx 24rpx;
+		box-sizing: border-box;
+	}
+
+	.about-menu-row + .about-menu-row {
+		border-top: 1rpx solid #edf0f3;
+	}
+
+	.about-menu-row--hover {
+		background: #f7f9fb;
+	}
+
+	.about-menu-icon {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		width: 50rpx;
+		height: 50rpx;
+		flex: 0 0 50rpx;
+		margin-right: 18rpx;
+	}
+
+	.about-menu-title {
+		flex: 1;
+		min-width: 0;
+		color: #30353c;
+		font-size: 30rpx;
+		font-weight: 600;
+		line-height: 1.35;
+	}
+
+	.about-menu-extra {
+		flex: 0 0 auto;
+		margin-left: 16rpx;
+		color: #8c949d;
+		font-size: 26rpx;
+		line-height: 1.35;
+	}
+
+	.about-menu-arrow {
+		flex: 0 0 auto;
+		margin-left: 14rpx;
+	}
+
 	/* 问题反馈列表项容器 */
 	.feedback-list-wrapper {
 		position: relative;
 	}
 
-	/* 覆盖按钮 - 覆盖整个uni-list-item */
+	/* 覆盖按钮 - 覆盖整个菜单行 */
 	.feedback-overlay-btn {
 		position: absolute;
 		top: 0;
@@ -201,25 +239,4 @@
 		border: none;
 	}
 
-	:deep(.uni-list-item__container) {
-		align-items: center;
-		min-height: 112rpx;
-		padding: 20rpx 24rpx !important;
-		box-sizing: border-box;
-	}
-
-	:deep(.uni-list-item__content-title) {
-		font-size: 32rpx !important;
-		font-weight: 600;
-		line-height: 1.35;
-	}
-
-	:deep(.uni-list-item__extra-text) {
-		font-size: 26rpx !important;
-		line-height: 1.35;
-	}
-
-	:deep(.uni-list-item__icon) {
-		margin-right: 18rpx;
-	}
 </style>

@@ -44,36 +44,59 @@ def accepted_crawled_candidates(workbook, config):
 
 def run():
     workbooks = configured_workbooks()
-    ai_root = ROOT / "resources/question-bank/ai"
+    ai_root = ROOT / GENERATOR["DEFAULT_AI_QUESTIONS_ROOT"]
+    authoring_materials_root = (
+        ROOT / GENERATOR["DEFAULT_AUTHORING_ROOT"] / "materials"
+    )
     source_directories = sorted(path for path in ai_root.iterdir() if path.is_dir())
+    material_directories = sorted(
+        path for path in authoring_materials_root.iterdir() if path.is_dir()
+    )
     assert len(source_directories) == len(GENERATOR["SUBJECT_CONFIGS"])
     assert set(path.name for path in source_directories) == set(workbooks)
+    assert set(path.name for path in material_directories) == set(workbooks)
 
     for subject_id, (_workbook_path, workbook, config) in sorted(workbooks.items()):
-        source_path = ai_root / subject_id / "questions.jsonl"
+        source_path = ai_root / subject_id / "questions.json"
+        notes_path = authoring_materials_root / subject_id / "tricolor-notes"
         assert source_path.is_file(), f"missing AI source: {source_path}"
+        assert notes_path.is_dir(), f"missing authoring notes directory: {notes_path}"
         crawled = accepted_crawled_candidates(workbook, config)
         ai_candidates, skipped, source_records = GENERATOR["load_ai_candidates"](
             source_path,
             config,
             TEST_VERSION,
         )
-        assert source_records == 1
-        assert len(ai_candidates) == 1
-        assert not skipped
+        assert source_records >= 1
+        assert source_records == len(ai_candidates) + len(skipped)
         merged, ai_checks = GENERATOR["merge_ai_candidates"](
             crawled,
             ai_candidates,
             config,
         )
-        assert len(merged) == len(crawled) + 1
+        assert len(merged) == len(crawled) + len(ai_candidates)
         assert all(ai_checks.values())
 
-        ai_candidate = ai_candidates[0]
-        ai_index = merged.index(ai_candidate)
-        resolved_anchor = ai_candidate["resolvedAnchorQuestionId"]
-        assert ai_index > 0
-        assert merged[ai_index - 1]["fields"]["questionId"] == resolved_anchor
+        candidates_by_anchor = {}
+        for ai_candidate in ai_candidates:
+            candidates_by_anchor.setdefault(
+                ai_candidate["resolvedAnchorQuestionId"], []
+            ).append(ai_candidate)
+        for resolved_anchor, anchored_candidates in candidates_by_anchor.items():
+            anchored_candidates.sort(
+                key=lambda item: (item["insertOrder"], item["fields"]["questionId"])
+            )
+            anchor_index = next(
+                index
+                for index, candidate in enumerate(merged)
+                if candidate["fields"]["questionId"] == resolved_anchor
+            )
+            assert (
+                merged[
+                    anchor_index + 1 : anchor_index + 1 + len(anchored_candidates)
+                ]
+                == anchored_candidates
+            )
 
         updated_at = GENERATOR["date_value"](TEST_VERSION)
         questions = [
@@ -93,23 +116,24 @@ def run():
         )
         assert all(output_checks.values())
 
-        invalid = copy.deepcopy(ai_candidates)
-        invalid[0]["insertAfterQuestionId"] = "missing-anchor-question"
-        invalid[0]["resolvedAnchorQuestionId"] = "missing-anchor-question"
-        try:
-            GENERATOR["merge_ai_candidates"](crawled, invalid, config)
-        except ValueError as error:
-            assert "anchor_not_found" in str(error)
-        else:
-            raise AssertionError("missing AI anchor should fail validation")
+        if ai_candidates:
+            invalid = copy.deepcopy(ai_candidates)
+            invalid[0]["insertAfterQuestionId"] = "missing-anchor-question"
+            invalid[0]["resolvedAnchorQuestionId"] = "missing-anchor-question"
+            try:
+                GENERATOR["merge_ai_candidates"](crawled, invalid, config)
+            except ValueError as error:
+                assert "anchor_not_found" in str(error)
+            else:
+                raise AssertionError("missing AI anchor should fail validation")
 
-        draft_record = json.loads(source_path.read_text(encoding="utf-8").splitlines()[0])
+        draft_record = json.loads(source_path.read_text(encoding="utf-8"))[0]
         draft_record["reviewStatus"] = "draft"
         draft_record["insertAfterQuestionId"] = "drafts-do-not-require-valid-anchors"
         with tempfile.TemporaryDirectory() as temp_directory:
-            draft_path = Path(temp_directory) / "questions.jsonl"
+            draft_path = Path(temp_directory) / "questions.json"
             draft_path.write_text(
-                json.dumps(draft_record, ensure_ascii=False) + "\n",
+                json.dumps([draft_record], ensure_ascii=False, indent=2) + "\n",
                 encoding="utf-8",
             )
             draft_candidates, draft_skipped, draft_records = GENERATOR[

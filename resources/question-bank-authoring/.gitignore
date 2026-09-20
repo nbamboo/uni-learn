@@ -1,0 +1,19 @@
+# 本工程位于 resources/question-bank-authoring；原始教材与辅导资料仅保存在本机。
+materials/**/*.pdf
+materials/**/*.doc
+materials/**/*.docx
+materials/**/*.ppt
+materials/**/*.pptx
+materials/**/*.xls
+materials/**/*.xlsx
+materials/**/*.png
+materials/**/*.jpg
+materials/**/*.jpeg
+materials/**/*.webp
+materials/**/*.zip
+materials/**/*.rar
+materials/**/*.7z
+
+# 本地提取、OCR 和相似度分析中间产物。
+tmp/
+reports/

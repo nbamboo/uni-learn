@@ -1,5 +1,8 @@
 <template>
-	<view class="finance-calculator" :class="{ 'finance-calculator--embedded': embedded }">
+	<view class="finance-calculator" :class="{
+		'finance-calculator--embedded': embedded,
+		'finance-calculator--tool-page': toolPage
+	}">
 		<view class="example">
 			<!-- 基础表单校验 -->
 			<uni-forms ref="valiForm" :rules="rules" :model="valiFormData" labelWidth="0">
@@ -180,6 +183,10 @@
 		},
 		props: {
 			embedded: {
+				type: Boolean,
+				default: false
+			},
+			toolPage: {
 				type: Boolean,
 				default: false
 			},
@@ -663,7 +670,8 @@
 	}
 
 	.content_size {
-		font-size: 16px;
+		font-size: 29rpx;
+		font-weight: 600;
 	}
 
 	.form-row {
@@ -799,7 +807,7 @@
 	.input-suffix {
 		flex: 0 0 auto;
 		min-width: 28rpx;
-		font-size: 16px;
+		font-size: 29rpx;
 		color: #24272c;
 	}
 
@@ -844,7 +852,7 @@
 	.input-value {
 		min-width: 0;
 		overflow: hidden;
-		font-size: 16px;
+		font-size: 29rpx;
 		color: #999;
 		text-overflow: ellipsis;
 		white-space: nowrap;
@@ -858,12 +866,12 @@
 
 	.result-caption {
 		font-weight: 600;
-		font-size: 16px;
+		font-size: 33rpx;
 	}
 
 	.result {
 		font-weight: 600;
-		font-size: 24px;
+		font-size: 41rpx;
 		color: #333;
 	}
 
@@ -873,14 +881,32 @@
 
 	.pmt-btn-clear {
 		margin-right: 10rpx;
-		font-size: 16px;
+		font-size: 29rpx;
+		font-weight: 600;
 	}
 
 	.pmt-btn-cal {
 		background-color: #008cff!important;
 		color: #ffffff !important;
 		margin-right: 10rpx;
-		font-size: 16px;
+		font-size: 29rpx;
+		font-weight: 600;
+	}
+
+	.finance-calculator--tool-page .content_size,
+	.finance-calculator--tool-page .input-suffix,
+	.finance-calculator--tool-page .input-value,
+	.finance-calculator--tool-page .pmt-btn-clear,
+	.finance-calculator--tool-page .pmt-btn-cal {
+		font-size: 30rpx;
+	}
+
+	.finance-calculator--tool-page .result-caption {
+		font-size: 34rpx;
+	}
+
+	.finance-calculator--tool-page .result {
+		font-size: 42rpx;
 	}
 
 	.btn-hover {

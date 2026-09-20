@@ -43,23 +43,23 @@ outputs/question-bank/<subjectId>/<version>/
 每个已配置科目使用独立目录：
 
 ```text
-resources/question-bank/ai/<subjectId>/questions.jsonl
+resources/question-bank/ai/<subjectId>/questions.json
 ```
 
 例如：
 
 ```text
-resources/question-bank/ai/junior-personal-finance/questions.jsonl
-resources/question-bank/ai/middle-personal-finance/questions.jsonl
+resources/question-bank/ai/junior-personal-finance/questions.json
+resources/question-bank/ai/middle-personal-finance/questions.json
 ```
 
-AI 题源是正式题库源数据，必须纳入版本控制，不得加入 `.gitignore`。`questions.jsonl` 必须是 JSONL 格式，每行一道完整 AI 题，不能写成 JSON 数组。
+AI 题源是正式题库源数据，必须纳入版本控制，不得加入 `.gitignore`。`questions.json` 必须是标准 JSON 格式，顶层为数组，每个数组元素是一道完整 AI 题；建议使用 UTF-8 编码和 2 空格缩进，便于编辑器格式化、折叠和校验。AI 题源不能写成逐行 JSON（JSONL）。
 
 当前各科目目录中的 `*-ai-20260919-001` 为合并流程测试例题，处于 `approved + enabled` 状态；显式传入对应 AI 目录时会进入生成结果。正式发布前必须逐题复核，不准备发布的测试题必须改为 `enabled: false`。
 
 ### 生成命令
 
-使用 `--ai-questions` 显式指定 AI 科目目录或具体的 `questions.jsonl`：
+使用 `--ai-questions` 显式指定 AI 科目目录或具体的 `questions.json`：
 
 ```bash
 python3 scripts/generate-question-bank-import.py \
@@ -68,7 +68,7 @@ python3 scripts/generate-question-bank-import.py \
   --version "2026-09-19-v2"
 ```
 
-如果 `--ai-questions` 指向目录，生成器自动读取目录中的 `questions.jsonl`。不传该参数时保持原有行为，只生成 Excel 中的爬取题，不能自动扫描或隐式加入 AI 测试题。
+如果 `--ai-questions` 指向目录，生成器自动读取目录中的 `questions.json`。不传该参数时保持原有行为，只生成 Excel 中的爬取题，不能自动扫描或隐式加入 AI 测试题。
 
 每次修改、启用、停用或重新锚定 AI 题都必须发布新版本，不得覆盖已经启用的旧版本。建议按批次集中发布 AI 题，避免每增加一题就创建一个完整题库版本。
 
@@ -141,7 +141,7 @@ AI 题不得包含未处理的图片标记，不得缺少题干、选项、答�
 
 1. 解析并校验 Excel 爬取题。
 2. 按章节、小节和来源顺序排列有效爬取题。
-3. 读取并校验显式指定的 AI JSONL。
+3. 读取并校验显式指定的 AI JSON 数组。
 4. 建立爬取题 `questionId` 锚点索引。
 5. 按 `insertAfterQuestionId` 和 `insertOrder` 合并 AI 题。
 6. 对合并后的题目统一生成连续 `sortOrder`。
@@ -149,7 +149,7 @@ AI 题不得包含未处理的图片标记，不得缺少题干、选项、答�
 
 `validation-report.json` 必须记录爬取题、AI 源记录、AI 接受题、AI 跳过题和合并后总题数，并保证下列 AI 检查为 `true`：
 
-- `aiJsonlValid`
+- `aiJsonValid`
 - `aiQuestionIdsUnique`
 - `aiQuestionPrefixesMatch`
 - `aiQuestionsReviewed`
@@ -162,7 +162,7 @@ AI 题不得包含未处理的图片标记，不得缺少题干、选项、答�
 - `aiAnswersValid`
 - `aiQuestionsNotDuplicated`
 
-`manifest.json` 必须记录 Excel 和 AI JSONL 的文件路径、大小、SHA-256，以及 AI 题接受和跳过数量。修改生成器或任何 AI 题源后运行：
+`manifest.json` 必须记录 Excel 和 AI JSON 的文件路径、大小、SHA-256，以及 AI 题接受和跳过数量。修改生成器或任何 AI 题源后运行：
 
 ```bash
 python3 scripts/test-question-bank-ai-import.py

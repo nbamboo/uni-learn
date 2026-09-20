@@ -19,6 +19,7 @@
 				<finance-calculator
 					ref="calculator"
 					:embedded="true"
+					:tool-page="true"
 				></finance-calculator>
 			</view>
 
@@ -236,8 +237,8 @@
 		justify-content: center;
 		min-width: 0;
 		border-radius: 9rpx;
-		font-size: 17px;
-		font-weight: 500;
+		font-size: 30rpx;
+		font-weight: 600;
 		color: #6f7580;
 		transition: background-color 0.18s ease, color 0.18s ease;
 	}

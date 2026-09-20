@@ -16,6 +16,7 @@ const MIGRATION_KEY_PREFIX = 'uni-learn-practice-cloud-migration-v1:'
 const UNI_ID_STORAGE_KEYS = ['uni_id_token', 'uni_id_token_expired', 'uniIdToken', 'uniIdTokenExpired']
 const SYNC_BATCH_SIZE = 20
 const SNAPSHOT_CACHE_TTL = 2 * 60 * 1000
+const PRACTICE_BOOTSTRAP_CACHE_TTL = 2 * 60 * 1000
 const SUMMARY_CACHE_TTL = 10 * 60 * 1000
 const PROFILE_CACHE_TTL = 5 * 60 * 1000
 const RECORDS_CACHE_TTL = 10 * 60 * 1000
@@ -40,6 +41,7 @@ const QUESTION_SELECTION_MODES = Object.freeze({
 })
 
 const snapshotCache = new Map()
+const practiceBootstrapCache = new Map()
 const summaryCache = new Map()
 const summaryRefreshRequiredKeys = new Set()
 const userProfileCache = new Map()
@@ -1177,6 +1179,7 @@ function savePracticePosition(storageKey, positionKey, progress) {
 }
 
 function enqueueEvent(event) {
+	if (event && event.subjectId) invalidatePracticeBootstrapCache(event.subjectId)
 	const events = readOutbox()
 	const duplicateIndex = events.findIndex(item => item.eventId === event.eventId)
 	if (duplicateIndex > -1) events.splice(duplicateIndex, 1)
@@ -1304,6 +1307,7 @@ export function savePracticeProgress(question, options) {
 	} else {
 		updateLocalPracticeRoundPosition(progress, section)
 	}
+	invalidatePracticeBootstrapCache(subjectId)
 	savePendingProgress(progress)
 	return progress.progressId
 }
@@ -1367,6 +1371,7 @@ function observePracticePreferencesUser() {
 		observedPreferencesUserId = userId
 		preferencesRequest = null
 		preferencesRefreshRequired = Boolean(userId)
+		practiceBootstrapCache.clear()
 		recordsCache.clear()
 		markPracticeSummaryRefreshRequired()
 	}
@@ -1375,6 +1380,7 @@ function observePracticePreferencesUser() {
 
 export function markPracticePreferencesRefreshRequired() {
 	preferencesRefreshRequired = true
+	practiceBootstrapCache.clear()
 }
 
 export function markPracticeRecordsRefreshRequired() {
@@ -1756,6 +1762,31 @@ function setCached(cache, key, data, ttl) {
 	return cloneValue(data)
 }
 
+function practiceBootstrapCacheKey(input, questionIds) {
+	const user = getCurrentPracticeUser()
+	const subjectId = typeof input.subjectId === 'string' ? input.subjectId.trim() : ''
+	const mode = typeof input.mode === 'string' ? input.mode.trim() : ''
+	const chapterId = input.chapterId === undefined || input.chapterId === null
+		? ''
+		: String(input.chapterId).trim()
+	const section = typeof input.section === 'string' ? input.section.trim() : ''
+	const knowledge = typeof input.knowledge === 'string' ? input.knowledge.trim() : ''
+	const keyword = normalizeExamKeyword(input.keyword)
+	const scopeHash = hashString([mode, chapterId, section, knowledge, keyword].join('|'))
+	const questionHash = hashString(questionIds.slice().sort().join('|'))
+	return `${subjectId}|${user.uid || 'guest'}|${scopeHash}|${questionHash}`
+}
+
+function invalidatePracticeBootstrapCache(subjectId) {
+	if (!subjectId) {
+		practiceBootstrapCache.clear()
+		return
+	}
+	Array.from(practiceBootstrapCache.keys()).forEach(key => {
+		if (key.indexOf(`${subjectId}|`) === 0) practiceBootstrapCache.delete(key)
+	})
+}
+
 function cacheCloudSummary(subjectId, summary) {
 	const cacheKey = summaryCacheKey(subjectId)
 	const saved = setCached(summaryCache, cacheKey, summary, SUMMARY_CACHE_TTL)
@@ -1936,6 +1967,7 @@ function getLocalPracticeRecords(params) {
 
 export function invalidateUserPracticeCache(subjectId) {
 	if (subjectId) {
+		invalidatePracticeBootstrapCache(subjectId)
 		Array.from(snapshotCache.keys()).forEach(key => {
 			if (key.indexOf(`${subjectId}|`) === 0) snapshotCache.delete(key)
 		})
@@ -1947,6 +1979,7 @@ export function invalidateUserPracticeCache(subjectId) {
 		})
 		return
 	}
+	practiceBootstrapCache.clear()
 	snapshotCache.clear()
 	summaryCache.clear()
 	recordsCache.clear()
@@ -2025,6 +2058,7 @@ export async function getPracticeStateSnapshot(subjectId, options) {
 
 export async function getPracticeBootstrap(options) {
 	const input = options || {}
+	observePracticePreferencesUser()
 	const subjectId = typeof input.subjectId === 'string' ? input.subjectId.trim() : ''
 	const mode = PRACTICE_ENTRY_MODES.indexOf(input.mode) > -1 ? input.mode : ''
 	if (!subjectId || !mode) {
@@ -2034,10 +2068,16 @@ export async function getPracticeBootstrap(options) {
 		)
 	}
 	if (!practiceCloudSyncEnabled()) return null
-	await flushPracticeEvents({ includeProgress: false })
 	const questionIds = Array.isArray(input.questionIds)
 		? Array.from(new Set(input.questionIds.filter(Boolean))).slice(0, MAX_SNAPSHOT_QUESTION_IDS)
 		: []
+	const cacheKey = practiceBootstrapCacheKey(Object.assign({}, input, { subjectId, mode }), questionIds)
+	const hasLocalChanges = pendingPracticeEventCount() > 0 || readPreferencesEntry().dirty
+	if (!input.forceRefresh && !preferencesRefreshRequired && !hasLocalChanges) {
+		const cached = getCached(practiceBootstrapCache, cacheKey)
+		if (cached) return cached
+	}
+	await flushPracticeEvents({ includeProgress: false })
 	let result
 	try {
 		result = await executeCloudCall('getPracticeBootstrap', {
@@ -2102,8 +2142,16 @@ export async function getPracticeBootstrap(options) {
 		else removeLocalExamDraft(getExamDraftScope(input))
 	}
 	if (result && result.snapshot) {
-		const cacheKey = `${subjectId}|0|0|${hashString(questionIds.slice().sort().join('|'))}`
-		setCached(snapshotCache, cacheKey, result.snapshot, SNAPSHOT_CACHE_TTL)
+		const snapshotKey = `${subjectId}|0|0|${hashString(questionIds.slice().sort().join('|'))}`
+		setCached(snapshotCache, snapshotKey, result.snapshot, SNAPSHOT_CACHE_TTL)
+	}
+	if (pendingPracticeEventCount() === 0 && !readPreferencesEntry().dirty) {
+		return setCached(
+			practiceBootstrapCache,
+			cacheKey,
+			result,
+			PRACTICE_BOOTSTRAP_CACHE_TTL
+		)
 	}
 	return result
 }
@@ -2529,6 +2577,7 @@ export async function updatePracticePreferences(preferences, options) {
 	))
 	const previous = readPreferencesEntry()
 	savePreferencesEntry(next, true, previous.syncedAt)
+	invalidatePracticeBootstrapCache()
 	if (!practiceCloudSyncEnabled()) {
 		return Object.assign({}, next, {
 			_syncPending: false,

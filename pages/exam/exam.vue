@@ -650,8 +650,8 @@
 	.subject-name { margin-top: 5rpx; font-size: 33rpx; font-weight: 600; line-height: 1.3; }
 	.subject-switch { display: flex; align-items: center; gap: 4rpx; padding: 10rpx 12rpx; border-radius: 12rpx; background: #f1f8fe; color: #008cff; font-size: 27rpx; }
 	.overview-card,
-	.practice-card { margin: 16rpx 24rpx 0; padding: 24rpx; border: 1rpx solid #e4eaf0; border-radius: 18rpx; background: #ffffff; box-shadow: 0 5rpx 18rpx rgba(31, 48, 65, 0.04); }
-	.overview-card { margin-top: 20rpx; }
+	.practice-card { margin: 17rpx 24rpx 0; padding: 24rpx; border: 1rpx solid #e4eaf0; border-radius: 18rpx; background: #ffffff; box-shadow: 0 5rpx 18rpx rgba(31, 48, 65, 0.04); }
+	.overview-card { margin-top: 21rpx; }
 	.card-heading, .completion-heading, .sheet-header { display: flex; align-items: center; justify-content: space-between; }
 	.card-title { font-size: 33rpx; font-weight: 600; }
 	.completion-heading { margin-top: 24rpx; }
@@ -664,17 +664,17 @@
 	.stat-item { display: flex; align-items: center; flex-direction: column; justify-content: center; min-height: 88rpx; border-radius: 12rpx; background: #f5f9fc; text-align: center; }
 	.stat-value { color: #2f3944; font-size: 31rpx; font-weight: 600; line-height: 1.1; }
 	.stat-label { margin-top: 8rpx; color: #7f8892; font-size: 25rpx; }
-	.search-entry { display: flex; align-items: center; height: 82rpx; margin-top: 16rpx; padding: 0 20rpx; border: 1rpx solid #d6e7f4; border-radius: 14rpx; box-sizing: border-box; background: #f7fbfe; color: #56616d; font-size: 29rpx; }
+	.search-entry { display: flex; align-items: center; height: 82rpx; margin-top: 17rpx; padding: 0 20rpx; border: 1rpx solid #d6e7f4; border-radius: 14rpx; box-sizing: border-box; background: #f7fbfe; color: #56616d; font-size: 29rpx; }
 	.search-entry text { flex: 1; margin-left: 14rpx; white-space: nowrap; }
-	.feature-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14rpx; margin-top: 16rpx; }
+	.feature-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 15rpx; margin-top: 17rpx; }
 	.feature-item { display: flex; align-items: center; min-height: 126rpx; padding: 20rpx; border: 1rpx solid #edf1f4; border-radius: 14rpx; box-sizing: border-box; background: #f8fafc; }
 	.feature-icon { position: relative; display: flex; align-items: center; justify-content: center; width: 72rpx; height: 72rpx; flex: 0 0 72rpx; border-radius: 12rpx; background: #eaf5ff; }
-	.feature-badge { position: absolute; top: -10rpx; right: -14rpx; min-width: 34rpx; height: 34rpx; padding: 0 8rpx; border: 3rpx solid #ffffff; border-radius: 18rpx; box-sizing: border-box; background: #e65757; color: #ffffff; font-size: 18rpx; line-height: 31rpx; }
+	.feature-badge { position: absolute; top: -10rpx; right: -14rpx; display: flex; align-items: center; justify-content: center; min-width: 34rpx; height: 34rpx; padding: 0 8rpx; border: 3rpx solid #ffffff; border-radius: 18rpx; box-sizing: border-box; background: #e65757; color: #ffffff; font-size: 18rpx; line-height: 1; text-align: center; }
 	.feature-member-badge { position: absolute; top: -14rpx; right: -22rpx; height: 34rpx; padding: 0 10rpx; border: 3rpx solid #ffffff; border-radius: 18rpx; box-sizing: border-box; background: #30465f; color: #ffffff; font-size: 19rpx; line-height: 30rpx; white-space: nowrap; }
 	.feature-copy { display: flex; flex: 1; flex-direction: column; min-width: 0; margin-left: 18rpx; }
 	.feature-title { font-size: 29rpx; font-weight: 600; line-height: 1.25; }
 	.feature-desc { margin-top: 7rpx; color: #8c949d; font-size: 25rpx; line-height: 1.35; }
-	.bank-note { display: flex; align-items: center; gap: 10rpx; margin: 10rpx 32rpx 0; padding: 20rpx 22rpx; border-radius: 8rpx; background: #f5f6f8; font-size: 25rpx; color: #6f747d; }
+	.bank-note { display: flex; align-items: center; gap: 10rpx; margin: 11rpx 32rpx 0; padding: 20rpx 22rpx; border-radius: 8rpx; background: #f5f6f8; font-size: 25rpx; color: #6f747d; }
 	.bank-note.error { background: #fff2f2; color: #bd3f3f; }
 	.subject-sheet { padding: 28rpx; border-radius: 16rpx 16rpx 0 0; background: #ffffff; }
 	.sheet-header { padding: 0 4rpx 24rpx; border-bottom: 1rpx solid #edf0f3; }

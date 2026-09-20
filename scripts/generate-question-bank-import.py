@@ -52,6 +52,9 @@ AI_SUPPORTED_TYPES = {"single", "judgment", "multiple"}
 SECTION_ORDINAL_PATTERN = re.compile(
     r"^第\s*([0-9一二三四五六七八九十百零〇两]+)\s*(?:节|部分)"
 )
+DEFAULT_AI_QUESTIONS_ROOT = Path("resources/question-bank/ai")
+DEFAULT_AUTHORING_ROOT = Path("resources/question-bank-authoring")
+DEFAULT_OUTPUT_ROOT = Path("outputs/question-bank")
 
 SUBJECT_CONFIGS = {
     "银行从业初级个人理财": {
@@ -513,24 +516,22 @@ def build_candidate(row, config, version):
     }
 
 
-def read_jsonl(path):
+def read_ai_questions_json(path):
+    try:
+        value = json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as error:
+        raise ValueError(
+            f"AI题源JSON解析失败: {path}:{error.lineno}:{error.colno}: {error.msg}"
+        ) from error
+    if not isinstance(value, list):
+        raise ValueError(f"AI题源JSON顶层必须是题目数组: {path}")
     records = []
-    with path.open("r", encoding="utf-8") as source:
-        for line_number, raw_line in enumerate(source, 1):
-            line = raw_line.strip()
-            if not line:
-                continue
-            try:
-                value = json.loads(line)
-            except json.JSONDecodeError as error:
-                raise ValueError(
-                    f"AI题源JSONL解析失败: {path}:{line_number}: {error.msg}"
-                ) from error
-            if not isinstance(value, dict):
-                raise ValueError(
-                    f"AI题源每行必须是JSON对象: {path}:{line_number}"
-                )
-            records.append((line_number, value))
+    for source_index, record in enumerate(value, 1):
+        if not isinstance(record, dict):
+            raise ValueError(
+                f"AI题源数组元素必须是JSON对象: {path} 第{source_index}条"
+            )
+        records.append((source_index, record))
     return records
 
 
@@ -538,7 +539,7 @@ def json_text(value):
     return clean_text(value) if isinstance(value, str) else ""
 
 
-def build_ai_candidate(record, source_path, line_number, config, version):
+def build_ai_candidate(record, source_path, source_index, config, version):
     raw_options = record.get("options")
     options = []
     option_shape_valid = isinstance(raw_options, list)
@@ -659,7 +660,7 @@ def build_ai_candidate(record, source_path, line_number, config, version):
     return {
         "sourceType": "ai",
         "sourceFile": str(source_path),
-        "sourceLine": line_number,
+        "sourceIndex": source_index,
         "insertAfterQuestionId": anchor_question_id,
         "resolvedAnchorQuestionId": anchor_question_id,
         "insertOrder": insert_order,
@@ -672,22 +673,23 @@ def build_ai_candidate(record, source_path, line_number, config, version):
 def load_ai_candidates(path, config, version):
     candidates = []
     skipped = []
-    source_records = read_jsonl(path)
-    for line_number, record in source_records:
+    source_records = read_ai_questions_json(path)
+    for source_index, record in source_records:
         review_status = json_text(record.get("reviewStatus"))
         enabled = record.get("enabled")
         if review_status not in AI_REVIEW_STATUSES:
             raise ValueError(
-                f"AI题源reviewStatus无效: {path}:{line_number}: {review_status or '<empty>'}"
+                f"AI题源reviewStatus无效: {path} 第{source_index}条: "
+                f"{review_status or '<empty>'}"
             )
         if type(enabled) is not bool:
             raise ValueError(
-                f"AI题源enabled必须是布尔值: {path}:{line_number}"
+                f"AI题源enabled必须是布尔值: {path} 第{source_index}条"
             )
         if review_status != "approved" or not enabled:
             skipped.append(
                 {
-                    "sourceLine": line_number,
+                    "sourceIndex": source_index,
                     "questionId": json_text(record.get("questionId")),
                     "reviewStatus": review_status,
                     "enabled": enabled,
@@ -695,7 +697,7 @@ def load_ai_candidates(path, config, version):
             )
             continue
         candidates.append(
-            build_ai_candidate(record, path, line_number, config, version)
+            build_ai_candidate(record, path, source_index, config, version)
         )
     return candidates, skipped, len(source_records)
 
@@ -772,7 +774,7 @@ def merge_ai_candidates(crawled_candidates, ai_candidates, config):
     invalid = [candidate for candidate in ai_candidates if candidate["reasons"]]
     if invalid:
         details = "\n".join(
-            f"- {candidate['sourceFile']}:{candidate['sourceLine']} "
+            f"- {candidate['sourceFile']} 第{candidate['sourceIndex']}条 "
             f"{candidate['fields']['questionId'] or '<missing-id>'}: "
             f"{', '.join(candidate['reasons'])}"
             for candidate in invalid
@@ -800,7 +802,7 @@ def merge_ai_candidates(crawled_candidates, ai_candidates, config):
         )
 
     checks = {
-        "aiJsonlValid": True,
+        "aiJsonValid": True,
         "aiQuestionIdsUnique": len(ai_id_counts) == len(ai_candidates),
         "aiQuestionPrefixesMatch": all(
             candidate["fields"]["questionId"].startswith(
@@ -1271,12 +1273,12 @@ def validate_outputs(questions, catalog, *, question_types_match=True):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("input", type=Path, help="题目整理 Excel 文件路径")
-    parser.add_argument("--output-root", type=Path, default=Path("outputs/question-bank"))
+    parser.add_argument("--output-root", type=Path, default=DEFAULT_OUTPUT_ROOT)
     parser.add_argument("--version", help="题库版本；默认根据工作簿生成日期生成 YYYY-MM-DD-v1")
     parser.add_argument(
         "--ai-questions",
         type=Path,
-        help="AI题源JSONL文件或包含questions.jsonl的科目目录；不传则不合并AI题",
+        help="AI题源JSON文件或包含questions.json的科目目录；不传则不合并AI题",
     )
     args = parser.parse_args()
 
@@ -1298,7 +1300,7 @@ def main():
     if args.ai_questions:
         ai_source_path = args.ai_questions.resolve()
         if ai_source_path.is_dir():
-            ai_source_path = ai_source_path / "questions.jsonl"
+            ai_source_path = ai_source_path / "questions.json"
         if not ai_source_path.is_file():
             raise FileNotFoundError(f"找不到AI题源文件: {ai_source_path}")
 

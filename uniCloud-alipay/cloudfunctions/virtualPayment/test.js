@@ -302,8 +302,8 @@ async function run() {
 						order: {
 							order_id: createdOrderId,
 							status: 2,
-							order_fee: 800,
-							paid_fee: 800,
+							order_fee: 10,
+							paid_fee: 10,
 							paid_time: 1788235200,
 							wx_order_id: 'wx-order-one',
 							wxpay_order_id: 'transaction-one',
@@ -319,7 +319,7 @@ async function run() {
 	const availablePlans = (await service.execute({ action: 'getMembership' }, 'user-one')).plans
 	assert.deepEqual(
 		availablePlans.map(plan => plan.priceFen),
-		[800, 1900, 3500, 5900]
+		[10, 1900, 3500, 5900]
 	)
 	assert.equal(availablePlans[0].regularPriceFen, 1200)
 	assert.equal(availablePlans[0].name, '全科31天')
@@ -335,7 +335,7 @@ async function run() {
 		code: 'login-code'
 	}, 'user-one')
 	createdOrderId = created.order.outTradeNo
-	assert.equal(created.order.amountFen, 800)
+	assert.equal(created.order.amountFen, 10)
 	assert.equal(created.payData.mode, 'short_series_goods')
 	assert.equal(
 		created.payData.paySig,
@@ -401,7 +401,7 @@ async function run() {
 		httpMethod: 'POST',
 		headers: { 'content-type': 'text/xml' },
 		queryStringParameters: { timestamp, nonce, signature },
-		body: `<xml><Event><![CDATA[xpay_refund_notify]]></Event><MchOrderId><![CDATA[${created.order.outTradeNo}]]></MchOrderId><WxOrderId><![CDATA[wx-order-one]]></WxOrderId><WxRefundId><![CDATA[refund-one]]></WxRefundId><RefundFee>800</RefundFee><RetCode>0</RetCode><RefundSuccTimestamp>1788235400</RefundSuccTimestamp></xml>`
+		body: `<xml><Event><![CDATA[xpay_refund_notify]]></Event><MchOrderId><![CDATA[${created.order.outTradeNo}]]></MchOrderId><WxOrderId><![CDATA[wx-order-one]]></WxOrderId><WxRefundId><![CDATA[refund-one]]></WxRefundId><RefundFee>10</RefundFee><RetCode>0</RetCode><RefundSuccTimestamp>1788235400</RefundSuccTimestamp></xml>`
 	})
 	assert.match(refundResult.body, /<ErrCode>0<\/ErrCode>/)
 	assert.equal(environment.collections.question_bank_payment_orders.get(created.order.outTradeNo).status, 'refunded')

@@ -1,5 +1,5 @@
 <template>
-	<finance-calculator></finance-calculator>
+	<finance-calculator :tool-page="true"></finance-calculator>
 </template>
 
 <script>

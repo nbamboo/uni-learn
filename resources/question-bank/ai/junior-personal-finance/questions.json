@@ -1,0 +1,486 @@
+[
+  {
+    "questionId": "ipf-ai-20260920-001",
+    "subjectId": "junior-personal-finance",
+    "chapterId": "2",
+    "chapter": "第二章 个人理财业务相关法律法规",
+    "section": "第三节 银行销售及代理销售产品相关法律法规",
+    "knowledge": "基金代销业务涉及的法律法规",
+    "insertAfterQuestionId": "ipf-3695654",
+    "insertOrder": 100,
+    "type": "single",
+    "selectionMode": "single",
+    "title": "关于基金销售机构对分支机构和基金销售人员的考核评价，下列做法符合规定的是（ ）。",
+    "options": [
+      {
+        "alias": "A",
+        "text": "将基金销售收入作为主要考核指标"
+      },
+      {
+        "alias": "B",
+        "text": "对认购期基金实施特别考核激励"
+      },
+      {
+        "alias": "C",
+        "text": "实施短期激励以提高募集效率"
+      },
+      {
+        "alias": "D",
+        "text": "将投资人长期投资收益纳入考核评价指标体系"
+      }
+    ],
+    "answer": [
+      "D"
+    ],
+    "explanation": "基金销售机构应将基金销售保有规模、投资人长期投资收益等纳入考核评价指标体系；不得将基金销售收入作为主要考核指标，不得实施短期激励，也不得针对认购期基金实施特别考核激励。因此D符合规定，A、B、C不符合规定。",
+    "reviewStatus": "draft",
+    "enabled": true,
+    "provenance": {
+      "type": "ai",
+      "provider": "OpenAI",
+      "model": "Codex",
+      "createdAt": "2026-09-20",
+      "sourceNote": "依据2026年《初级个人理财》三色笔记第10页“基金销售行为内部控制与风险管理”生成；已与2026-09-19-v1全部780道题比较，未发现同考点相似题"
+    }
+  },
+  {
+    "questionId": "ipf-ai-20260920-002",
+    "subjectId": "junior-personal-finance",
+    "chapterId": "2",
+    "chapter": "第二章 个人理财业务相关法律法规",
+    "section": "第三节 银行销售及代理销售产品相关法律法规",
+    "knowledge": "基金代销业务涉及的法律法规",
+    "insertAfterQuestionId": "ipf-3695661",
+    "insertOrder": 100,
+    "type": "single",
+    "selectionMode": "single",
+    "title": "基金销售机构申请延续业务许可证时，若其未实质开展公募基金销售业务，最近一个会计年度基金（货币市场基金除外）销售日均保有量低于（ ），将不符合许可证延续条件。",
+    "options": [
+      {
+        "alias": "A",
+        "text": "1亿元"
+      },
+      {
+        "alias": "B",
+        "text": "3亿元"
+      },
+      {
+        "alias": "C",
+        "text": "5亿元"
+      },
+      {
+        "alias": "D",
+        "text": "10亿元"
+      }
+    ],
+    "answer": [
+      "C"
+    ],
+    "explanation": "选项C正确：基金销售机构未实质开展公募基金销售业务，且最近一个会计年度基金（货币市场基金除外）销售日均保有量低于5亿元的，不符合业务许可证延续条件。选项A、B、D所列金额均不符合教材规定。",
+    "reviewStatus": "draft",
+    "enabled": true,
+    "provenance": {
+      "type": "ai",
+      "provider": "OpenAI",
+      "model": "Codex",
+      "createdAt": "2026-09-20",
+      "sourceNote": "依据2026年《初级个人理财》三色笔记第10页“基金销售行为内部控制与风险管理”生成；已与2026-09-19-v1全部780题及当前AI题源1题比较，未发现同考点相似题"
+    }
+  },
+  {
+    "questionId": "ipf-ai-20260920-003",
+    "subjectId": "junior-personal-finance",
+    "chapterId": "2",
+    "chapter": "第二章 个人理财业务相关法律法规",
+    "section": "第三节 银行销售及代理销售产品相关法律法规",
+    "knowledge": "保险代理业务涉及的相关法律法规",
+    "insertAfterQuestionId": "ipf-3695659",
+    "insertOrder": 100,
+    "type": "single",
+    "selectionMode": "single",
+    "title": "关于商业银行网点与保险公司的合作期限，下列说法正确的是（ ）。",
+    "options": [
+      {
+        "alias": "A",
+        "text": "每个网点与每家保险公司的连续合作期限不得少于6个月"
+      },
+      {
+        "alias": "B",
+        "text": "每个网点与每家保险公司的连续合作期限不得少于1年"
+      },
+      {
+        "alias": "C",
+        "text": "合作期限完全由销售人员自行决定"
+      },
+      {
+        "alias": "D",
+        "text": "仅总行合作需要约定期限，网点不受限制"
+      }
+    ],
+    "answer": [
+      "B"
+    ],
+    "explanation": "选项B正确：商业银行每个网点与每家保险公司的连续合作期限不得少于1年。选项A缩短了法定最低合作期限；选项C错误，合作期限不能由销售人员自行决定；选项D错误，该要求明确适用于商业银行网点。",
+    "reviewStatus": "draft",
+    "enabled": true,
+    "provenance": {
+      "type": "ai",
+      "provider": "OpenAI",
+      "model": "Codex",
+      "createdAt": "2026-09-20",
+      "sourceNote": "依据2026年《初级个人理财》三色笔记第10页“保险代理经营规则相关要求”生成；已与2026-09-19-v1全部780题及当前AI题源1题比较，未发现同考点相似题"
+    }
+  },
+  {
+    "questionId": "ipf-ai-20260920-004",
+    "subjectId": "junior-personal-finance",
+    "chapterId": "2",
+    "chapter": "第二章 个人理财业务相关法律法规",
+    "section": "第四节 个人外汇业务涉及的法律法规",
+    "knowledge": "《外汇业务指引》中关于个人经常项目外汇业务的介绍",
+    "insertAfterQuestionId": "ipf-3695683",
+    "insertOrder": 100,
+    "type": "single",
+    "selectionMode": "single",
+    "title": "个人因借用他人便利化额度等方式规避管理而被列入“关注名单”的，其关注期限为（ ）。",
+    "options": [
+      {
+        "alias": "A",
+        "text": "列入当年"
+      },
+      {
+        "alias": "B",
+        "text": "列入当年及之后连续1年"
+      },
+      {
+        "alias": "C",
+        "text": "列入当年及之后连续2年"
+      },
+      {
+        "alias": "D",
+        "text": "自列入之日起连续5年"
+      }
+    ],
+    "answer": [
+      "C"
+    ],
+    "explanation": "选项C正确：“关注名单”内个人的关注期限为列入名单的当年及之后连续2年。选项A、B均缩短了关注期限；选项D把期限错误表述为自列入之日起连续5年。",
+    "reviewStatus": "draft",
+    "enabled": true,
+    "provenance": {
+      "type": "ai",
+      "provider": "OpenAI",
+      "model": "Codex",
+      "createdAt": "2026-09-20",
+      "sourceNote": "依据2026年《初级个人理财》三色笔记第11页“个人结售汇相关条款”生成；已与2026-09-19-v1全部780题及当前AI题源1题比较，未发现同考点相似题"
+    }
+  },
+  {
+    "questionId": "ipf-ai-20260920-005",
+    "subjectId": "junior-personal-finance",
+    "chapterId": "2",
+    "chapter": "第二章 个人理财业务相关法律法规",
+    "section": "第四节 个人外汇业务涉及的法律法规",
+    "knowledge": "《外汇业务指引》中关于个人经常项目外汇业务的介绍",
+    "insertAfterQuestionId": "ipf-3695683",
+    "insertOrder": 200,
+    "type": "single",
+    "selectionMode": "single",
+    "title": "关于外汇局开具的提取外币现钞备案表，下列说法正确的是（ ）。",
+    "options": [
+      {
+        "alias": "A",
+        "text": "自签发之日起30天内有效，且不可重复使用"
+      },
+      {
+        "alias": "B",
+        "text": "自签发之日起30天内有效，可以重复使用"
+      },
+      {
+        "alias": "C",
+        "text": "自签发之日起60天内有效，且不可重复使用"
+      },
+      {
+        "alias": "D",
+        "text": "长期有效，直至所载金额全部提取"
+      }
+    ],
+    "answer": [
+      "A"
+    ],
+    "explanation": "选项A正确：外汇局开具的提取外币现钞备案表自签发之日起30天内有效，并且不可重复使用。选项B错在允许重复使用；选项C错在将有效期延长为60天；选项D错在认为备案表长期有效。",
+    "reviewStatus": "draft",
+    "enabled": true,
+    "provenance": {
+      "type": "ai",
+      "provider": "OpenAI",
+      "model": "Codex",
+      "createdAt": "2026-09-20",
+      "sourceNote": "依据2026年《初级个人理财》三色笔记第11页“外币现钞收付、存取和携带相关条款”生成；已与2026-09-19-v1全部780题及当前AI题源1题比较，未发现同考点相似题"
+    }
+  },
+  {
+    "questionId": "ipf-ai-20260920-006",
+    "subjectId": "junior-personal-finance",
+    "chapterId": "2",
+    "chapter": "第二章 个人理财业务相关法律法规",
+    "section": "第五节 金融消费者权益保护相关法律法规",
+    "knowledge": "《银行保险机构消费者权益保护管理办法》的主要规定",
+    "insertAfterQuestionId": "ipf-6894504",
+    "insertOrder": 100,
+    "type": "single",
+    "selectionMode": "single",
+    "title": "根据《银行保险机构消费者权益保护管理办法》，银行保险机构对消费者权益保护工作的安排正确的是（ ）。",
+    "options": [
+      {
+        "alias": "A",
+        "text": "仅在发生投诉后启动消费者权益保护工作"
+      },
+      {
+        "alias": "B",
+        "text": "将消费者权益保护交由销售部门单独负责"
+      },
+      {
+        "alias": "C",
+        "text": "将消费者权益保护纳入公司治理、企业文化建设和经营发展战略，并贯穿业务流程各环节"
+      },
+      {
+        "alias": "D",
+        "text": "只需在产品销售完成后披露消费者权益保护情况"
+      }
+    ],
+    "answer": [
+      "C"
+    ],
+    "explanation": "选项C正确：银行保险机构应当将消费者权益保护纳入公司治理、企业文化建设和经营发展战略，建立健全相关体制机制，并将要求贯穿业务流程各环节。选项A、D把消费者权益保护局限在投诉或售后阶段；选项B错误，该工作不是销售部门的单独职责。",
+    "reviewStatus": "draft",
+    "enabled": true,
+    "provenance": {
+      "type": "ai",
+      "provider": "OpenAI",
+      "model": "Codex",
+      "createdAt": "2026-09-20",
+      "sourceNote": "依据2026年《初级个人理财》三色笔记第12页“《银行保险机构消费者权益保护管理办法》的主要规定”生成；已与2026-09-19-v1全部780题及当前AI题源1题比较，未发现同考点相似题"
+    }
+  },
+  {
+    "questionId": "ipf-ai-20260920-007",
+    "subjectId": "junior-personal-finance",
+    "chapterId": "3",
+    "chapter": "第三章 理财投资市场概述",
+    "section": "第三节 理财投资市场介绍",
+    "knowledge": "货币市场介绍",
+    "insertAfterQuestionId": "ipf-3694801",
+    "insertOrder": 100,
+    "type": "single",
+    "selectionMode": "single",
+    "title": "个人投资者参与交易所国债逆回购时，下列关于起点金额的组合正确的是（ ）。",
+    "options": [
+      {
+        "alias": "A",
+        "text": "上交所10万元，深交所1000元"
+      },
+      {
+        "alias": "B",
+        "text": "上交所1000元，深交所10万元"
+      },
+      {
+        "alias": "C",
+        "text": "上交所和深交所均为10万元"
+      },
+      {
+        "alias": "D",
+        "text": "上交所和深交所均为1000元"
+      }
+    ],
+    "answer": [
+      "A"
+    ],
+    "explanation": "选项A正确：教材所列上交所国债逆回购起点金额为10万元，深交所为1000元。选项B颠倒了两个交易所的起点金额；选项C、D错误地认为两个交易所采用相同起点。",
+    "reviewStatus": "draft",
+    "enabled": true,
+    "provenance": {
+      "type": "ai",
+      "provider": "OpenAI",
+      "model": "Codex",
+      "createdAt": "2026-09-20",
+      "sourceNote": "依据2026年《初级个人理财》三色笔记第14页“货币市场”生成；已与2026-09-19-v1全部780题及当前AI题源1题比较，未发现同考点相似题"
+    }
+  },
+  {
+    "questionId": "ipf-ai-20260920-008",
+    "subjectId": "junior-personal-finance",
+    "chapterId": "3",
+    "chapter": "第三章 理财投资市场概述",
+    "section": "第三节 理财投资市场介绍",
+    "knowledge": "保险市场介绍",
+    "insertAfterQuestionId": "ipf-3696252",
+    "insertOrder": 100,
+    "type": "single",
+    "selectionMode": "single",
+    "title": "受益人与被保险人在同一事件中死亡，且无法确定死亡先后顺序时，应当推定（ ）。",
+    "options": [
+      {
+        "alias": "A",
+        "text": "被保险人死亡在先"
+      },
+      {
+        "alias": "B",
+        "text": "受益人死亡在先"
+      },
+      {
+        "alias": "C",
+        "text": "两者同时死亡，不作任何推定"
+      },
+      {
+        "alias": "D",
+        "text": "由保险人自行确定死亡顺序"
+      }
+    ],
+    "answer": [
+      "B"
+    ],
+    "explanation": "选项B正确：受益人与被保险人在同一事件中死亡，且不能确定死亡先后顺序的，推定受益人死亡在先。选项A与规定相反；选项C错误，法律规则要求作出推定；选项D错误，保险人无权自行确定死亡顺序。",
+    "reviewStatus": "draft",
+    "enabled": true,
+    "provenance": {
+      "type": "ai",
+      "provider": "OpenAI",
+      "model": "Codex",
+      "createdAt": "2026-09-20",
+      "sourceNote": "依据2026年《初级个人理财》三色笔记第17页“保险市场介绍”生成；已与2026-09-19-v1全部780题及当前AI题源1题比较，未发现同考点相似题"
+    }
+  },
+  {
+    "questionId": "ipf-ai-20260920-009",
+    "subjectId": "junior-personal-finance",
+    "chapterId": "4",
+    "chapter": "第四章 金融投资产品概述",
+    "section": "第二节 银行理财产品",
+    "knowledge": "银行理财子公司及产品",
+    "insertAfterQuestionId": "ipf-6897811",
+    "insertOrder": 100,
+    "type": "single",
+    "selectionMode": "single",
+    "title": "在国务院银行业监督管理机构没有另行规定的情况下，银行理财子公司发行的理财产品不得直接或间接投资于（ ）。",
+    "options": [
+      {
+        "alias": "A",
+        "text": "普通国债"
+      },
+      {
+        "alias": "B",
+        "text": "非关联方发行的金融债券"
+      },
+      {
+        "alias": "C",
+        "text": "本公司发行的理财产品"
+      },
+      {
+        "alias": "D",
+        "text": "合规货币市场工具"
+      }
+    ],
+    "answer": [
+      "C"
+    ],
+    "explanation": "选项C正确：银行理财子公司发行的理财产品不得直接或间接投资于本公司发行的理财产品，国务院银行业监督管理机构另有规定的除外。教材未将选项A、B、D所列合规资产概括为这一禁止投资对象。",
+    "reviewStatus": "draft",
+    "enabled": true,
+    "provenance": {
+      "type": "ai",
+      "provider": "OpenAI",
+      "model": "Codex",
+      "createdAt": "2026-09-20",
+      "sourceNote": "依据2026年《初级个人理财》三色笔记第21页“银行理财子公司及产品”生成；已与2026-09-19-v1全部780题及当前AI题源1题比较，未发现同考点相似题"
+    }
+  },
+  {
+    "questionId": "ipf-ai-20260920-010",
+    "subjectId": "junior-personal-finance",
+    "chapterId": "4",
+    "chapter": "第四章 金融投资产品概述",
+    "section": "第五节 其他资产管理产品",
+    "knowledge": "基金子公司产品",
+    "insertAfterQuestionId": "ipf-3698116",
+    "insertOrder": 100,
+    "type": "single",
+    "selectionMode": "single",
+    "title": "基金子公司开展专户业务等专业化经营时，应建立以（ ）为核心的风险控制体系。",
+    "options": [
+      {
+        "alias": "A",
+        "text": "销售规模"
+      },
+      {
+        "alias": "B",
+        "text": "净资本"
+      },
+      {
+        "alias": "C",
+        "text": "客户数量"
+      },
+      {
+        "alias": "D",
+        "text": "营业收入"
+      }
+    ],
+    "answer": [
+      "B"
+    ],
+    "explanation": "选项B正确：基金子公司从事专户业务、基金销售业务、私募股权管理业务及监管许可的其他业务时，应实行专业化经营，并建立以净资本为核心的风险控制体系。选项A、C、D均不是教材规定的风险控制核心。",
+    "reviewStatus": "draft",
+    "enabled": true,
+    "provenance": {
+      "type": "ai",
+      "provider": "OpenAI",
+      "model": "Codex",
+      "createdAt": "2026-09-20",
+      "sourceNote": "依据2026年《初级个人理财》三色笔记第24页“基金子公司产品”生成；已与2026-09-19-v1全部780题及当前AI题源1题比较，未发现同考点相似题"
+    }
+  },
+  {
+    "questionId": "ipf-ai-20260920-011",
+    "subjectId": "junior-personal-finance",
+    "chapterId": "6",
+    "chapter": "第六章 理财规划计算工具与方法",
+    "section": "第四节 理财规划计算工具",
+    "knowledge": "Excel的使用",
+    "insertAfterQuestionId": "ipf-4014562",
+    "insertOrder": 100,
+    "type": "single",
+    "selectionMode": "single",
+    "title": "使用Excel财务函数时，客户每月偿还的房贷本息属于现金流出，输入时应记为（ ）。",
+    "options": [
+      {
+        "alias": "A",
+        "text": "正数"
+      },
+      {
+        "alias": "B",
+        "text": "负数"
+      },
+      {
+        "alias": "C",
+        "text": "零"
+      },
+      {
+        "alias": "D",
+        "text": "无需输入"
+      }
+    ],
+    "answer": [
+      "B"
+    ],
+    "explanation": "选项B正确：使用Excel财务函数输入现金流时，投资、存款、生活费用支出以及房贷本息支出等现金流出应记为负数；收入、赎回投资和借入本金等现金流入记为正数。选项A颠倒了现金流方向，选项C、D均会导致计算输入不完整或错误。",
+    "reviewStatus": "draft",
+    "enabled": true,
+    "provenance": {
+      "type": "ai",
+      "provider": "OpenAI",
+      "model": "Codex",
+      "createdAt": "2026-09-20",
+      "sourceNote": "依据2026年《初级个人理财》三色笔记第32页“Excel的使用”生成；已与2026-09-19-v1全部780题及当前AI题源1题比较，未发现同考点相似题"
+    }
+  }
+]

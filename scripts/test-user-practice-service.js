@@ -899,6 +899,117 @@ async function testPracticeBootstrapFallsBackForOlderCloudFunction() {
 	])
 }
 
+async function testPracticeBootstrapUsesShortMemberCache() {
+	const storage = new Map()
+	let now = Date.now()
+	class CacheTestDate extends Date {
+		static now() {
+			return now
+		}
+	}
+	const user = { uid: 'bootstrap-cache-user', tokenExpired: now + 60 * 60 * 1000 }
+	const subjectId = 'junior-personal-finance'
+	storage.set(`uni-learn-membership-v1:${user.uid}`, activeMembership())
+	let bootstrapCalls = 0
+	const environment = {
+		uni: {
+			getStorageSync: key => storage.get(key),
+			setStorageSync: (key, value) => storage.set(key, value),
+			removeStorageSync: key => storage.delete(key)
+		},
+		uniCloud: {
+			getCurrentUserInfo: () => user,
+			async callFunction(request) {
+				const action = request.data.action
+				if (action === 'getPracticeBootstrap') {
+					bootstrapCalls += 1
+					return {
+						result: {
+							errCode: 0,
+							data: {
+								subjectId,
+								mode: request.data.mode,
+								membership: activeMembership(),
+								preferences: {
+									answerMode: 'practice',
+									nightMode: false,
+									updatedAt: bootstrapCalls
+								},
+								snapshot: {
+									subjectId,
+									wrongQuestionIds: [],
+									favoriteQuestionIds: [],
+									answerSelections: {}
+								},
+								practiceRound: null,
+								examDraft: null
+							}
+						}
+					}
+				}
+				if (action === 'updatePreferences') {
+					return {
+						result: {
+							errCode: 0,
+							data: {
+								answerMode: request.data.answerMode,
+								nightMode: request.data.nightMode,
+								updatedAt: request.data.updatedAt
+							}
+						}
+					}
+				}
+				throw new Error(`unexpected action ${action}`)
+			}
+		},
+		console,
+		setTimeout,
+		clearTimeout,
+		Date: CacheTestDate,
+		Map,
+		Set,
+		Promise,
+		Math,
+		JSON,
+		Error,
+		Array,
+		Object,
+		Number,
+		String,
+		Boolean
+	}
+	const service = loadService(environment)
+	const options = {
+		subjectId,
+		mode: 'chapter',
+		chapterId: '1',
+		questionIds: ['ipf-1', 'ipf-2']
+	}
+	const first = await service.getPracticeBootstrap(options)
+	const cached = await service.getPracticeBootstrap(options)
+	assert.equal(bootstrapCalls, 1)
+	assert.deepEqual(cached, first)
+
+	now += 2 * 60 * 1000 + 1
+	await service.getPracticeBootstrap(options)
+	assert.equal(bootstrapCalls, 2)
+
+	await service.getPracticeBootstrap(Object.assign({}, options, { chapterId: '2' }))
+	assert.equal(bootstrapCalls, 3)
+
+	await service.updatePracticePreferences({ nightMode: true })
+	await service.getPracticeBootstrap(options)
+	assert.equal(bootstrapCalls, 4)
+
+	service.savePracticeProgress({
+		id: 'ipf-1',
+		subjectId,
+		chapterId: '1'
+	}, { mode: 'chapter' })
+	await service.getPracticeBootstrap(options)
+	assert.equal(bootstrapCalls, 5)
+}
+
 async function testServerRevocationClearsLocalMembership() {
 	const storage = new Map()
 	const user = { uid: 'revoked-member-user', tokenExpired: Date.now() + 60 * 60 * 1000 }
@@ -1595,6 +1706,7 @@ async function run() {
 	await testNonMemberLocalOnly()
 	await testMembershipActivationFlushesLocalQueue()
 	await testPracticeBootstrapFallsBackForOlderCloudFunction()
+	await testPracticeBootstrapUsesShortMemberCache()
 	await testServerRevocationClearsLocalMembership()
 	await testForegroundRefreshesCachedPreferencesOnce()
 	await testPersistentSummaryAndForegroundRefresh()
