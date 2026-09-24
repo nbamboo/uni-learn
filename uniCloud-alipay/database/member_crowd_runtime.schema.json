@@ -1,0 +1,56 @@
+{
+  "bsonType": "object",
+  "description": "人群包同步锁、微信 token 缓存和最后发布状态，仅允许云函数访问",
+  "permission": {
+    "read": false,
+    "create": false,
+    "update": false,
+    "delete": false
+  },
+  "required": ["kind"],
+  "properties": {
+    "_id": {
+      "description": "固定运行时记录 ID"
+    },
+    "kind": {
+      "bsonType": "string",
+      "enum": ["lock", "published-state", "wechat-token"]
+    },
+    "owner": {
+      "bsonType": "string"
+    },
+    "job_id": {
+      "bsonType": "string"
+    },
+    "access_token": {
+      "bsonType": "string"
+    },
+    "expire_at": {
+      "bsonType": "double"
+    },
+    "snapshot_hash": {
+      "bsonType": "string"
+    },
+    "crowd_id": {
+      "bsonType": "string"
+    },
+    "crowd_name": {
+      "bsonType": "string"
+    },
+    "member_count": {
+      "bsonType": "int"
+    },
+    "effective_count": {
+      "bsonType": "int"
+    },
+    "published_at": {
+      "bsonType": "double"
+    },
+    "created_at": {
+      "bsonType": "double"
+    },
+    "updated_at": {
+      "bsonType": "double"
+    }
+  }
+}

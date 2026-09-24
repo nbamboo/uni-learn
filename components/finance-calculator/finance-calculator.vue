@@ -32,6 +32,10 @@
 							<checkbox-group class="field-checkbox-group" @change="checkboxChange($event, 'nper')">
 								<label class="checkbox-label content_size">
 									<view class="field-checkbox-wrap">
+										<view class="field-checkbox-visual" :class="{
+											checked: parmitems[0].checked,
+											disabled: parmitems[0].checkboxDisabledValue
+										}"></view>
 										<checkbox class="field-checkbox" value="nper" :checked="parmitems[0].checked"
 											:disabled="parmitems[0].checkboxDisabledValue" />
 									</view>
@@ -58,6 +62,10 @@
 							<checkbox-group class="field-checkbox-group" @change="checkboxChange($event, 'pv')">
 								<label class="checkbox-label content_size">
 									<view class="field-checkbox-wrap">
+										<view class="field-checkbox-visual" :class="{
+											checked: parmitems[1].checked,
+											disabled: parmitems[1].checkboxDisabledValue
+										}"></view>
 										<checkbox class="field-checkbox" value="pv" :checked="parmitems[1].checked"
 											:disabled="parmitems[1].checkboxDisabledValue" />
 									</view>
@@ -84,6 +92,10 @@
 							<checkbox-group class="field-checkbox-group" @change="checkboxChange($event, 'fv')">
 								<label class="checkbox-label content_size">
 									<view class="field-checkbox-wrap">
+										<view class="field-checkbox-visual" :class="{
+											checked: parmitems[2].checked,
+											disabled: parmitems[2].checkboxDisabledValue
+										}"></view>
 										<checkbox class="field-checkbox" value="fv" :checked="parmitems[2].checked"
 											:disabled="parmitems[2].checkboxDisabledValue" />
 									</view>
@@ -110,6 +122,10 @@
 							<checkbox-group class="field-checkbox-group" @change="checkboxChange($event, 'pmt')">
 								<label class="checkbox-label content_size">
 									<view class="field-checkbox-wrap">
+										<view class="field-checkbox-visual" :class="{
+											checked: parmitems[3].checked,
+											disabled: parmitems[3].checkboxDisabledValue
+										}"></view>
 										<checkbox class="field-checkbox" value="pmt" :checked="parmitems[3].checked"
 											:disabled="parmitems[3].checkboxDisabledValue" />
 									</view>
@@ -135,6 +151,7 @@
 						<radio-group class="radio-options" @change="radioChange">
 							<label class="radio-option" v-for="(item, index) in items" :key="item.value">
 								<view class="field-radio-wrap">
+									<view class="field-radio-visual" :class="{ checked: index === current }"></view>
 									<radio class="field-radio" :value="item.value" :checked="index === current" />
 								</view>
 								<view class="content_size">{{item.name}}</view>
@@ -161,6 +178,7 @@
 		<!-- 自定义数字键盘 -->
 		<number-input-keyboard
 			:visible="keyboardVisible"
+			:tool-page="toolPage"
 			:value="keyboardValue"
 			:allow-negative="currentKeyboardConfig.allowNegative"
 			:allow-decimal="currentKeyboardConfig.allowDecimal"
@@ -727,8 +745,47 @@
 	}
 
 	.field-checkbox {
-		transform: scale(0.5);
-		transform-origin: left center;
+		position: absolute;
+		top: 0;
+		left: 0;
+		z-index: 2;
+		width: 100%;
+		height: 100%;
+		opacity: 0;
+	}
+
+	.field-checkbox-visual {
+		position: relative;
+		width: 28rpx;
+		height: 28rpx;
+		flex: 0 0 28rpx;
+		border: 2rpx solid #8b929a;
+		border-radius: 4rpx;
+		box-sizing: border-box;
+		background: #ffffff;
+	}
+
+	.field-checkbox-visual.checked {
+		border-color: #008cff;
+		background: #008cff;
+	}
+
+	.field-checkbox-visual.checked::after {
+		position: absolute;
+		top: 46%;
+		left: 50%;
+		width: 7rpx;
+		height: 13rpx;
+		border-right: 3rpx solid #ffffff;
+		border-bottom: 3rpx solid #ffffff;
+		box-sizing: border-box;
+		content: '';
+		transform: translate(-50%, -50%) rotate(45deg);
+		transform-origin: center;
+	}
+
+	.field-checkbox-visual.disabled {
+		opacity: 0.42;
 	}
 
 	.field-control {
@@ -759,6 +816,7 @@
 	}
 
 	.field-radio-wrap {
+		position: relative;
 		display: flex;
 		flex: 0 0 48rpx;
 		align-items: center;
@@ -768,8 +826,40 @@
 	}
 
 	.field-radio {
-		transform: scale(0.5);
-		transform-origin: left center;
+		position: absolute;
+		top: 0;
+		left: 0;
+		z-index: 2;
+		width: 100%;
+		height: 100%;
+		opacity: 0;
+	}
+
+	.field-radio-visual {
+		position: relative;
+		width: 28rpx;
+		height: 28rpx;
+		flex: 0 0 28rpx;
+		border: 2rpx solid #8b929a;
+		border-radius: 50%;
+		box-sizing: border-box;
+		background: #ffffff;
+	}
+
+	.field-radio-visual.checked {
+		border-color: #008cff;
+	}
+
+	.field-radio-visual.checked::after {
+		position: absolute;
+		top: 50%;
+		left: 50%;
+		width: 14rpx;
+		height: 14rpx;
+		border-radius: 50%;
+		background: #008cff;
+		content: '';
+		transform: translate(-50%, -50%);
 	}
 
 	@media screen and (max-width: 599px) {
@@ -898,15 +988,137 @@
 	.finance-calculator--tool-page .input-value,
 	.finance-calculator--tool-page .pmt-btn-clear,
 	.finance-calculator--tool-page .pmt-btn-cal {
-		font-size: 30rpx;
+		font-size: 32rpx;
 	}
 
 	.finance-calculator--tool-page .result-caption {
-		font-size: 34rpx;
+		font-size: 36rpx;
 	}
 
 	.finance-calculator--tool-page .result {
-		font-size: 42rpx;
+		font-size: 44rpx;
+	}
+
+	@media screen and (min-width: 768px) {
+		.finance-calculator--tool-page .example {
+			padding: 32px 48px 24px;
+		}
+
+		.finance-calculator--tool-page .content_size,
+		.finance-calculator--tool-page .input-suffix,
+		.finance-calculator--tool-page .input-value,
+		.finance-calculator--tool-page .pmt-btn-clear,
+		.finance-calculator--tool-page .pmt-btn-cal {
+			font-size: 32px;
+		}
+
+		.finance-calculator--tool-page .field-label {
+			min-height: 56px;
+			padding-left: 8px;
+		}
+
+		.finance-calculator--tool-page .checkbox-label {
+			padding-left: 44px;
+		}
+
+		.finance-calculator--tool-page .field-label--plain {
+			padding-left: 52px;
+		}
+
+		.finance-calculator--tool-page .field-checkbox-wrap {
+			left: 8px;
+			width: 36px;
+			height: 56px;
+		}
+
+		.finance-calculator--tool-page .field-checkbox-visual {
+			width: 28px;
+			height: 28px;
+			flex-basis: 28px;
+			border-width: 2px;
+			border-radius: 4px;
+		}
+
+		.finance-calculator--tool-page .field-checkbox-visual.checked::after {
+			width: 7px;
+			height: 13px;
+			border-bottom-width: 3px;
+			border-right-width: 3px;
+		}
+
+		.finance-calculator--tool-page .custom-input {
+			height: 56px;
+		}
+
+		.finance-calculator--tool-page .cursor {
+			height: 30px;
+		}
+
+		.finance-calculator--tool-page .radio-option:first-child {
+			padding-left: 16px;
+		}
+
+		.finance-calculator--tool-page .field-radio-wrap {
+			width: 36px;
+			height: 56px;
+			flex-basis: 36px;
+		}
+
+		.finance-calculator--tool-page .field-radio-visual {
+			width: 28px;
+			height: 28px;
+			flex-basis: 28px;
+			border-width: 2px;
+		}
+
+		.finance-calculator--tool-page .field-radio-visual.checked::after {
+			width: 14px;
+			height: 14px;
+		}
+
+		.finance-calculator--tool-page .result-wrapper {
+			margin-top: 16px;
+			padding: 32px 0;
+		}
+
+		.finance-calculator--tool-page .result-caption {
+			font-size: 36px;
+		}
+
+		.finance-calculator--tool-page .result {
+			font-size: 44px;
+		}
+
+		/* 题目内弹出的计算器使用同一套宽屏封顶规则。 */
+		.finance-calculator--embedded .example { padding: 32px 48px 24px; }
+		.finance-calculator--embedded .content_size,
+		.finance-calculator--embedded .input-suffix,
+		.finance-calculator--embedded .input-value,
+		.finance-calculator--embedded .pmt-btn-clear,
+		.finance-calculator--embedded .pmt-btn-cal { font-size: 30px; }
+		.finance-calculator--embedded .field-label { min-height: 56px; padding-left: 8px; }
+		.finance-calculator--embedded .checkbox-label { padding-left: 44px; }
+		.finance-calculator--embedded .field-label--plain { padding-left: 52px; }
+		.finance-calculator--embedded .field-checkbox-wrap { left: 8px; width: 36px; height: 56px; }
+		.finance-calculator--embedded .field-checkbox-visual { width: 28px; height: 28px; flex-basis: 28px; border-width: 2px; border-radius: 4px; }
+		.finance-calculator--embedded .field-checkbox-visual.checked::after { width: 7px; height: 13px; border-bottom-width: 3px; border-right-width: 3px; }
+		.finance-calculator--embedded .custom-input { height: 56px; }
+		.finance-calculator--embedded .cursor { height: 30px; }
+		.finance-calculator--embedded .radio-option:first-child { padding-left: 16px; }
+		.finance-calculator--embedded .field-radio-wrap { width: 36px; height: 56px; flex-basis: 36px; }
+		.finance-calculator--embedded .field-radio-visual { width: 28px; height: 28px; flex-basis: 28px; border-width: 2px; }
+		.finance-calculator--embedded .field-radio-visual.checked::after { width: 14px; height: 14px; }
+		.finance-calculator--embedded .result-wrapper { margin-top: 16px; padding: 32px 0; }
+		.finance-calculator--embedded .result-caption { font-size: 34px; }
+		.finance-calculator--embedded .result { font-size: 42px; }
+		/* 工具首页同时带有 embedded 标记，工具字号优先。 */
+		.finance-calculator--embedded.finance-calculator--tool-page .content_size,
+		.finance-calculator--embedded.finance-calculator--tool-page .input-suffix,
+		.finance-calculator--embedded.finance-calculator--tool-page .input-value,
+		.finance-calculator--embedded.finance-calculator--tool-page .pmt-btn-clear,
+		.finance-calculator--embedded.finance-calculator--tool-page .pmt-btn-cal { font-size: 32px; }
+		.finance-calculator--embedded.finance-calculator--tool-page .result-caption { font-size: 36px; }
+		.finance-calculator--embedded.finance-calculator--tool-page .result { font-size: 44px; }
 	}
 
 	.btn-hover {

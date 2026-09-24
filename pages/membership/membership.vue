@@ -3,8 +3,8 @@
 		<view class="hero-card" :class="{ active: membership.isMember }">
 			<view class="hero-copy">
 				<text class="hero-caption hero-caption-top">{{ membershipCaption }}</text>
-				<view class="countdown-line">
-					<text class="hero-title">考试倒计时</text>
+				<view class="countdown-line" v-if="examCountdownConfig.enabled">
+					<text class="hero-title">{{ examCountdownConfig.title }}</text>
 					<view class="countdown-row">
 						<view class="countdown-block">
 							<text class="countdown-value">{{ examCountdown.days }}</text>
@@ -39,11 +39,15 @@
 			<view class="plan-grid">
 				<view
 					class="plan-item"
-					:class="{ selected: selectedProductId === plan.productId }"
+					:class="{
+						selected: selectedProductId === plan.productId,
+						disabled: planUnavailableForCurrentMember(plan)
+					}"
 					v-for="plan in plans"
 					:key="plan.productId"
-					@tap="selectedProductId = plan.productId"
+					@tap="selectPlan(plan)"
 				>
+					<text v-if="planUnavailableForCurrentMember(plan)" class="plan-restriction">仅限非会员</text>
 					<text class="plan-name">{{ plan.name }}</text>
 					<view class="plan-price">
 						<text class="price-symbol">¥</text>
@@ -55,7 +59,7 @@
 					<text v-else class="plan-average">{{ averageText(plan) }}</text>
 				</view>
 			</view>
-			<button class="purchase-button" :loading="purchasing" :disabled="purchasing || loading" @tap="purchase">
+			<button class="purchase-button" :loading="purchasing" :disabled="purchasing || loading || selectedPlanUnavailable" @tap="purchase">
 				{{ purchasing ? '正在处理' : purchaseButtonText }}
 			</button>
 		</view>
@@ -65,22 +69,24 @@
 <script>
 	import {
 		getCachedMembership,
+		getExamCountdownDays,
 		getMembership,
 		purchaseMembership
 	} from '@/services/membership.js'
 
 	const FALLBACK_PLANS = [
-		{ productId: 'membership_1m', name: '全科31天', months: 1, days: 31, priceFen: 10, regularPriceFen: 1200, showRegularPrice: true },
-		{ productId: 'membership_3m', name: '全科93天', months: 3, days: 93, priceFen: 1900, regularPriceFen: 2900 },
-		{ productId: 'membership_6m', name: '全科186天', months: 6, days: 186, priceFen: 3500, regularPriceFen: 5200 },
-		{ productId: 'membership_12m', name: '全科366天', months: 12, days: 366, priceFen: 5900, regularPriceFen: 8900 }
+		{ productId: 'membership_1m', name: '全科31天', months: 1, days: 31, priceFen: 10, regularPriceFen: 1200, showRegularPrice: true, activeMemberPurchasable: false },
+		{ productId: 'membership_3m', name: '全科93天', months: 3, days: 93, priceFen: 1900, regularPriceFen: 2900, activeMemberPurchasable: true },
+		{ productId: 'membership_6m', name: '全科186天', months: 6, days: 186, priceFen: 3500, regularPriceFen: 5200, activeMemberPurchasable: true },
+		{ productId: 'membership_12m', name: '全科366天', months: 12, days: 366, priceFen: 5900, regularPriceFen: 8900, activeMemberPurchasable: true }
 	]
 
-	function getNextExamTargetAt() {
-		const now = new Date()
-		const target = new Date(now.getFullYear(), 11, 31, 23, 59, 59, 999)
-		if (target.getTime() <= now.getTime()) target.setFullYear(target.getFullYear() + 1)
-		return target.getTime()
+	function mergePlanDefaults(plans) {
+		return plans.map(plan => Object.assign(
+			{},
+			FALLBACK_PLANS.find(item => item.productId === plan.productId) || {},
+			plan
+		))
 	}
 
 	export default {
@@ -92,8 +98,8 @@
 				selectedProductId: 'membership_12m',
 				loading: false,
 				purchasing: false,
-				examTargetAt: getNextExamTargetAt(),
-				examCountdown: { days: '0' },
+				examCountdownConfig: cached.examCountdown,
+				examCountdown: { days: String(getExamCountdownDays(cached.examCountdown)) },
 				countdownTimer: null,
 				benefits: [
 					{ title: '屏蔽全部广告', desc: '学习和查看成绩时不再展示广告', icon: 'eye-slash' },
@@ -104,7 +110,10 @@
 		},
 		computed: {
 			selectedPlan() {
-				return this.plans.find(item => item.productId === this.selectedProductId) || this.plans[0]
+				return this.plans.find(item => item.productId === this.selectedProductId) || null
+			},
+			selectedPlanUnavailable() {
+				return this.planUnavailableForCurrentMember(this.selectedPlan)
 			},
 			membershipCaption() {
 				if (!this.membership.isMember) return '开通会员，享受免广告与云端同步'
@@ -127,16 +136,42 @@
 			this.stopExamCountdown()
 		},
 		methods: {
+			planUnavailableForCurrentMember(plan) {
+				return Boolean(
+					this.membership.isMember
+					&& plan
+					&& plan.activeMemberPurchasable === false
+				)
+			},
+			showMonthlyPlanRestriction() {
+				uni.showModal({
+					title: '暂不可购买',
+					content: '全科31天仅限非会员购买，当前会员请选择全科93天、186天或366天续费。',
+					showCancel: false
+				})
+			},
+			selectPlan(plan) {
+				if (this.planUnavailableForCurrentMember(plan)) {
+					this.showMonthlyPlanRestriction()
+					return
+				}
+				this.selectedProductId = plan.productId
+			},
+			ensureSelectedPlanAvailable() {
+				if (this.selectedPlan && !this.selectedPlanUnavailable) return
+				const availablePlan = this.plans.find(plan => !this.planUnavailableForCurrentMember(plan))
+				this.selectedProductId = availablePlan ? availablePlan.productId : ''
+			},
 			updateExamCountdown() {
-				const remainingSeconds = Math.max(0, Math.floor((this.examTargetAt - Date.now()) / 1000))
 				this.examCountdown = {
-					days: String(Math.max(0, Math.floor(remainingSeconds / 86400)))
+					days: String(getExamCountdownDays(this.examCountdownConfig))
 				}
 			},
 			startExamCountdown() {
 				this.stopExamCountdown()
+				if (!this.examCountdownConfig.enabled) return
 				this.updateExamCountdown()
-				this.countdownTimer = setInterval(() => this.updateExamCountdown(), 1000)
+				this.countdownTimer = setInterval(() => this.updateExamCountdown(), 60 * 1000)
 			},
 			stopExamCountdown() {
 				if (!this.countdownTimer) return
@@ -158,7 +193,10 @@
 			},
 			applyMembership(value) {
 				this.membership = value
-				if (value.plans && value.plans.length) this.plans = value.plans
+				this.examCountdownConfig = value.examCountdown || getCachedMembership().examCountdown
+				if (value.plans && value.plans.length) this.plans = mergePlanDefaults(value.plans)
+				this.ensureSelectedPlanAvailable()
+				this.startExamCountdown()
 			},
 			async loadMembership() {
 				if (this.loading || this.purchasing) return
@@ -173,6 +211,10 @@
 			},
 			async purchase() {
 				if (this.purchasing || !this.selectedPlan) return
+				if (this.selectedPlanUnavailable) {
+					this.showMonthlyPlanRestriction()
+					return
+				}
 				this.purchasing = true
 				try {
 					const result = await purchaseMembership(this.selectedPlan.productId)
@@ -185,6 +227,10 @@
 					})
 				} catch (error) {
 					if (error && error.errCode === 'VIRTUAL_PAYMENT_CANCELLED') return
+					if (error && error.errCode === 'VIRTUAL_PAYMENT_PRODUCT_NOT_AVAILABLE_FOR_ACTIVE_MEMBER') {
+						this.showMonthlyPlanRestriction()
+						return
+					}
 					uni.showModal({
 						title: '支付未完成',
 						content: error && (error.errMsg || error.message) || '支付失败，请稍后重试',
@@ -225,8 +271,11 @@
 	.benefit-title { font-size: 27rpx; font-weight: 600; }
 	.benefit-desc { margin-top: 7rpx; color: #838c95; font-size: 22rpx; line-height: 1.4; }
 	.plan-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16rpx; margin-top: 24rpx; }
-	.plan-item { display: flex; align-items: center; flex-direction: column; min-height: 152rpx; padding: 20rpx 12rpx; border: 2rpx solid #e5e9ed; border-radius: 16rpx; box-sizing: border-box; background: #fafbfc; }
+	.plan-item { position: relative; display: flex; align-items: center; flex-direction: column; min-height: 152rpx; padding: 20rpx 12rpx; border: 2rpx solid #e5e9ed; border-radius: 16rpx; box-sizing: border-box; background: #fafbfc; overflow: hidden; }
 	.plan-item.selected { border-color: #008cff; background: #edf8ff; box-shadow: 0 5rpx 18rpx rgba(0, 140, 255, 0.1); }
+	.plan-item.disabled { border-color: #e4e7ea; background: #f3f4f5; color: #9aa1a8; box-shadow: none; }
+	.plan-item.disabled .plan-price { color: #9aa1a8; }
+	.plan-restriction { position: absolute; top: 0; right: 0; padding: 4rpx 10rpx; border-bottom-left-radius: 10rpx; background: #d9dde1; color: #7c858e; font-size: 17rpx; line-height: 1.4; }
 	.plan-name { font-size: 25rpx; font-weight: 600; }
 	.plan-price { display: flex; align-items: baseline; margin-top: 10rpx; color: #007bd1; }
 	.price-symbol { font-size: 22rpx; }
@@ -236,4 +285,34 @@
 	.purchase-button { height: 88rpx; margin-top: 26rpx; border-radius: 46rpx; background: #008cff; color: #ffffff; font-size: 29rpx; font-weight: 600; line-height: 88rpx; }
 	.purchase-button::after { border: 0; }
 	.purchase-button[disabled] { background: #85c9f7; color: #ffffff; }
+
+	@media screen and (min-width: 768px) {
+		.membership-page { width: 100%; max-width: 820px; margin: 0 auto; padding: 24px 24px calc(48px + env(safe-area-inset-bottom)); }
+		.hero-card { min-height: 196px; padding: 32px; border-radius: 22px; box-shadow: 0 12px 34px rgba(35, 51, 70, 0.18); }
+		.hero-title { margin-right: 14px; font-size: 23px; }
+		.countdown-line { margin-top: 10px; }
+		.countdown-value { font-size: 42px; }
+		.countdown-unit { margin-left: 3px; font-size: 20px; }
+		.hero-caption { font-size: 23px; }
+		.hero-caption-top { font-size: 31px; }
+		.member-badge { padding: 8px 16px; border-radius: 22px; font-size: 21px; }
+		.section-card { margin-top: 22px; padding: 28px; border-radius: 18px; box-shadow: 0 6px 24px rgba(33, 45, 58, 0.055); }
+		.section-title { font-size: 31px; }
+		.section-note { font-size: 21px; }
+		.benefit-list { margin-top: 12px; }
+		.benefit-item { padding: 18px 0; }
+		.benefit-icon { width: 72px; height: 72px; flex-basis: 72px; margin-right: 20px; border-radius: 18px; }
+		.benefit-title { font-size: 27px; }
+		.benefit-desc { margin-top: 7px; font-size: 22px; }
+		.plan-grid { gap: 16px; margin-top: 24px; }
+		.plan-item { min-height: 152px; padding: 20px 12px; border-width: 2px; border-radius: 16px; }
+		.plan-restriction { padding: 4px 10px; border-bottom-left-radius: 10px; font-size: 17px; }
+		.plan-name { font-size: 25px; }
+		.plan-price { margin-top: 10px; }
+		.price-symbol { font-size: 22px; }
+		.price-value { margin-left: 3px; font-size: 39px; }
+		.plan-regular-price,
+		.plan-average { margin-top: 4px; font-size: 19px; }
+		.purchase-button { height: 88px; margin-top: 26px; border-radius: 46px; font-size: 29px; line-height: 88px; }
+	}
 </style>

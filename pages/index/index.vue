@@ -28,6 +28,7 @@
 					<block v-for="item in parameterTools" :key="item.url">
 						<my-unit
 							:tool-data="item"
+							:wide-screen="wideScreen"
 							@change="openTool"
 						></my-unit>
 
@@ -62,7 +63,9 @@
 			MyUnit
 		},
 		data() {
+			const windowWidth = uni.getSystemInfoSync().windowWidth
 			return {
+				wideScreen: windowWidth >= 768,
 				membership: getCachedMembership(),
 				membershipLoaded: false,
 				membershipLoading: false,
@@ -148,9 +151,19 @@
 			}
 		},
 		onShow() {
+			this.syncCustomTabBar()
 			if (this.activeMode === 1) this.refreshMembership()
 		},
+		onResize(event) {
+			const width = Number(event && event.size && event.size.windowWidth)
+			this.wideScreen = (width || uni.getSystemInfoSync().windowWidth) >= 768
+		},
 		methods: {
+			syncCustomTabBar() {
+				const page = this.$mp && this.$mp.page
+				const tabBar = page && typeof page.getTabBar === 'function' && page.getTabBar()
+				if (tabBar) tabBar.setData({ selected: 0, nightMode: false })
+			},
 			switchMode(index) {
 				if (index === this.activeMode) return
 
@@ -237,7 +250,7 @@
 		justify-content: center;
 		min-width: 0;
 		border-radius: 9rpx;
-		font-size: 30rpx;
+		font-size: 32rpx;
 		font-weight: 600;
 		color: #6f7580;
 		transition: background-color 0.18s ease, color 0.18s ease;
@@ -289,4 +302,49 @@
 			padding-left: calc((100% - 820px) / 2);
 		}
 	}
+
+	@media screen and (min-width: 768px) {
+		.workspace-header {
+			gap: 16px;
+			padding-right: 24px;
+			padding-left: 24px;
+			padding-top: 12px;
+			padding-bottom: 12px;
+		}
+
+		.mode-tabs {
+			height: 64px;
+			padding: 4px;
+			border-radius: 12px;
+		}
+
+		.mode-tab {
+			border-radius: 9px;
+			font-size: 32px;
+		}
+
+		.parameter-pane {
+			padding-bottom: 24px;
+		}
+
+		.parameter-list {
+			padding: 8px 12px 20px;
+		}
+	}
+
+	@media screen and (min-width: 900px) {
+		.workspace-header {
+			padding-right: calc((100% - 820px) / 2);
+			padding-left: calc((100% - 820px) / 2);
+		}
+	}
+
+	/* #ifdef MP-WEIXIN */
+	@media screen and (min-width: 768px) {
+		.calculator-pane,
+		.parameter-pane {
+			padding-bottom: calc(76px + env(safe-area-inset-bottom));
+		}
+	}
+	/* #endif */
 </style>

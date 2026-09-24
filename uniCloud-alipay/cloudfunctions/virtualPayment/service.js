@@ -4,6 +4,8 @@ const crypto = require('crypto')
 
 const ORDER_COLLECTION = 'question_bank_payment_orders'
 const MEMBERSHIP_COLLECTION = 'question_bank_memberships'
+const APP_CONFIG_COLLECTION = 'question_bank_app_configs'
+const EXAM_COUNTDOWN_CONFIG_ID = 'exam_countdown'
 const USER_COLLECTION = 'uni-id-users'
 const ENV = 0
 const ORDER_ID_PATTERN = /^[A-Za-z0-9_\-|*@]{8,32}$/
@@ -14,12 +16,13 @@ const MISSING_ORDER_ERRCODE = 268490002
 const MISSING_ORDER_CLOSE_ATTEMPTS = 3
 const MISSING_ORDER_CLOSE_AGE_MS = 30 * 60 * 1000
 const MEMBER_EXPIRY_GRACE_MS = 6 * 60 * 60 * 1000
+const DEFAULT_EXAM_TARGET_AT = Date.parse('2026-10-23T16:00:00.000Z')
 
 const PRODUCTS = Object.freeze({
-	'membership_1m': Object.freeze({ productId: 'membership_1m', name: '全科31天', months: 1, days: 31, priceFen: 10, regularPriceFen: 1200, showRegularPrice: true }),
-	'membership_3m': Object.freeze({ productId: 'membership_3m', name: '全科93天', months: 3, days: 93, priceFen: 1900, regularPriceFen: 2900 }),
-	'membership_6m': Object.freeze({ productId: 'membership_6m', name: '全科186天', months: 6, days: 186, priceFen: 3500, regularPriceFen: 5200 }),
-	'membership_12m': Object.freeze({ productId: 'membership_12m', name: '全科366天', months: 12, days: 366, priceFen: 5900, regularPriceFen: 8900 })
+	'membership_1m': Object.freeze({ productId: 'membership_1m', name: '全科31天', months: 1, days: 31, priceFen: 10, regularPriceFen: 1200, showRegularPrice: true, activeMemberPurchasable: false }),
+	'membership_3m': Object.freeze({ productId: 'membership_3m', name: '全科93天', months: 3, days: 93, priceFen: 1900, regularPriceFen: 2900, activeMemberPurchasable: true }),
+	'membership_6m': Object.freeze({ productId: 'membership_6m', name: '全科186天', months: 6, days: 186, priceFen: 3500, regularPriceFen: 5200, activeMemberPurchasable: true }),
+	'membership_12m': Object.freeze({ productId: 'membership_12m', name: '全科366天', months: 12, days: 366, priceFen: 5900, regularPriceFen: 8900, activeMemberPurchasable: true })
 })
 
 class VirtualPaymentError extends Error {
@@ -164,6 +167,23 @@ function publicMembership(membership, timestamp) {
 			reviewMode: isMember,
 			smartPracticeOver30: isMember
 		}
+	}
+}
+
+function publicExamCountdown(config, timestamp) {
+	const source = config && typeof config === 'object' ? config : {}
+	const targetAt = dateValue(source.targetAt) || DEFAULT_EXAM_TARGET_AT
+	const updatedAt = dateValue(source.updatedAt)
+	return {
+		enabled: source.enabled !== false,
+		title: typeof source.title === 'string' && source.title.trim()
+			? source.title.trim()
+			: '考试倒计时',
+		targetAt,
+		timezone: source.timezone === 'Asia/Shanghai' ? source.timezone : 'Asia/Shanghai',
+		revision: Math.max(1, Number(source.revision) || 1),
+		updatedAt,
+		serverNow: Number(timestamp) || Date.now()
 	}
 }
 
@@ -424,10 +444,25 @@ function createVirtualPaymentService(db, options) {
 		return getDocument(db, MEMBERSHIP_COLLECTION, userId)
 	}
 
+	async function readExamCountdownConfig() {
+		try {
+			return await getDocument(db, APP_CONFIG_COLLECTION, EXAM_COUNTDOWN_CONFIG_ID)
+		} catch (error) {
+			// 配置表尚未上传或暂时不可用时使用内置目标时间，不影响会员权益查询。
+			return null
+		}
+	}
+
 	async function getMembership(event, userId) {
+		const [saved, examCountdownConfig] = await Promise.all([
+			readMembership(userId),
+			readExamCountdownConfig()
+		])
 		const timestamp = now().getTime()
-		const saved = await readMembership(userId)
-		return Object.assign(publicMembership(saved, timestamp), { plans: publicPlans() })
+		return Object.assign(publicMembership(saved, timestamp), {
+			plans: publicPlans(),
+			examCountdown: publicExamCountdown(examCountdownConfig, timestamp)
+		})
 	}
 
 	async function createOrder(event, userId) {
@@ -439,6 +474,15 @@ function createVirtualPaymentService(db, options) {
 		})
 		const product = PRODUCTS[productId]
 		if (!product) fail('VIRTUAL_PAYMENT_PRODUCT_NOT_FOUND', '会员商品不存在')
+		if (product.activeMemberPurchasable === false) {
+			const membership = await readMembership(userId)
+			if (publicMembership(membership, now().getTime()).isMember) {
+				fail(
+					'VIRTUAL_PAYMENT_PRODUCT_NOT_AVAILABLE_FOR_ACTIVE_MEMBER',
+					'全科31天仅限非会员购买，当前会员请选择全科93天、186天或366天续费'
+				)
+			}
+		}
 		const login = await code2Session(event.code)
 		const user = await getDocument(db, USER_COLLECTION, userId)
 		if (!user || extractOpenIds(user).indexOf(login.openid) === -1) {
@@ -851,6 +895,9 @@ function createVirtualPaymentService(db, options) {
 }
 
 module.exports = {
+	APP_CONFIG_COLLECTION,
+	DEFAULT_EXAM_TARGET_AT,
+	EXAM_COUNTDOWN_CONFIG_ID,
 	MEMBERSHIP_COLLECTION,
 	ORDER_COLLECTION,
 	PRODUCTS,
@@ -862,6 +909,7 @@ module.exports = {
 	calculateUserSignature,
 	createVirtualPaymentService,
 	parseNotificationBody,
+	publicExamCountdown,
 	publicMembership,
 	recomputeMembership,
 	xmlResponse

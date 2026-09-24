@@ -1,7 +1,0 @@
-{
-  "name": "getCurrentSsqLotteryDetailData",
-  "dependencies": {},
-  "extensions": {
-    "uni-cloud-jql": {}
-  }
-}

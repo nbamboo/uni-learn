@@ -14,6 +14,7 @@ function loadMembershipService(environment) {
 		.replace(/\bexport\s+(?=(?:class|async\s+function|function|const|let|var)\b)/g, '')
 	source += `\n;globalThis.__membershipService = {
 		getCachedMembership,
+		getExamCountdownDays,
 		getMembership,
 		purchaseMembership,
 		queryMembershipOrder,
@@ -37,9 +38,20 @@ async function run() {
 	let syncScheduleCalls = 0
 	let forcedLoginCalls = 0
 	let tokenFailureOnce = false
+	const examServerNow = Date.parse('2026-09-21T16:00:00.000Z')
+	const examTargetAt = Date.parse('2026-10-23T16:00:00.000Z')
 	let cloudMembership = {
 		isMember: true,
-		expiresAt: Date.now() + 30 * 24 * 60 * 60 * 1000
+		expiresAt: Date.now() + 30 * 24 * 60 * 60 * 1000,
+		examCountdown: {
+			enabled: true,
+			title: '考试倒计时',
+			targetAt: examTargetAt,
+			timezone: 'Asia/Shanghai',
+			revision: 1,
+			updatedAt: examServerNow,
+			serverNow: examServerNow
+		}
 	}
 	const environment = {
 		ensurePracticeUser: async options => {
@@ -171,8 +183,16 @@ async function run() {
 	storage.set(membershipStorageKey, Object.assign({}, cachedMembership, {
 		cachedAt: currentTime - 7 * 60 * 60 * 1000
 	}))
-	await service.getMembership()
+	const refreshedMembership = await service.getMembership()
 	assert.equal(membershipCalls, 1)
+	assert.equal(refreshedMembership.examCountdown.targetAt, examTargetAt)
+	assert.equal(
+		service.getExamCountdownDays(
+			refreshedMembership.examCountdown,
+			refreshedMembership.examCountdown.receivedAt
+		),
+		32
+	)
 
 	storage.set(membershipStorageKey, Object.assign({}, cachedMembership, {
 		isMember: true,
@@ -199,6 +219,7 @@ async function run() {
 	assert.equal(revoked.entitlements.advancedAnswerModes, false)
 	assert.equal(revoked.entitlements.reviewMode, false)
 	assert.equal(revoked.entitlements.smartPracticeOver30, false)
+	assert.equal(revoked.examCountdown.targetAt, examTargetAt)
 	assert.equal(service.getCachedMembership().isMember, false)
 
 	user.uid = 'second-member-user'

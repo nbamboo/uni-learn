@@ -1,0 +1,9 @@
+{
+  "name": "member-crowd-core",
+  "version": "1.0.0",
+  "main": "index.js",
+  "private": true,
+  "scripts": {
+    "test": "node test.js"
+  }
+}

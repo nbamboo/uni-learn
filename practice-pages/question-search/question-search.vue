@@ -326,4 +326,28 @@
 	.night-mode .exam-progress-copy { color: #63b9f6; }
 	.night-mode .result-index { background: #17364d; color: #63b9f6; }
 	.night-mode .empty-state { color: #e6e9ed; }
+
+	@media screen and (min-width: 768px) {
+		.search-page { width: 100%; max-width: 820px; margin: 0 auto; padding: 24px; }
+		.search-bar { height: 84px; padding: 0 22px; border-width: 2px; border-radius: 14px; }
+		.search-bar input { margin-left: 14px; font-size: 31px; }
+		.clear-button { padding: 12px 0 12px 16px; }
+		.section-heading, .result-heading { padding: 30px 4px 18px; }
+		.result-counts { gap: 18px; font-size: 25px; }
+		.section-heading text:first-child, .result-heading text:first-child { font-size: 33px; }
+		.section-heading text:last-child, .result-heading text:last-child { font-size: 25px; }
+		.keyword-list { gap: 14px; }
+		.keyword-chip { min-height: 88px; padding: 14px 18px; border-radius: 12px; }
+		.keyword-chip text:first-child { font-size: 29px; }
+		.keyword-chip text:last-child { font-size: 25px; }
+		.result-item { min-height: 144px; margin-bottom: 14px; padding: 22px 20px; border-radius: 14px; }
+		.result-index { width: 48px; height: 48px; flex-basis: 48px; margin-right: 18px; border-radius: 8px; font-size: 25px; }
+		.result-content { margin-right: 14px; }
+		.result-title { font-size: 31px; }
+		.result-meta { margin-top: 14px; font-size: 25px; }
+		.empty-state { padding-top: 140px; }
+		.empty-title { margin-top: 22px; font-size: 33px; }
+		.empty-caption { margin-top: 10px; font-size: 25px; }
+		.search-ad-container { margin-top: 28px; border-radius: 8px; }
+	}
 </style>

@@ -34,6 +34,8 @@
 
 会员页只在“全科31天”的 0.1 元价格下显示带删除线的“¥12”，不展示“限时折扣”文案；其余方案按当前价格展示月均金额。后续恢复标准价时，将服务端和会员页备用商品表中的 `priceFen` 改为对应的 `regularPriceFen`，并移除月卡的 `showRegularPrice`；同时修改并重新发布 MP 后台四个道具的价格。
 
+“全科31天”仅允许非会员、已过期会员或已撤销会员购买。有效会员（包括自然到期后的 6 小时宽限期）不能重复购买该档位，会员页会置灰并提示选择全科93天、186天或366天；云函数在创建订单前执行相同校验，其他三个档位继续累加当前有效期。
+
 道具发布后通常需要约 10 分钟生效。不要让客户端展示价格、云函数下单金额和 MP 后台道具价格出现差异；服务端的商品表是下单金额的唯一来源。云函数按订单创建时保存的金额验收发货，因此调价前已经创建的历史订单仍可正常完成发货和退款。
 
 本次切换当前价格时按以下顺序操作，并在切换窗口内暂停真机支付测试，避免后台道具与云函数短暂不同步而返回 `GOODS_PRICE_INVALID`：
@@ -45,6 +47,8 @@
 5. 重新进入会员中心，确认四档天数、价格及月卡下方带删除线的“¥12”，再完成一笔 0.1 元真单验证。
 
 本次固定天数发放为订单和会员发放记录新增了可选的 `days` 字段，需要分别上传 `question_bank_payment_orders.schema.json` 和 `question_bank_memberships.schema.json`。旧记录仍保留 `months` 并继续按原自然月规则计算，不需要迁移历史数据。
+
+会员中心考试倒计时由 `question_bank_app_configs` 集合中的 `exam_countdown` 文档控制。当前目标时间为北京时间 `2026-10-24 00:00:00`，对应 UTC `2026-10-23T16:00:00.000Z`；在 2026 年 9 月 22 日显示剩余 32 天。需要调整时，在 uniCloud 控制台修改该文档的 `targetAt`，同时递增 `revision` 并更新 `updatedAt`。将 `enabled` 改为 `false` 可隐藏倒计时。客户端在进入会员中心时通过现有 `getMembership` 请求取得配置，不会增加云函数调用次数，页面只在本地每分钟更新一次。
 
 ## 3. 服务端密钥配置
 
@@ -99,6 +103,9 @@ node scripts/check-virtual-payment-readiness.js
 2. `question_bank_payment_orders.index.json`
 3. `question_bank_memberships.schema.json`
 4. `question_bank_memberships.index.json`
+5. `question_bank_app_configs.schema.json`
+
+随后只针对 `question_bank_app_configs` 集合导入 `question_bank_app_configs.init_data.json`。不要在 database 根目录执行“初始化云数据库”；倒计时配置按 `_id: exam_countdown` 导入或覆盖即可。
 
 线上需确认存在以下 5 个业务索引（不含数据库自带的 `_id_`）：
 

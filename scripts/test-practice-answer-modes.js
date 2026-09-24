@@ -114,6 +114,7 @@ async function run() {
 		plans: []
 	}
 	let membershipResponse = activeMembership
+	const membershipPurchaseCalls = []
 	const environment = {
 		getQuestionTypeDisplayLabel: question => question.type === 'material'
 			? `材料题，第 ${question.materialQuestionIndex}/${question.materialQuestionCount} 小题`
@@ -242,8 +243,18 @@ async function run() {
 					: value
 			),
 			FREE_SMART_QUESTION_COUNT_MAX: 30,
-			getCachedMembership: () => membershipResponse,
+			getCachedMembership: () => Object.assign({
+				examCountdown: { enabled: true, title: '考试倒计时' }
+			}, membershipResponse),
+			getExamCountdownDays: () => 32,
 			getMembership: async () => membershipResponse,
+			purchaseMembership: async productId => {
+				membershipPurchaseCalls.push(productId)
+				return {
+					order: { status: 'pending' },
+					membership: membershipResponse
+				}
+			},
 			cacheMembershipSnapshot: value => value,
 			showMembershipUpsell: async () => true,
 		updatePracticePreferences: async preferences => {
@@ -1636,6 +1647,48 @@ async function run() {
 	assert.doesNotMatch(membershipPageSource, /错题集与收藏夹|考试模式与背题模式/)
 	assert.match(membershipPageSource, /云端学习数据同步/)
 	assert.match(membershipPageSource, /同一微信账号跨设备登录，答题记录与学习进度自动同步/)
+	assert.match(membershipPageSource, /仅限非会员/)
+	assert.match(membershipPageSource, /60 \* 1000/)
+	assert.doesNotMatch(membershipPageSource, /setInterval\([^\n]+, 1000\)/)
+	const membershipComponent = loadComponent(environment, '../pages/membership/membership.vue')
+	membershipResponse = activeMembership
+	const membershipPage = Object.assign(membershipComponent.data(), membershipComponent.methods)
+	Object.keys(membershipComponent.computed).forEach(key => {
+		Object.defineProperty(membershipPage, key, {
+			configurable: true,
+			get: () => membershipComponent.computed[key].call(membershipPage)
+		})
+	})
+	const monthlyPlan = membershipPage.plans.find(plan => plan.productId === 'membership_1m')
+	assert.equal(membershipPage.planUnavailableForCurrentMember(monthlyPlan), true)
+	membershipPage.selectedProductId = 'membership_1m'
+	membershipPage.ensureSelectedPlanAvailable()
+	assert.equal(membershipPage.selectedProductId, 'membership_3m')
+	const modalCountBeforeRestrictedSelection = modalOptions.length
+	membershipPage.selectPlan(monthlyPlan)
+	assert.equal(membershipPage.selectedProductId, 'membership_3m')
+	assert.equal(modalOptions.length, modalCountBeforeRestrictedSelection + 1)
+	assert.equal(modalOptions.slice(-1)[0].title, '暂不可购买')
+	assert.match(modalOptions.slice(-1)[0].content, /全科31天仅限非会员购买/)
+	membershipPage.membership = { isMember: false, status: 'inactive', expiresAt: 0, plans: [] }
+	membershipPage.selectPlan(monthlyPlan)
+	assert.equal(membershipPage.selectedProductId, 'membership_1m')
+	membershipPage.membership = activeMembership
+	membershipPage.selectedProductId = 'membership_1m'
+	const purchaseCallsBeforeRestriction = membershipPurchaseCalls.length
+	await membershipPage.purchase()
+	assert.equal(membershipPurchaseCalls.length, purchaseCallsBeforeRestriction)
+	membershipPage.selectedProductId = 'membership_3m'
+	await membershipPage.purchase()
+	assert.equal(membershipPurchaseCalls.slice(-1)[0], 'membership_3m')
+	membershipPage.stopExamCountdown()
+	membershipResponse = {
+		isMember: false,
+		status: 'inactive',
+		expiresAt: 0,
+		entitlements: { adFree: false, practiceRecords: false, advancedAnswerModes: false },
+		plans: []
+	}
 	const settingsPageSource = fs.readFileSync(path.resolve(__dirname, '../practice-pages/answer-settings/answer-settings.vue'), 'utf8')
 	assert.match(settingsPageSource, /unit-id="adunit-a5cd0c36c24ffd76"/)
 	assert.match(settingsPageSource, /v-if="showAds"/)
@@ -1728,10 +1781,49 @@ async function run() {
 	assert.match(toolHomeSource, /unit-id="adunit-9ff96a0edd39a741"/)
 	assert.match(toolHomeSource, /showAds && item\.url === '\/pages\/flzzb\/flzzb'/)
 	assert.match(toolHomeSource, /\.parameter-ad-container\s*\{[\s\S]*?margin:\s*10px;/)
+	assert.match(toolHomeSource, /@media screen and \(min-width: 768px\)[\s\S]*?\.mode-tabs \{[\s\S]*?height: 64px;/)
+	const financeCalculatorSource = fs.readFileSync(path.resolve(__dirname, '../components/finance-calculator/finance-calculator.vue'), 'utf8')
+	assert.match(financeCalculatorSource, /class="field-checkbox-visual"/)
+	assert.match(financeCalculatorSource, /\.field-checkbox-visual \{[^}]*width: 28rpx;[^}]*height: 28rpx;/)
+	assert.match(financeCalculatorSource, /\.field-checkbox \{[^}]*opacity: 0;/)
+	assert.doesNotMatch(financeCalculatorSource, /\.field-checkbox \{[^}]*transform: scale\(0\.5\)/)
+	assert.match(financeCalculatorSource, /@media screen and \(min-width: 768px\)[\s\S]*?\.finance-calculator--tool-page \.custom-input \{[\s\S]*?height: 56px;/)
+	assert.match(financeCalculatorSource, /\.finance-calculator--tool-page \.result-wrapper \{[\s\S]*?padding: 32px 0;/)
 	const parameterCardSource = fs.readFileSync(path.resolve(__dirname, '../components/myUnit/myUnit.vue'), 'utf8')
 	assert.match(parameterCardSource, /<uni-card\s+margin="10px"/)
+	assert.match(parameterCardSource, /@media screen and \(min-width: 768px\)[\s\S]*?\.tool-title \{[\s\S]*?font-size: 32px;/)
 	const compoundFutureValueSource = fs.readFileSync(path.resolve(__dirname, '../pages/flzzb/flzzb.vue'), 'utf8')
 	assert.doesNotMatch(compoundFutureValueSource, /adunit-9ff96a0edd39a741|<ad-custom/)
+	const wideScreenPagePaths = [
+		'../pages/exam/exam.vue',
+		'../practice-pages/practice/practice.vue',
+		'../practice-pages/chapter/chapter.vue',
+		'../practice-pages/practice-records/practice-records.vue',
+		'../practice-pages/question-search/question-search.vue',
+		'../practice-pages/answer-settings/answer-settings.vue',
+		'../pages/about/about.vue',
+		'../pages/membership/membership.vue',
+		'../pages/course/course.vue'
+	]
+	wideScreenPagePaths.forEach(relativePath => {
+		const source = fs.readFileSync(path.resolve(__dirname, relativePath), 'utf8')
+		assert.match(source, /@media screen and \(min-width: 768px\)/, `${relativePath} 应包含宽屏尺寸封顶规则`)
+		assert.match(source, /max-width:\s*820px/, `${relativePath} 应限制主要内容区宽度`)
+	})
+	const parameterTablePaths = [
+		'../pages/njzzb/njzzb.vue',
+		'../pages/njxzb/njxzb.vue',
+		'../pages/flxzb/flxzb.vue',
+		'../pages/flzzb/flzzb.vue',
+		'../pages/swbzh/swbzh.vue',
+		'../pages/swbjy/swbjy.vue',
+		'../pages/swbnzj/swbnzj.vue',
+		'../pages/swblw/swblw.vue'
+	]
+	parameterTablePaths.forEach(relativePath => {
+		const source = fs.readFileSync(path.resolve(__dirname, relativePath), 'utf8')
+		assert.match(source, /@media screen and \(min-width: 768px\)[\s\S]*?\.table \{[^}]*max-width: 820px;/)
+	})
 
 	console.log('practice answer mode tests passed')
 }

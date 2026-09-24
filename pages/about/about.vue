@@ -76,10 +76,16 @@
 				}
 			},
 			onShow() {
+				this.syncCustomTabBar()
 				this.pendingCount = pendingPracticeEventCount()
 				this.loadMembership()
 			},
 			methods: {
+				syncCustomTabBar() {
+					const page = this.$mp && this.$mp.page
+					const tabBar = page && typeof page.getTabBar === 'function' && page.getTabBar()
+					if (tabBar) tabBar.setData({ selected: 2, nightMode: false })
+				},
 				async loadMembership() {
 					try {
 						this.membership = await getMembership()
@@ -238,5 +244,27 @@
 	.feedback-overlay-btn::after {
 		border: none;
 	}
+
+	@media screen and (min-width: 768px) {
+		.about-page { padding: 24px 0 calc(24px + env(safe-area-inset-bottom)); }
+		.account-card { min-height: 144px; margin: 0 24px 24px; padding: 28px 24px; border-radius: 16px; }
+		.account-avatar { width: 78px; height: 78px; flex-basis: 78px; border-width: 4px; font-size: 33px; }
+		.account-copy { margin: 0 20px; }
+		.account-name { font-size: 33px; }
+		.account-status,
+		.account-pending { margin-top: 8px; font-size: 25px; }
+		.about-menu-card { margin: 0 24px; border-radius: 16px; box-shadow: 0 5px 18px rgba(31, 48, 65, 0.04); }
+		.about-menu-row { min-height: 112px; padding: 20px 24px; }
+		.about-menu-icon { width: 50px; height: 50px; flex-basis: 50px; margin-right: 18px; }
+		.about-menu-title { font-size: 30px; }
+		.about-menu-extra { margin-left: 16px; font-size: 26px; }
+		.about-menu-arrow { margin-left: 14px; }
+	}
+
+	/* #ifdef MP-WEIXIN */
+	@media screen and (min-width: 768px) {
+		.about-page { padding-bottom: calc(24px + 76px + env(safe-area-inset-bottom)); }
+	}
+	/* #endif */
 
 </style>

@@ -1,0 +1,23 @@
+{
+  "name": "member-crowd-worker",
+  "version": "1.0.0",
+  "main": "index.js",
+  "private": true,
+  "dependencies": {
+    "member-crowd-core": "file:../common/member-crowd-core",
+    "uni-config-center": "file:../../../uni_modules/uni-config-center/uniCloud/cloudfunctions/common/uni-config-center"
+  },
+  "cloudfunction-config": {
+    "runtime": "Nodejs18",
+    "memorySize": 512,
+    "timeout": 600,
+    "triggers": [
+      {
+        "name": "member-crowd-worker-10m",
+        "type": "timer",
+        "config": "0 5/10 * * * * *"
+      }
+    ]
+  },
+  "extensions": {}
+}

@@ -7,7 +7,7 @@
 			</view>
 			<view class="subject-switch">
 				<text>切换</text>
-				<uni-icons type="bottom" size="15" color="#008cff"></uni-icons>
+				<uni-icons type="bottom" :size="wideScreen ? 20 : 15" color="#008cff"></uni-icons>
 			</view>
 		</view>
 
@@ -49,15 +49,15 @@
 			</view>
 
 			<view class="search-entry" @tap="goSearch">
-				<uni-icons type="search" size="20" color="#008cff"></uni-icons>
+				<uni-icons type="search" :size="wideScreen ? 30 : 20" color="#008cff"></uni-icons>
 				<text>搜索题目或知识点</text>
-				<uni-icons type="right" size="16" color="#b6bbc3"></uni-icons>
+				<uni-icons type="right" :size="wideScreen ? 22 : 16" color="#b6bbc3"></uni-icons>
 			</view>
 
 			<view class="feature-grid">
 				<view class="feature-item" @tap="startPractice('smart')">
 					<view class="feature-icon">
-						<uni-icons type="scan" size="25" color="#008cff"></uni-icons>
+						<uni-icons type="scan" :size="wideScreen ? 40 : 25" color="#008cff"></uni-icons>
 					</view>
 					<view class="feature-copy">
 						<text class="feature-title">智能练习</text>
@@ -66,7 +66,7 @@
 				</view>
 				<view class="feature-item" @tap="goChapter('chapter')">
 					<view class="feature-icon">
-						<uni-icons type="list" size="25" color="#008cff"></uni-icons>
+						<uni-icons type="list" :size="wideScreen ? 40 : 25" color="#008cff"></uni-icons>
 					</view>
 					<view class="feature-copy">
 						<text class="feature-title">章节练习</text>
@@ -75,7 +75,7 @@
 				</view>
 				<view class="feature-item" v-for="item in features" :key="item.key" @tap="handleFeature(item)">
 					<view class="feature-icon" :class="item.tone">
-						<uni-icons :type="item.icon" size="25" :color="item.color"></uni-icons>
+						<uni-icons :type="item.icon" :size="wideScreen ? 40 : 25" :color="item.color"></uni-icons>
 						<view class="feature-member-badge" v-if="isLockedPracticeFeature(item.key)">会员</view>
 						<view class="feature-badge" v-else-if="featureCount(item.key)">{{ featureCount(item.key) }}</view>
 					</view>
@@ -88,17 +88,17 @@
 		</view>
 
 		<view class="bank-note" v-if="currentCatalogPending">
-			<uni-icons type="spinner-cycle" size="18" color="#7a7e83"></uni-icons>
+			<uni-icons type="spinner-cycle" :size="wideScreen ? 24 : 18" color="#7a7e83"></uni-icons>
 			<text>正在从云端加载题库数据...</text>
 		</view>
 
 			<view class="bank-note error" v-else-if="currentCatalogError" @tap="retryCatalog">
-			<uni-icons type="refreshempty" size="18" color="#d34d4d"></uni-icons>
+			<uni-icons type="refreshempty" :size="wideScreen ? 24 : 18" color="#d34d4d"></uni-icons>
 			<text>{{ currentCatalogError }}，点击重试</text>
 		</view>
 
 			<view class="bank-note" v-else-if="!stats.total">
-				<uni-icons type="info" size="18" color="#7a7e83"></uni-icons>
+				<uni-icons type="info" :size="wideScreen ? 24 : 18" color="#7a7e83"></uni-icons>
 				<text>该科目题库正在整理，可先切换到初级个人理财。</text>
 			</view>
 
@@ -110,7 +110,7 @@
 			>
 				<uni-icons
 					:type="userDataSyncing ? 'spinner-cycle' : 'cloud-download'"
-					size="18"
+					:size="wideScreen ? 24 : 18"
 					:color="userDataSyncing ? '#7a7e83' : '#d34d4d'"
 				></uni-icons>
 				<text v-if="userDataSyncing">{{ userDataSyncText }}</text>
@@ -129,7 +129,7 @@
 						<text class="sheet-caption">练习记录会按科目分别保存</text>
 					</view>
 					<view class="sheet-close" @tap="closeSubjectPicker">
-						<uni-icons type="closeempty" size="24" :color="nightMode ? '#b6bec8' : '#5f6570'"></uni-icons>
+						<uni-icons type="closeempty" :size="wideScreen ? 30 : 24" :color="nightMode ? '#b6bec8' : '#5f6570'"></uni-icons>
 					</view>
 				</view>
 
@@ -181,7 +181,9 @@
 	export default {
 		data() {
 			const localPreferences = getLocalPracticePreferences()
+			const windowWidth = uni.getSystemInfoSync().windowWidth
 			return {
+				wideScreen: windowWidth >= 768,
 				nightMode: Boolean(localPreferences.nightMode),
 				membership: getCachedMembership(),
 				membershipLoaded: false,
@@ -266,6 +268,7 @@
 			}
 		},
 		async onShow() {
+			this.syncCustomTabBar(this.nightMode)
 			this.userDataPendingCount = pendingPracticeEventCount()
 			const membershipTask = this.refreshMembership()
 			try {
@@ -281,10 +284,19 @@
 				membershipTask
 			])
 		},
+		onResize(event) {
+			const width = Number(event && event.size && event.size.windowWidth)
+			this.wideScreen = (width || uni.getSystemInfoSync().windowWidth) >= 768
+		},
 		onHide() {
 			this.applyTabBarTheme(false)
 		},
 		methods: {
+			syncCustomTabBar(nightMode) {
+				const page = this.$mp && this.$mp.page
+				const tabBar = page && typeof page.getTabBar === 'function' && page.getTabBar()
+				if (tabBar) tabBar.setData({ selected: 1, nightMode: Boolean(nightMode) })
+			},
 			async refreshMembership() {
 				try {
 					this.membership = await getMembership()
@@ -310,6 +322,7 @@
 					backgroundColor: nightMode ? '#171c22' : '#ffffff',
 					borderStyle: 'black'
 				})
+				this.syncCustomTabBar(nightMode)
 			},
 			async refreshNightMode() {
 				this.applyNightMode(getLocalPracticePreferences())
@@ -719,4 +732,59 @@
 	.night-mode .subject-option.active { border-color: #269df0; background: #17364d; color: #63b9f6; }
 	.night-mode .subject-option.unavailable:not(.active) { color: #8d97a2; }
 	.night-mode .subject-status { color: #818c98; }
+
+	@media screen and (min-width: 768px) {
+		.practice-home {
+			width: 100%;
+			max-width: 820px;
+			margin: 0 auto;
+			padding-bottom: calc(24px + env(safe-area-inset-bottom));
+			box-sizing: border-box;
+		}
+
+		.subject-bar { min-height: 104px; padding: 18px 24px; }
+		.subject-copy { margin-left: 24px; }
+		.subject-label, .sheet-caption { font-size: 25px; }
+		.subject-name { margin-top: 5px; font-size: 33px; }
+		.subject-switch { gap: 4px; padding: 10px 12px; border-radius: 12px; font-size: 27px; }
+		.overview-card,
+		.practice-card { margin: 17px 24px 0; padding: 24px; border-radius: 18px; }
+		.overview-card { margin-top: 21px; }
+		.card-title { font-size: 33px; }
+		.completion-heading { margin-top: 24px; }
+		.overview-subtitle { font-size: 27px; }
+		.completion-value { font-size: 41px; }
+		.completion-progress { height: 12px; margin-top: 18px; border-radius: 6px; }
+		.stat-grid { gap: 12px; margin-top: 22px; padding-top: 22px; }
+		.stat-item { min-height: 88px; border-radius: 12px; }
+		.stat-value { font-size: 31px; }
+		.stat-label { margin-top: 8px; font-size: 25px; }
+		.search-entry { height: 82px; margin-top: 17px; padding: 0 20px; border-radius: 14px; font-size: 29px; }
+		.search-entry text { margin-left: 14px; }
+		.feature-grid { gap: 15px; margin-top: 17px; }
+		.feature-item { min-height: 126px; padding: 20px; border-radius: 14px; }
+		.feature-icon { width: 72px; height: 72px; flex-basis: 72px; border-radius: 12px; }
+		.feature-badge { top: -10px; right: -14px; min-width: 34px; height: 34px; padding: 0 8px; border-width: 3px; border-radius: 18px; font-size: 18px; }
+		.feature-member-badge { top: -14px; right: -22px; height: 34px; padding: 0 10px; border-width: 3px; border-radius: 18px; font-size: 19px; line-height: 30px; }
+		.feature-copy { margin-left: 18px; }
+		.feature-title { font-size: 29px; }
+		.feature-desc { margin-top: 7px; font-size: 25px; }
+		.bank-note { gap: 10px; margin: 11px 32px 0; padding: 20px 22px; border-radius: 8px; font-size: 25px; }
+		.subject-sheet { max-width: 820px; margin: 0 auto; padding: 28px; border-radius: 16px 16px 0 0; box-sizing: border-box; }
+		.sheet-header { padding: 0 4px 24px; }
+		.sheet-title { font-size: 33px; }
+		.sheet-caption { margin-top: 6px; }
+		.sheet-close { padding: 12px; }
+		.subject-group { padding: 26px 4px 4px; }
+		.group-title { font-size: 31px; }
+		.subject-options { gap: 16px; margin-top: 18px; }
+		.subject-option { min-height: 82px; padding: 12px 18px; border-width: 2px; border-radius: 8px; font-size: 29px; }
+		.subject-status { margin-top: 4px; font-size: 23px; }
+	}
+
+	/* #ifdef MP-WEIXIN */
+	@media screen and (min-width: 768px) {
+		.practice-home { padding-bottom: calc(24px + 76px + env(safe-area-inset-bottom)); }
+	}
+	/* #endif */
 </style>

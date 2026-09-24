@@ -2,7 +2,10 @@
 
 const fs = require('node:fs')
 const path = require('node:path')
-const { PRODUCTS } = require('../uniCloud-alipay/cloudfunctions/virtualPayment/service')
+const {
+	DEFAULT_EXAM_TARGET_AT,
+	PRODUCTS
+} = require('../uniCloud-alipay/cloudfunctions/virtualPayment/service')
 
 const projectRoot = path.resolve(__dirname, '..')
 const failures = []
@@ -64,10 +67,10 @@ if (paymentConfig) {
 }
 
 const expectedProducts = {
-	'membership_1m': { name: '全科31天', months: 1, days: 31, priceFen: 10, regularPriceFen: 1200 },
-	'membership_3m': { name: '全科93天', months: 3, days: 93, priceFen: 1900, regularPriceFen: 2900 },
-	'membership_6m': { name: '全科186天', months: 6, days: 186, priceFen: 3500, regularPriceFen: 5200 },
-	'membership_12m': { name: '全科366天', months: 12, days: 366, priceFen: 5900, regularPriceFen: 8900 }
+	'membership_1m': { name: '全科31天', months: 1, days: 31, priceFen: 10, regularPriceFen: 1200, activeMemberPurchasable: false },
+	'membership_3m': { name: '全科93天', months: 3, days: 93, priceFen: 1900, regularPriceFen: 2900, activeMemberPurchasable: true },
+	'membership_6m': { name: '全科186天', months: 6, days: 186, priceFen: 3500, regularPriceFen: 5200, activeMemberPurchasable: true },
+	'membership_12m': { name: '全科366天', months: 12, days: 366, priceFen: 5900, regularPriceFen: 8900, activeMemberPurchasable: true }
 }
 Object.keys(expectedProducts).forEach(productId => {
 	const actual = PRODUCTS[productId]
@@ -77,7 +80,8 @@ Object.keys(expectedProducts).forEach(productId => {
 		|| actual.months !== expected.months
 		|| actual.days !== expected.days
 		|| actual.priceFen !== expected.priceFen
-		|| actual.regularPriceFen !== expected.regularPriceFen) {
+		|| actual.regularPriceFen !== expected.regularPriceFen
+		|| actual.activeMemberPurchasable !== expected.activeMemberPurchasable) {
 		failures.push(`会员商品配置错误：${productId}`)
 	}
 })
@@ -100,6 +104,8 @@ if (packageConfig) {
 	'uniCloud-alipay/database/question_bank_payment_orders.index.json',
 	'uniCloud-alipay/database/question_bank_memberships.schema.json',
 	'uniCloud-alipay/database/question_bank_memberships.index.json',
+	'uniCloud-alipay/database/question_bank_app_configs.schema.json',
+	'uniCloud-alipay/database/question_bank_app_configs.init_data.json',
 	'services/membership.js',
 	'scripts/test-membership-service.js',
 	'scripts/verify-virtual-payment-callback.js',
@@ -110,8 +116,25 @@ if (packageConfig) {
 	'uniCloud-alipay/database/question_bank_payment_orders.schema.json',
 	'uniCloud-alipay/database/question_bank_payment_orders.index.json',
 	'uniCloud-alipay/database/question_bank_memberships.schema.json',
-	'uniCloud-alipay/database/question_bank_memberships.index.json'
+	'uniCloud-alipay/database/question_bank_memberships.index.json',
+	'uniCloud-alipay/database/question_bank_app_configs.schema.json'
 ].forEach(readJson)
+
+const appConfigs = readJson('uniCloud-alipay/database/question_bank_app_configs.init_data.json')
+const examCountdownConfig = Array.isArray(appConfigs)
+	? appConfigs.find(item => item && item._id === 'exam_countdown')
+	: null
+const configuredTargetAt = Date.parse(
+	examCountdownConfig
+	&& examCountdownConfig.targetAt
+	&& examCountdownConfig.targetAt.$date || ''
+)
+if (!examCountdownConfig
+	|| examCountdownConfig.enabled !== true
+	|| examCountdownConfig.timezone !== 'Asia/Shanghai'
+	|| configuredTargetAt !== DEFAULT_EXAM_TARGET_AT) {
+	failures.push('考试倒计时配置必须启用并指向 2026-10-24 00:00:00（北京时间）')
+}
 
 const paymentIndexes = readJson('uniCloud-alipay/database/question_bank_payment_orders.index.json')
 if (paymentIndexes && !paymentIndexes.some(index => {

@@ -1,0 +1,16 @@
+{
+  "name": "member-crowd-admin",
+  "version": "1.0.0",
+  "main": "index.js",
+  "private": true,
+  "dependencies": {
+    "member-crowd-core": "file:../common/member-crowd-core",
+    "uni-id-common": "file:../../../uni_modules/uni-id-common/uniCloud/cloudfunctions/common/uni-id-common"
+  },
+  "cloudfunction-config": {
+    "runtime": "Nodejs18",
+    "memorySize": 256,
+    "timeout": 60
+  },
+  "extensions": {}
+}

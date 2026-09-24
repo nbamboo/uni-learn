@@ -1,0 +1,57 @@
+{
+  "bsonType": "object",
+  "description": "题库小程序可由后台调整的全局运行配置，仅允许云函数读取",
+  "required": [
+    "_id",
+    "enabled",
+    "title",
+    "targetAt",
+    "timezone",
+    "revision",
+    "updatedAt"
+  ],
+  "permission": {
+    "read": false,
+    "create": false,
+    "update": false,
+    "delete": false,
+    "count": false
+  },
+  "properties": {
+    "_id": {
+      "bsonType": "string",
+      "enum": ["exam_countdown"],
+      "description": "配置唯一标识"
+    },
+    "enabled": {
+      "bsonType": "bool",
+      "description": "是否在会员中心显示考试倒计时"
+    },
+    "title": {
+      "bsonType": "string",
+      "minLength": 1,
+      "maxLength": 30
+    },
+    "targetAt": {
+      "bsonType": "date",
+      "description": "考试开始时间，统一以时间戳参与倒计时计算"
+    },
+    "timezone": {
+      "bsonType": "string",
+      "enum": ["Asia/Shanghai"]
+    },
+    "revision": {
+      "bsonType": "int",
+      "minimum": 1,
+      "description": "每次后台修改时递增，便于定位配置版本"
+    },
+    "updatedAt": {
+      "bsonType": "date"
+    },
+    "updatedBy": {
+      "bsonType": "string",
+      "minLength": 1,
+      "maxLength": 64
+    }
+  }
+}

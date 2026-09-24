@@ -798,4 +798,36 @@
 	.night-mode .item-progress-fill { background: #269df0; }
 	.night-mode .empty-state button { background: #168ee5; }
 	.night-mode .error-state { color: #ef9a9a; }
+
+	@media screen and (min-width: 768px) {
+		.catalog-page { width: 100%; max-width: 820px; margin: 0 auto; padding-bottom: 40px; box-sizing: border-box; }
+		.catalog-summary { padding: 30px 32px; }
+		.summary-label { font-size: 24px; }
+		.summary-title { margin-top: 7px; font-size: 35px; }
+		.catalog-search { height: 78px; margin: 24px 24px 0; padding: 0 22px; border-radius: 8px; }
+		.catalog-search input { margin-left: 12px; font-size: 28px; }
+		.catalog-list { padding: 20px 24px 0; }
+		.catalog-item { min-height: 142px; margin-bottom: 16px; padding: 22px; border-radius: 8px; }
+		.chapter-card { margin-bottom: 16px; border-radius: 14px; }
+		.chapter-item { min-height: 136px; padding: 24px; }
+		.chapter-expand { width: 50px; height: 50px; flex-basis: 50px; margin-right: 20px; border-width: 2px; }
+		.expand-glyph { width: 22px; height: 22px; }
+		.expand-glyph::before { width: 22px; height: 4px; }
+		.expand-glyph::after { width: 4px; height: 22px; }
+		.practice-action { width: 100px; height: 56px; flex-basis: 100px; margin-left: 20px; border-radius: 28px; font-size: 25px; }
+		.section-item { min-height: 116px; padding: 20px 24px 20px 56px; }
+		.section-guide { width: 18px; height: 18px; flex-basis: 18px; margin-right: 24px; border-width: 0 0 3px 3px; }
+		.section-title { font-size: 28px; }
+		.section-action { width: 92px; flex-basis: 92px; }
+		.knowledge-ad-container { margin-bottom: 16px; border-radius: 8px; }
+		.item-index { width: 54px; height: 54px; flex-basis: 54px; margin-right: 20px; border-radius: 8px; font-size: 26px; }
+		.item-title { font-size: 30px; }
+		.item-meta { margin-top: 7px; font-size: 23px; }
+		.item-progress-row { min-height: 24px; margin-top: 13px; font-size: 22px; }
+		.item-progress { height: 7px; margin-right: 16px; border-radius: 4px; }
+		.item-action { width: 52px; height: 52px; margin-left: 18px; border-radius: 8px; }
+		.empty-state { padding: 120px 30px; font-size: 28px; }
+		.empty-state text { margin-top: 18px; }
+		.empty-state button { min-width: 220px; height: 76px; margin-top: 28px; border-radius: 38px; font-size: 28px; line-height: 76px; }
+	}
 </style>

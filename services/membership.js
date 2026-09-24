@@ -15,6 +15,7 @@ const MEMBER_CACHE_TTL = 6 * 60 * 60 * 1000
 const NON_MEMBER_CACHE_TTL = 6 * 60 * 60 * 1000
 const MEMBER_EXPIRY_GRACE_MS = 6 * 60 * 60 * 1000
 const MEMBERSHIP_PAGE_URL = '/pages/membership/membership'
+const DEFAULT_EXAM_TARGET_AT = Date.parse('2026-10-23T16:00:00.000Z')
 
 let membershipRequest = null
 
@@ -52,6 +53,32 @@ function userScopedStorageKey(baseKey) {
 	return user && user.uid ? `${baseKey}:${user.uid}` : baseKey
 }
 
+function normalizeExamCountdown(value) {
+	const source = value && typeof value === 'object' ? value : {}
+	const targetAt = Number(source.targetAt) || DEFAULT_EXAM_TARGET_AT
+	return {
+		enabled: source.enabled !== false,
+		title: typeof source.title === 'string' && source.title.trim()
+			? source.title.trim()
+			: '考试倒计时',
+		targetAt,
+		timezone: source.timezone === 'Asia/Shanghai' ? source.timezone : 'Asia/Shanghai',
+		revision: Math.max(1, Number(source.revision) || 1),
+		updatedAt: Number(source.updatedAt) || 0,
+		serverNow: Number(source.serverNow) || 0,
+		receivedAt: Number(source.receivedAt) || 0
+	}
+}
+
+export function getExamCountdownDays(value, clientNow) {
+	const countdown = normalizeExamCountdown(value)
+	const localNow = Number(clientNow) || Date.now()
+	const correctedNow = countdown.serverNow && countdown.receivedAt
+		? localNow + countdown.serverNow - countdown.receivedAt
+		: localNow
+	return Math.max(0, Math.ceil((countdown.targetAt - correctedNow) / (24 * 60 * 60 * 1000)))
+}
+
 function normalizeMembership(value) {
 	const source = value && typeof value === 'object' ? value : {}
 	const expiresAt = Number(source.expiresAt) || 0
@@ -72,14 +99,27 @@ function normalizeMembership(value) {
 			smartPracticeOver30: isMember
 		},
 		plans: Array.isArray(source.plans) ? source.plans.map(item => Object.assign({}, item)) : [],
+		examCountdown: normalizeExamCountdown(source.examCountdown),
 		cachedAt: Number(source.cachedAt) || 0
 	}
 }
 
 function saveMembership(value) {
 	const previous = getCachedMembership()
-	const normalized = normalizeMembership(Object.assign({}, value, { cachedAt: Date.now() }))
-	storageSet(userScopedStorageKey(STORAGE_KEY), normalized)
+	const storageKey = userScopedStorageKey(STORAGE_KEY)
+	const saved = storageGet(storageKey)
+	const receivedAt = Date.now()
+	const merged = Object.assign(
+		{},
+		saved && typeof saved === 'object' ? saved : {},
+		value,
+		{ cachedAt: receivedAt }
+	)
+	if (value && value.examCountdown && typeof value.examCountdown === 'object') {
+		merged.examCountdown = Object.assign({}, value.examCountdown, { receivedAt })
+	}
+	const normalized = normalizeMembership(merged)
+	storageSet(storageKey, normalized)
 	const user = getCurrentPracticeUser()
 	if (user && user.uid) storageSet(LAST_USER_ID_KEY, user.uid)
 	if (normalized.isMember) schedulePracticeSync({ immediate: true })
@@ -329,7 +369,7 @@ export async function queryMembershipOrder(outTradeNo, options) {
 		result = await executeCloudCall('queryOrder', { outTradeNo })
 		if (result && result.order && result.order.status === 'delivered') break
 	}
-	if (result && result.membership) saveMembership(result.membership)
+	if (result && result.membership) result.membership = saveMembership(result.membership)
 	return result
 }
 
@@ -385,6 +425,7 @@ export async function restoreLastMembershipOrder() {
 export default {
 	getCachedMembership,
 	cacheMembershipSnapshot,
+	getExamCountdownDays,
 	getMembership,
 	membershipIsActive,
 	showMembershipUpsell,

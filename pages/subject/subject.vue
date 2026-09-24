@@ -87,4 +87,13 @@
 	.active {
 		background-color: #c2c2c2;
 	}
+
+	@media screen and (min-width: 768px) {
+		.dtk {
+			width: 600px;
+			max-width: calc(100% - 48px);
+			height: 800px;
+			margin: 10px auto;
+		}
+	}
 </style>

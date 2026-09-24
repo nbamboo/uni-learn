@@ -1,5 +1,5 @@
 <template>
-	<view class="number-keyboard-mask" v-if="visible" @click="handleMaskClick">
+	<view class="number-keyboard-mask" :class="{ 'tool-page': toolPage }" v-if="visible" @click="handleMaskClick">
 		<view class="keyboard-container" :class="{ 'show': isAnimating }" @click.stop>
 			<!-- 键盘按键区 -->
 			<view class="keyboard-body">
@@ -87,6 +87,10 @@ export default {
 	props: {
 		/** 键盘显示状态 */
 		visible: {
+			type: Boolean,
+			default: false
+		},
+		toolPage: {
 			type: Boolean,
 			default: false
 		},
@@ -365,6 +369,24 @@ export default {
 
 .key-btn-confirm:active {
 	background-color: #0078d7;
+}
+
+.tool-page .key-text {
+	font-size: 42rpx;
+}
+
+.tool-page .key-btn-clear .key-text {
+	font-size: 30rpx;
+}
+
+.tool-page .key-btn-confirm .confirm-text {
+	font-size: 34rpx;
+}
+
+@media screen and (min-width: 768px) {
+	.tool-page .key-text { font-size: 42px; }
+	.tool-page .key-btn-clear .key-text { font-size: 30px; }
+	.tool-page .key-btn-confirm .confirm-text { font-size: 34px; }
 }
 
 /* iOS 安全区域 */

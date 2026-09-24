@@ -350,4 +350,30 @@
 	.night-mode .record-status.wrong { background: #3b2327; }
 	.night-mode .record-status.favorite { background: #3a321e; }
 	.night-mode .error-state { color: #ef9a9a; }
+
+	@media screen and (min-width: 768px) {
+		.records-page { width: 100%; max-width: 820px; margin: 0 auto; padding-bottom: 40px; box-sizing: border-box; }
+		.records-header { padding: 28px 24px 22px; }
+		.subject-info { padding: 0 6px; }
+		.subject-label { font-size: 25px; }
+		.subject-name { margin-top: 8px; font-size: 33px; }
+		.record-tabs { height: 72px; margin-top: 24px; padding: 6px; border-radius: 14px; }
+		.record-tab { border-radius: 10px; font-size: 31px; }
+		.records-summary { min-height: 120px; margin: 18px 24px 0; padding: 22px 24px; border-radius: 14px; }
+		.exam-progress-copy { margin-right: 18px; font-size: 25px; }
+		.summary-value { font-size: 41px; }
+		.summary-label { margin-left: 10px; font-size: 27px; }
+		.records-summary button { height: 68px; margin-left: 24px; padding: 0 28px; border-radius: 34px; font-size: 29px; }
+		.record-list { padding: 16px 24px 0; }
+		.record-item { min-height: 144px; margin-bottom: 14px; padding: 22px 20px; border-radius: 14px; }
+		.record-index { width: 48px; height: 48px; flex-basis: 48px; margin: 2px 18px 0 0; border-radius: 10px; font-size: 25px; }
+		.record-title { font-size: 31px; }
+		.record-meta { margin-top: 14px; font-size: 25px; }
+		.record-status { width: 46px; height: 46px; flex-basis: 46px; margin: 2px 0 0 16px; }
+		.empty-state { padding: 120px 52px; }
+		.empty-icon { width: 100px; height: 100px; border-radius: 8px; }
+		.empty-title { margin-top: 26px; font-size: 33px; }
+		.empty-caption { margin-top: 12px; font-size: 25px; }
+		.empty-state button { height: 76px; margin-top: 30px; padding: 0 42px; border-radius: 40px; font-size: 29px; line-height: 76px; }
+	}
 </style>

@@ -126,4 +126,16 @@
 			border-radius: 50%;
 		}
 	}
+
+	/* 宽屏设备继续沿用手机端的视觉尺度，避免 rpx 随屏宽无限放大。 */
+	@media screen and (min-width: 768px) {
+		checkbox .wx-checkbox-input,
+		checkbox .uni-checkbox-input,
+		radio .wx-radio-wrapper .wx-radio-input,
+		radio .uni-radio-wrapper .uni-radio-input {
+			width: 28px;
+			height: 28px;
+			border-width: 2px;
+		}
+	}
 </style>

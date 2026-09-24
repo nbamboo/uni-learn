@@ -1,0 +1,92 @@
+{
+  "bsonType": "object",
+  "description": "微信会员人群包同步任务，仅允许云函数访问",
+  "permission": {
+    "read": false,
+    "create": false,
+    "update": false,
+    "delete": false
+  },
+  "required": [
+    "status",
+    "stage",
+    "trigger",
+    "created_at",
+    "updated_at",
+    "deadline_at"
+  ],
+  "properties": {
+    "_id": {
+      "description": "任务 ID"
+    },
+    "status": {
+      "bsonType": "string",
+      "enum": ["queued", "processing", "published", "failed", "skipped"]
+    },
+    "stage": {
+      "bsonType": "string"
+    },
+    "trigger": {
+      "bsonType": "string",
+      "enum": ["manual", "daily"]
+    },
+    "force": {
+      "bsonType": "bool"
+    },
+    "member_count": {
+      "bsonType": "int"
+    },
+    "uploaded_count": {
+      "bsonType": "int"
+    },
+    "effective_count": {
+      "bsonType": "int"
+    },
+    "snapshot_hash": {
+      "bsonType": "string"
+    },
+    "file_name": {
+      "bsonType": "string"
+    },
+    "media_id": {
+      "bsonType": "string"
+    },
+    "crowd_id": {
+      "bsonType": "string"
+    },
+    "crowd_name": {
+      "bsonType": "string"
+    },
+    "remote_state": {
+      "bsonType": "string"
+    },
+    "attempt_count": {
+      "bsonType": "int"
+    },
+    "publish_attempts": {
+      "bsonType": "int"
+    },
+    "last_error": {
+      "description": "脱敏后的最近一次错误；成功完成时为 null"
+    },
+    "next_attempt_at": {
+      "bsonType": "double",
+      "description": "下次允许执行的毫秒时间戳；终态时为 0"
+    },
+    "deadline_at": {
+      "bsonType": "double"
+    },
+    "created_at": {
+      "bsonType": "double"
+    },
+    "updated_at": {
+      "bsonType": "double"
+    },
+    "published_at": {
+      "bsonType": "double"
+    },
+    "finished_at": {
+      "bsonType": "double"
+    }
+  }
+}

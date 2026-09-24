@@ -1,0 +1,70 @@
+.tab-bar {
+  position: fixed;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 1000;
+  display: flex;
+  height: 50px;
+  padding-bottom: env(safe-area-inset-bottom);
+  border-top: 1px solid #e7e9ed;
+  background: #ffffff;
+  box-sizing: content-box;
+}
+
+.tab-bar__item {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 50px;
+}
+
+.tab-bar__icon {
+  display: block;
+  width: 24px;
+  height: 24px;
+}
+
+.tab-bar__label {
+  margin-top: 3px;
+  color: #7a7e83;
+  font-size: 10px;
+  line-height: 1.2;
+}
+
+.tab-bar__label--selected {
+  color: #008cff;
+}
+
+.tab-bar--tablet {
+  height: 76px;
+}
+
+.tab-bar--tablet .tab-bar__item {
+  height: 76px;
+}
+
+.tab-bar--tablet .tab-bar__icon {
+  width: 34px;
+  height: 34px;
+}
+
+.tab-bar--tablet .tab-bar__label {
+  margin-top: 5px;
+  font-size: 15px;
+}
+
+.tab-bar--night {
+  border-top-color: #303842;
+  background: #171c22;
+}
+
+.tab-bar--night .tab-bar__label {
+  color: #8f99a5;
+}
+
+.tab-bar--night .tab-bar__label--selected {
+  color: #008cff;
+}

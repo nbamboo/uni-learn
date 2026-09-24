@@ -27,6 +27,9 @@ uni_modules/uni-config-center/uniCloud/cloudfunctions/common/uni-config-center/u
 
 # 微信虚拟支付密钥与消息推送验签配置
 uni_modules/uni-config-center/uniCloud/cloudfunctions/common/uni-config-center/virtual-payment/config.json
+
+# 会员广告屏蔽同步云函数的可选本地环境变量
+uniCloud-alipay/cloudfunctions/member-crowd-worker/.env
 outputs/qa-uni-learn-20260831/uni-learn_测试用例与测试报告_2026-08-31.xlsx
 outputs/question-bank/difference-report-2026-09-10.json
 outputs/question-bank/difference-report-2026-09-10.md

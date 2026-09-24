@@ -1,0 +1,22 @@
+{
+  "name": "member-crowd-daily",
+  "version": "1.0.0",
+  "main": "index.js",
+  "private": true,
+  "dependencies": {
+    "member-crowd-core": "file:../common/member-crowd-core"
+  },
+  "cloudfunction-config": {
+    "runtime": "Nodejs18",
+    "memorySize": 256,
+    "timeout": 60,
+    "triggers": [
+      {
+        "name": "member-crowd-daily-business-hours",
+        "type": "timer",
+        "config": "0 0 0,8,10,12,14,16,18,20,22 * * * *"
+      }
+    ]
+  },
+  "extensions": {}
+}

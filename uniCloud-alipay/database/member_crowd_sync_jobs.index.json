@@ -1,0 +1,27 @@
+[
+  {
+    "IndexName": "status_next_attempt_created",
+    "MgoKeySchema": {
+      "MgoIndexKeys": [
+        {
+          "Name": "status",
+          "Direction": "1",
+          "Type": "varchar"
+        },
+        {
+          "Name": "next_attempt_at",
+          "Direction": "1",
+          "Type": "double"
+        },
+        {
+          "Name": "created_at",
+          "Direction": "1",
+          "Type": "double"
+        }
+      ],
+      "MgoIsUnique": false,
+      "MgoIsSparse": false
+    }
+  }
+]
+

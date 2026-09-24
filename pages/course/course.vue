@@ -81,6 +81,8 @@
 		background-color: #ffffff;
 		border-radius: 16rpx;
 		box-shadow: 0 2rpx 12rpx rgba(0, 0, 0, 0.06);
+		font-size: 30rpx;
+		line-height: 1.7;
 	}
 
 	.content {
@@ -94,6 +96,29 @@
 	}
 
 	.image-view {
+		width: 100%;
 		border-radius: 12rpx;
+	}
+
+	@media screen and (min-width: 768px) {
+		.course-container {
+			width: calc(100% - 48px);
+			max-width: 820px;
+			margin: 24px auto;
+			padding: 32px;
+			border-radius: 16px;
+			box-sizing: border-box;
+			box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
+			font-size: 30px;
+		}
+
+		.image-content {
+			margin-top: 16px;
+			margin-bottom: 32px;
+		}
+
+		.image-view {
+			border-radius: 12px;
+		}
 	}
 </style>

@@ -651,4 +651,67 @@
 	.smart-editor-sheet.night-mode .smart-editor-value,
 	.smart-editor-sheet.night-mode .smart-editor-percent,
 	.smart-editor-sheet.night-mode .smart-editor-done { color: #53b5ff; }
+
+	@media screen and (min-width: 768px) {
+		.settings-page { width: 100%; max-width: 820px; margin: 0 auto; padding: 24px 24px calc(164px + env(safe-area-inset-bottom)); }
+		.settings-section { margin-bottom: 28px; }
+		.section-heading { margin: 0 4px 16px; }
+		.section-title { font-size: 32px; }
+		.section-desc { margin-top: 4px; font-size: 24px; }
+		.settings-card, .smart-card { border-radius: 16px; box-shadow: 0 4px 14px rgba(31, 45, 61, 0.04); }
+		.mode-card { padding: 16px; }
+		.mode-segments { padding: 5px; border-radius: 12px; }
+		.mode-segment { height: 68px; border-radius: 9px; font-size: 29px; }
+		.mode-member-badge { margin-left: 7px; padding: 2px 7px; border-radius: 8px; font-size: 18px; }
+		.mode-active-desc { padding: 18px 10px 6px 32px; font-size: 24px; }
+		.smart-card { padding: 20px; }
+		.strategy-segments { padding: 5px; border-radius: 12px; }
+		.strategy-segment { height: 64px; border-radius: 9px; font-size: 29px; }
+		.smart-summary-list { margin-top: 10px; }
+		.smart-summary-row { min-height: 74px; padding: 0 4px 0 28px; }
+		.smart-summary-label { font-size: 28px; }
+		.smart-summary-main { margin-left: 20px; }
+		.smart-summary-count { font-size: 30px; }
+		.smart-summary-divider { margin-left: 28px; }
+		.ratio-summary-values { font-size: 26px; }
+		.ratio-summary-separator { padding: 0 9px; }
+		.smart-summary-chevron { margin-right: 8px; }
+		.other-card { padding: 0 24px; }
+		.setting-row { min-height: 116px; }
+		.setting-divider { margin-left: 72px; }
+		.setting-icon { width: 56px; height: 56px; flex-basis: 56px; margin-right: 16px; border-radius: 13px; }
+		.setting-title { font-size: 29px; }
+		.setting-desc { margin-top: 6px; font-size: 24px; }
+		.moon-shape { width: 29px; height: 29px; }
+		.moon-cutout { top: -4px; right: -4px; width: 27px; height: 27px; }
+		.night-control { margin-left: 16px; }
+		.row-chevron { width: 13px; height: 13px; flex-basis: 13px; margin: 0 7px 0 16px; border-width: 3px 3px 0 0; }
+		.switch-preview { width: 76px; height: 42px; flex-basis: 76px; border-radius: 22px; }
+		.switch-thumb { top: 4px; left: 4px; width: 34px; height: 34px; box-shadow: 0 2px 7px rgba(31, 45, 61, 0.2); }
+		.switch-preview.active .switch-thumb { left: 38px; }
+		.sync-note { gap: 8px; margin-top: 18px; font-size: 24px; }
+		.settings-ad-container { margin-top: 28px; border-radius: 16px; }
+		.settings-ad { border-radius: 16px; }
+		.save-bar { right: auto; left: 50%; width: 820px; max-width: 100%; padding: 18px 24px calc(18px + env(safe-area-inset-bottom)); transform: translateX(-50%); }
+		.save-button { height: 84px; border-radius: 14px; font-size: 30px; }
+
+		.smart-editor-sheet { width: 100%; max-width: 820px; margin: 0 auto; border-radius: 20px 20px 0 0; }
+		.smart-editor-header { min-height: 104px; padding: 18px 28px; }
+		.smart-editor-title { font-size: 32px; }
+		.smart-editor-caption { margin-top: 5px; font-size: 24px; }
+		.smart-editor-done { margin-left: 24px; padding: 18px 8px 18px 24px; font-size: 28px; }
+		.smart-editor-body { max-height: calc(82vh - 104px - env(safe-area-inset-bottom)); padding: 24px 28px 30px; }
+		.smart-editor-section-title { font-size: 30px; }
+		.smart-editor-section-note { margin-left: 20px; font-size: 24px; }
+		.smart-editor-stepper { gap: 28px; margin-top: 22px; }
+		.smart-editor-step { width: 112px; height: 88px; border-radius: 14px; font-size: 39px; }
+		.smart-editor-value { min-width: 150px; font-size: 39px; }
+		.ratio-editor-section { margin-top: 30px; padding-top: 26px; }
+		.smart-editor-ratio-row { min-height: 116px; }
+		.smart-editor-ratio-name { font-size: 29px; }
+		.smart-editor-ratio-count { margin-left: 14px; font-size: 24px; }
+		.smart-editor-ratio-control { gap: 14px; margin-left: 24px; }
+		.smart-editor-ratio-control .smart-editor-step { width: 88px; height: 88px; }
+		.smart-editor-percent { width: 104px; font-size: 35px; }
+	}
 </style>

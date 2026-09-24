@@ -270,9 +270,45 @@ async function run() {
 
 	const currentTime = new Date('2026-09-01T04:00:00.000Z')
 	const environment = createDatabase({
-		'uni-id-users': [{ _id: 'user-one', wx_openid: { mp: 'openid-one' } }],
+		'uni-id-users': [
+			{ _id: 'user-one', wx_openid: { mp: 'openid-one' } },
+			{ _id: 'grace-user', wx_openid: { mp: 'openid-one' } },
+			{ _id: 'expired-user', wx_openid: { mp: 'openid-one' } },
+			{ _id: 'revoked-user', wx_openid: { mp: 'openid-one' } }
+		],
 		question_bank_payment_orders: [],
-		question_bank_memberships: []
+		question_bank_app_configs: [{
+			_id: 'exam_countdown',
+			enabled: true,
+			title: '考试倒计时',
+			targetAt: new Date('2026-10-23T16:00:00.000Z'),
+			timezone: 'Asia/Shanghai',
+			revision: 1,
+			updatedAt: new Date('2026-09-21T16:28:58.000Z')
+		}],
+		question_bank_memberships: [
+			{
+				_id: 'grace-user',
+				userId: 'grace-user',
+				status: 'expired',
+				expiresAt: new Date(currentTime.getTime() - 60 * 60 * 1000),
+				grants: []
+			},
+			{
+				_id: 'expired-user',
+				userId: 'expired-user',
+				status: 'expired',
+				expiresAt: new Date(currentTime.getTime() - 7 * 60 * 60 * 1000),
+				grants: []
+			},
+			{
+				_id: 'revoked-user',
+				userId: 'revoked-user',
+				status: 'revoked',
+				expiresAt: new Date(currentTime.getTime() + 30 * 24 * 60 * 60 * 1000),
+				grants: []
+			}
+		]
 	}, currentTime)
 	let queryCalls = 0
 	let createdOrderId = ''
@@ -316,7 +352,8 @@ async function run() {
 		}
 	})
 
-	const availablePlans = (await service.execute({ action: 'getMembership' }, 'user-one')).plans
+	const membershipSnapshot = await service.execute({ action: 'getMembership' }, 'user-one')
+	const availablePlans = membershipSnapshot.plans
 	assert.deepEqual(
 		availablePlans.map(plan => plan.priceFen),
 		[10, 1900, 3500, 5900]
@@ -328,6 +365,56 @@ async function run() {
 	assert.equal(availablePlans[3].name, '全科366天')
 	assert.equal(availablePlans[3].days, 366)
 	assert.equal(availablePlans[0].showRegularPrice, true)
+	assert.equal(membershipSnapshot.examCountdown.enabled, true)
+	assert.equal(membershipSnapshot.examCountdown.title, '考试倒计时')
+	assert.equal(membershipSnapshot.examCountdown.targetAt, Date.parse('2026-10-23T16:00:00.000Z'))
+	assert.equal(membershipSnapshot.examCountdown.timezone, 'Asia/Shanghai')
+	assert.equal(membershipSnapshot.examCountdown.revision, 1)
+	assert.equal(membershipSnapshot.examCountdown.serverNow, currentTime.getTime())
+	environment.collections.question_bank_app_configs.set('exam_countdown', {
+		_id: 'exam_countdown',
+		enabled: true,
+		title: '考试倒计时',
+		targetAt: new Date('2026-10-24T16:00:00.000Z'),
+		timezone: 'Asia/Shanghai',
+		revision: 2,
+		updatedAt: new Date(currentTime)
+	})
+	const updatedCountdown = (await service.execute({ action: 'getMembership' }, 'user-one')).examCountdown
+	assert.equal(updatedCountdown.targetAt, Date.parse('2026-10-24T16:00:00.000Z'))
+	assert.equal(updatedCountdown.revision, 2)
+	assert.deepEqual(
+		availablePlans.map(plan => plan.activeMemberPurchasable),
+		[false, true, true, true]
+	)
+
+	const ordersBeforeGraceRejection = environment.collections.question_bank_payment_orders.size
+	await assert.rejects(
+		service.execute({
+			action: 'createOrder',
+			productId: 'membership_1m',
+			code: 'login-code'
+		}, 'grace-user'),
+		error => {
+			assert.equal(error.errCode, 'VIRTUAL_PAYMENT_PRODUCT_NOT_AVAILABLE_FOR_ACTIVE_MEMBER')
+			assert.match(error.message, /全科31天仅限非会员购买/)
+			return true
+		}
+	)
+	assert.equal(environment.collections.question_bank_payment_orders.size, ordersBeforeGraceRejection)
+
+	const expiredMonthlyOrder = await service.execute({
+		action: 'createOrder',
+		productId: 'membership_1m',
+		code: 'login-code'
+	}, 'expired-user')
+	assert.equal(expiredMonthlyOrder.order.amountFen, 10)
+	const revokedMonthlyOrder = await service.execute({
+		action: 'createOrder',
+		productId: 'membership_1m',
+		code: 'login-code'
+	}, 'revoked-user')
+	assert.equal(revokedMonthlyOrder.order.amountFen, 10)
 
 	const created = await service.execute({
 		action: 'createOrder',
@@ -352,6 +439,26 @@ async function run() {
 	assert.equal(queried.order.status, 'delivered')
 	assert.equal(queried.membership.isMember, true)
 	assert.equal(queryCalls, 1)
+
+	const ordersBeforeActiveMemberRejection = environment.collections.question_bank_payment_orders.size
+	await assert.rejects(
+		service.execute({
+			action: 'createOrder',
+			productId: 'membership_1m',
+			code: 'login-code'
+		}, 'user-one'),
+		error => {
+			assert.equal(error.errCode, 'VIRTUAL_PAYMENT_PRODUCT_NOT_AVAILABLE_FOR_ACTIVE_MEMBER')
+			return true
+		}
+	)
+	assert.equal(environment.collections.question_bank_payment_orders.size, ordersBeforeActiveMemberRejection)
+	const activeMemberQuarterlyOrder = await service.execute({
+		action: 'createOrder',
+		productId: 'membership_3m',
+		code: 'login-code'
+	}, 'user-one')
+	assert.equal(activeMemberQuarterlyOrder.order.amountFen, 1900)
 
 	const timestamp = '1788235300'
 	const nonce = 'nonce-one'
@@ -407,6 +514,12 @@ async function run() {
 	assert.equal(environment.collections.question_bank_payment_orders.get(created.order.outTradeNo).status, 'refunded')
 	assert.equal(environment.collections.question_bank_memberships.get('user-one').status, 'expired')
 	assert.equal((await service.execute({ action: 'getMembership' }, 'user-one')).isMember, false)
+	const repurchasedMonthlyOrder = await service.execute({
+		action: 'createOrder',
+		productId: 'membership_1m',
+		code: 'login-code'
+	}, 'user-one')
+	assert.equal(repurchasedMonthlyOrder.order.amountFen, 10)
 	await testReconcileFairness()
 	await testMissingOrderCleanup()
 

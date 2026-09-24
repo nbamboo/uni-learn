@@ -71,7 +71,7 @@
 	page {
 		margin-top: 1%;
 		margin-left: 1%;
-		font-size: 26px;
+		font-size: 27px;
 		line-height: 60px;
 		color: #222;
 		height: 100%;
@@ -94,7 +94,7 @@
 		top: 0px;
 		z-index: 100;
 		height: 40px;
-		font-size: 14px;
+		font-size: 15px;
 		line-height: 40px;
 		background-color: #f8f8f8;
 		white-space: nowrap;
@@ -159,7 +159,7 @@
 		display: inline-block;
 		background-color: #fff;
 		box-sizing: border-box;
-		font-size: 14px;
+		font-size: 15px;
 		line-height: 40px;
 		position: relative;
 		overflow: hidden;
@@ -194,5 +194,10 @@
 	.table__row__td:nth-child(2) .table__row__text {
 		display: inline;
 		padding-left: 20%;
+	}
+
+	@media screen and (min-width: 768px) {
+		page { margin: 0; }
+		.table { width: calc(100% - 48px); max-width: 820px; height: calc(100% - 24px); margin: 24px auto 0; }
 	}
 </style>

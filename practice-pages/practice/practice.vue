@@ -1633,4 +1633,97 @@
 	.night-mode .answer-number.current { border-color: #269df0; color: #63b9f6; box-shadow: 0 0 0 4rpx #17364d; }
 	.night-mode .answer-number.answered { border-color: #168ee5; background: #168ee5; color: #ffffff; }
 	.night-mode .answer-sheet-submit { background: #168ee5; color: #ffffff; }
+
+	@media screen and (min-width: 768px) {
+		.practice-page,
+		.exam-result-page { width: 100%; max-width: 820px; margin: 0 auto; }
+		.progress-track { height: 6px; }
+		.question-swiper { height: calc(100vh - 106px - env(safe-area-inset-bottom)); }
+		.question-slide { width: 100%; flex-basis: 100%; }
+		.question-shell { margin: 24px; padding: 28px 28px 48px; border-radius: 8px; }
+		.type-badge { padding: 10px 20px; border-left-width: 6px; border-radius: 4px; font-size: 28px; }
+		.question-count { font-size: 31px; }
+		.question-count text { font-size: 41px; }
+		.question-meta { margin-top: 30px; padding-top: 24px; }
+		.chapter-name { font-size: 25px; }
+		.knowledge-name { margin-top: 6px; font-size: 24px; }
+		.calculator-button { width: 62px; height: 62px; margin-left: 18px; border-radius: 8px; }
+		.question-title { margin-top: 30px; font-size: 35px; }
+		.material-block { margin-top: 30px; padding: 24px; border-radius: 10px; }
+		.material-text { font-size: 31px; }
+		.question-stem { margin-top: 30px; }
+		.question-stem.material-question-stem { padding-top: 24px; }
+		.option-list { margin-top: 34px; }
+		.option-item { min-height: 104px; margin-top: 20px; padding: 18px 22px; border-width: 2px; border-radius: 8px; }
+		.option-alias { width: 54px; height: 54px; flex-basis: 54px; margin-right: 20px; border-width: 2px; font-size: 28px; }
+		.option-text { font-size: 31px; }
+		.confirm-answer-button { height: 82px; margin-top: 30px; border-radius: 8px; font-size: 29px; line-height: 82px; }
+		.analysis-panel { margin-top: 36px; padding-top: 28px; }
+		.result-line { gap: 8px; font-size: 31px; }
+		.answer-line { margin-top: 24px; }
+		.analysis-label { font-size: 28px; }
+		.answer-value { margin-left: 20px; font-size: 32px; }
+		.explanation-block { margin-top: 28px; }
+		.explanation-text { margin-top: 14px; font-size: 28px; }
+		.question-nav { gap: 18px; margin-top: 34px; }
+		.question-nav button { height: 82px; border-radius: 8px; font-size: 29px; line-height: 82px; }
+		.bottom-toolbar { right: auto; left: 50%; width: 820px; max-width: 100%; height: calc(100px + env(safe-area-inset-bottom)); padding: 0 12px env(safe-area-inset-bottom); transform: translateX(-50%); }
+		.toolbar-stat, .toolbar-command { gap: 8px; font-size: 27px; }
+		.toolbar-submit { height: 66px; border-radius: 34px; font-size: 28px; }
+
+		.answer-sheet,
+		.feedback-sheet,
+		.calculator-sheet { width: 100%; max-width: 820px; margin: 0 auto; box-sizing: border-box; }
+		.answer-sheet { padding: 28px 28px calc(28px + env(safe-area-inset-bottom)); border-radius: 16px 16px 0 0; }
+		.answer-sheet-header { padding-bottom: 24px; }
+		.answer-sheet-title { font-size: 35px; }
+		.answer-sheet-caption { margin-top: 5px; font-size: 24px; }
+		.sheet-close { padding: 12px; }
+		.answer-grid { gap: 20px; padding: 28px 4px 12px; }
+		.answer-number { width: 80px; height: 80px; border-width: 2px; font-size: 27px; }
+		.answer-number.current { box-shadow: 0 0 0 4px #eaf5ff; }
+		.answer-sheet-submit { height: 84px; margin-top: 24px; border-radius: 42px; font-size: 30px; line-height: 84px; }
+		.feedback-sheet { padding: 28px 32px calc(32px + env(safe-area-inset-bottom)); border-radius: 20px 20px 0 0; }
+		.feedback-sheet-header { padding-bottom: 24px; }
+		.feedback-sheet-title { font-size: 35px; }
+		.feedback-sheet-caption { margin-top: 6px; font-size: 24px; }
+		.feedback-sheet-close { width: 68px; height: 68px; }
+		.feedback-field-label { margin-top: 26px; font-size: 27px; }
+		.feedback-required { margin-right: 6px; }
+		.feedback-description-label { margin-top: 2px; margin-bottom: 16px; }
+		.feedback-type-grid { gap: 18px 24px; padding: 18px 0 26px; }
+		.feedback-type-item { min-height: 72px; padding: 0 18px; border-width: 2px; border-radius: 10px; font-size: 29px; }
+		.feedback-radio { width: 34px; height: 34px; flex-basis: 34px; margin-right: 14px; border-width: 2px; }
+		.feedback-radio-dot { width: 18px; height: 18px; }
+		.feedback-description-wrap { padding: 20px 20px 48px; border-width: 2px; border-radius: 10px; }
+		.feedback-description { height: 210px; font-size: 28px; }
+		.feedback-count { right: 20px; bottom: 14px; font-size: 23px; }
+		.feedback-submit-button { height: 84px; margin-top: 28px; border-radius: 42px; font-size: 30px; line-height: 84px; }
+		.calculator-sheet { height: 86vh; border-radius: 16px 16px 0 0; }
+		.calculator-sheet-header { height: 96px; padding: 0 20px 0 32px; }
+		.calculator-sheet-title { font-size: 33px; }
+		.calculator-sheet-close { width: 72px; height: 72px; }
+		.calculator-sheet-scroll { height: calc(86vh - 96px); }
+
+		.result-hero { padding: 44px 44px 34px; }
+		.result-meta-list { gap: 30px; }
+		.result-meta-row { font-size: 30px; }
+		.result-meta-icon { width: 42px; height: 42px; flex-basis: 42px; margin-right: 18px; font-size: 21px; }
+		.result-summary-card { margin: 0 28px; padding: 56px 24px 42px; border-radius: 34px; box-shadow: 0 22px 60px rgba(72, 82, 96, 0.08); }
+		.accuracy-ring { width: 340px; height: 340px; }
+		.accuracy-ring-inner { width: 270px; height: 270px; }
+		.accuracy-value { font-size: 73px; }
+		.accuracy-unit { margin-left: 5px; font-size: 35px; }
+		.accuracy-label { margin-top: 24px; font-size: 32px; }
+		.result-stats-grid { margin-top: 48px; }
+		.result-stat-value { font-size: 46px; }
+		.result-stat-label { margin-top: 14px; font-size: 25px; }
+		.result-unanswered-note { margin: 38px 18px 0; padding: 20px 24px; border-radius: 12px; font-size: 26px; }
+		.result-actions { gap: 14px; padding: 32px 28px 24px; }
+		.result-actions button { height: 88px; border-radius: 44px; font-size: 29px; line-height: 88px; }
+		.result-ad-container { margin: 0 28px; padding: 8px 0 calc(38px + env(safe-area-inset-bottom)); border-radius: 16px; }
+		.empty-state { padding: 40px; font-size: 29px; }
+		.empty-state text { margin-top: 20px; }
+		.empty-state button { margin-top: 30px; border-radius: 40px; font-size: 29px; }
+	}
 </style>
