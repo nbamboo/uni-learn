@@ -50,6 +50,7 @@
 			getCachedMembership,
 			getMembership
 		} from '@/services/membership.js'
+		import { syncQuestionBankTabNotice } from '@/services/question-bank-tab-notice.js'
 
 		export default {
 			data() {
@@ -76,16 +77,17 @@
 				}
 			},
 			onShow() {
-				this.syncCustomTabBar()
+				// #ifdef MP-WEIXIN
+				uni.showTabBar({ animation: false })
+				// #endif
+				syncQuestionBankTabNotice()
 				this.pendingCount = pendingPracticeEventCount()
 				this.loadMembership()
 			},
+			onReady() {
+				syncQuestionBankTabNotice()
+			},
 			methods: {
-				syncCustomTabBar() {
-					const page = this.$mp && this.$mp.page
-					const tabBar = page && typeof page.getTabBar === 'function' && page.getTabBar()
-					if (tabBar) tabBar.setData({ selected: 2, nightMode: false })
-				},
 				async loadMembership() {
 					try {
 						this.membership = await getMembership()
@@ -261,10 +263,21 @@
 		.about-menu-arrow { margin-left: 14px; }
 	}
 
-	/* #ifdef MP-WEIXIN */
-	@media screen and (min-width: 768px) {
-		.about-page { padding-bottom: calc(24px + 76px + env(safe-area-inset-bottom)); }
+	/* 744～1024px 级别的短竖屏平板不沿用放大的宽屏行高。 */
+	@media screen and (min-width: 700px) and (max-height: 1150px) {
+		.about-page { padding: 16px 0 calc(24px + env(safe-area-inset-bottom)); }
+		.account-card { min-height: 112px; margin: 0 18px 16px; padding: 18px; }
+		.account-avatar { width: 60px; height: 60px; flex-basis: 60px; font-size: 27px; }
+		.account-copy { margin: 0 14px; }
+		.account-name { font-size: 27px; }
+		.account-status,
+		.account-pending { margin-top: 4px; font-size: 21px; }
+		.about-menu-card { margin: 0 18px; }
+		.about-menu-row { min-height: 82px; padding: 14px 18px; }
+		.about-menu-icon { width: 46px; height: 46px; flex-basis: 46px; margin-right: 14px; }
+		.about-menu-title { font-size: 25px; }
+		.about-menu-extra { margin-left: 12px; font-size: 21px; }
+		.about-menu-arrow { margin-left: 10px; }
 	}
-	/* #endif */
 
 </style>

@@ -27,12 +27,14 @@
 
 | 道具 ID | 名称 | 当前价格 | 未来标准价 | 发放时长 |
 | --- | --- | ---: | ---: | ---: |
-| `membership_1m` | 全科31天 | 10 分 | 1200 分 | 31 天 |
+| `membership_1m` | 全科31天 | 100 分（1 元） | 1200 分 | 31 天 |
 | `membership_3m` | 全科93天 | 1900 分 | 2900 分 | 93 天 |
 | `membership_6m` | 全科186天 | 3500 分 | 5200 分 | 186 天 |
 | `membership_12m` | 全科366天 | 5900 分 | 8900 分 | 366 天 |
 
-会员页只在“全科31天”的 0.1 元价格下显示带删除线的“¥12”，不展示“限时折扣”文案；其余方案按当前价格展示月均金额。后续恢复标准价时，将服务端和会员页备用商品表中的 `priceFen` 改为对应的 `regularPriceFen`，并移除月卡的 `showRegularPrice`；同时修改并重新发布 MP 后台四个道具的价格。
+会员页只在“全科31天”的 1 元价格下显示带删除线的“¥12”，不展示“限时折扣”文案；其余方案按当前价格展示月均金额。后续恢复标准价时，将服务端和会员页备用商品表中的 `priceFen` 改为对应的 `regularPriceFen`，并移除月卡的 `showRegularPrice`；同时修改并重新发布 MP 后台四个道具的价格。
+
+iOS Apple 支付的单笔最低金额为 1 元，因此全科31天在所有终端统一调整为 1 元，不再使用 0.1 元的新订单价格。规则见[微信官方文档的“iOS 端用户下单条件”](https://developers.weixin.qq.com/miniprogram/dev/platform-capabilities/business-capabilities/virtual-payment.html)。
 
 “全科31天”仅允许非会员、已过期会员或已撤销会员购买。有效会员（包括自然到期后的 6 小时宽限期）不能重复购买该档位，会员页会置灰并提示选择全科93天、186天或366天；云函数在创建订单前执行相同校验，其他三个档位继续累加当前有效期。
 
@@ -40,13 +42,13 @@
 
 本次切换当前价格时按以下顺序操作，并在切换窗口内暂停真机支付测试，避免后台道具与云函数短暂不同步而返回 `GOODS_PRICE_INVALID`：
 
-1. 在 MP 后台把四个道具名称改为“全科31天 / 93天 / 186天 / 366天”，价格改为 0.1 元、19 元、35 元、59 元并重新发布；实际权益天数由云函数发放。
-2. 等待道具价格生效并逐项复核。
+1. 在 MP 后台的虚拟支付道具配置中编辑现有 `membership_1m`，将价格从 0.1 元改为 1 元（若输入框单位为分则填 100），保存并发布至现网。保留道具 ID、名称和其他三档价格不变；实际权益天数仍由云函数发放。
+2. 等待道具价格生效并确认现网 `membership_1m` 价格为 1 元，通常约需 10 分钟。
 3. 上传并部署 `virtualPayment` 云函数。
 4. 在微信开发者工具重新构建、预览并上传小程序体验版。
-5. 重新进入会员中心，确认四档天数、价格及月卡下方带删除线的“¥12”，再完成一笔 0.1 元真单验证。
+5. 重新进入会员中心，确认全科31天显示 1 元及下方带删除线的“¥12”，其他三档仍为 19 元、35 元、59 元。使用非会员或已过期账号，在 iOS 完成一笔 1 元真单，确认会员到账及 31 天有效期。
 
-本次固定天数发放为订单和会员发放记录新增了可选的 `days` 字段，需要分别上传 `question_bank_payment_orders.schema.json` 和 `question_bank_memberships.schema.json`。旧记录仍保留 `months` 并继续按原自然月规则计算，不需要迁移历史数据。
+首次接入固定天数发放时，订单和会员发放记录新增了可选的 `days` 字段，需要分别上传 `question_bank_payment_orders.schema.json` 和 `question_bank_memberships.schema.json`。已上传该版本后，本次仅将全科31天调价至 1 元，无需重新上传任何 database schema，也无需上传 `questionBankUser` 或 `uni-config-center`。旧记录仍保留 `months` 并继续按原自然月规则计算，不需要迁移历史数据。
 
 会员中心考试倒计时由 `question_bank_app_configs` 集合中的 `exam_countdown` 文档控制。当前目标时间为北京时间 `2026-10-24 00:00:00`，对应 UTC `2026-10-23T16:00:00.000Z`；在 2026 年 9 月 22 日显示剩余 32 天。需要调整时，在 uniCloud 控制台修改该文档的 `targetAt`，同时递增 `revision` 并更新 `updatedAt`。将 `enabled` 改为 `false` 可隐藏倒计时。客户端在进入会员中心时通过现有 `getMembership` 请求取得配置，不会增加云函数调用次数，页面只在本地每分钟更新一次。
 
@@ -167,7 +169,7 @@ node scripts/check-virtual-payment-readiness.js
 - [x] 已在产品说明和会员页告知月支付限额为 10 万元。
 - [x] MP 后台虚拟支付已开通。
 - [x] 已取得并配置 AppID / OfferID / 现网 AppKey。
-- [x] 四个现网道具已改为当前价格并重新发布、在线复核：`membership_1m` 0.1 元、`membership_3m` 19 元、`membership_6m` 35 元、`membership_12m` 59 元。
+- [ ] 全科31天现网道具已调价为 1 元并重新发布、在线复核：`membership_1m` 1 元；其他三档保持 `membership_3m` 19 元、`membership_6m` 35 元、`membership_12m` 59 元。
 - [ ] 如需 iOS 支付，已配置小程序简称并开通 Apple IAP。
 - [ ] 支付订单表与会员表已重新上传含 `days` 字段的 Schema；原有 5 个业务索引仍在线有效。
 - [ ] 当前定价与固定天数版本的 `virtualPayment` 已重新上传；消息推送 URL 化和定时触发器仍正常。
@@ -183,6 +185,6 @@ node scripts/check-virtual-payment-readiness.js
 - [x] 已在本文说明退款规则、结算周期和费率（Android 等 1%、iOS 12%）。
 - [ ] 上线后已用小额真单核对“支付 → 推送 → 发货 → 会员生效 → 后台账单金额”。
 
-真单验证时购买当前 0.1 元的 `membership_1m`，确认 `question_bank_payment_orders.status` 为 `delivered`、`question_bank_memberships.expiresAt` 延长 31 天，并验证免广告与云端学习数据同步权益。错题集、收藏夹、背题模式和 31～50 题智能练习仅会员可用；考试模式、做题模式及 10～30 题智能练习继续免费，非会员答错与收藏仍保存在本机。自然到期允许最多 6 小时宽限，普通页面的会员状态缓存同样为 6 小时；会员中心始终强制刷新。
+真单验证时购买当前 1 元的 `membership_1m`，确认 `question_bank_payment_orders.amountFen` 为 `100`、`status` 为 `delivered`、`question_bank_memberships.expiresAt` 延长 31 天，并验证免广告与云端学习数据同步权益。错题集、收藏夹、背题模式和 31～50 题智能练习仅会员可用；考试模式、做题模式及 10～30 题智能练习继续免费，非会员答错与收藏仍保存在本机。自然到期允许最多 6 小时宽限，普通页面的会员状态缓存同样为 6 小时；会员中心始终强制刷新。
 
 随后从 MP 后台执行一笔退款，确认订单变为 `refunded` 且相应时长被立即撤销。后台人工撤销必须将 `question_bank_memberships.status` 设为 `revoked`，不能仅修改为 `expired`；`revoked` 与退款撤销均不享有到期宽限。验证撤销后再次进入任一会员功能时，本地会员缓存立即变为非会员，并确认 `questionBankUser` 的会员 action 返回 `QUESTION_BANK_MEMBERSHIP_REQUIRED`。

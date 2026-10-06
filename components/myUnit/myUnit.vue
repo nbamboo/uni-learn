@@ -79,7 +79,7 @@
 	}
 
 	@media screen and (min-width: 768px) {
-		.tool-row { align-items: center; min-height: 96px; }
+		.tool-row { align-items: center; min-height: 88px; }
 
 		.tool-icon-column {
 			display: flex;
@@ -104,12 +104,12 @@
 		}
 
 		.tool-title {
-			font-size: 32px;
+			font-size: 26px;
 		}
 
 		.tool-desc {
-			margin-top: 7px;
-			font-size: 28px;
+			margin-top: 5px;
+			font-size: 22px;
 		}
 
 		.pmt-btn {
@@ -121,7 +121,7 @@
 			margin: 0;
 			padding: 0;
 			border-radius: 10px;
-			font-size: 28px;
+			font-size: 24px;
 			line-height: 1;
 		}
 

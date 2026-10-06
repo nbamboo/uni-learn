@@ -43,7 +43,7 @@
 			</view>
 		</view>
 
-		<view class="practice-card">
+			<view class="practice-card">
 			<view class="card-heading">
 				<text class="card-title">开始练习</text>
 			</view>
@@ -85,9 +85,19 @@
 					</view>
 				</view>
 			</view>
-		</view>
+			</view>
 
-		<view class="bank-note" v-if="currentCatalogPending">
+			<view class="bank-note sync-warning" v-if="cloudSyncPending" @tap="openSyncConflict">
+				<uni-icons
+					:type="reconciliationState.error ? 'refreshempty' : 'cloud-upload'"
+					:size="wideScreen ? 24 : 18"
+					color="#a76a00"
+				></uni-icons>
+				<text>{{ cloudSyncNoticeText }}</text>
+				<uni-icons type="right" :size="wideScreen ? 21 : 15" color="#a76a00"></uni-icons>
+			</view>
+
+			<view class="bank-note" v-if="currentCatalogPending">
 			<uni-icons type="spinner-cycle" :size="wideScreen ? 24 : 18" color="#7a7e83"></uni-icons>
 			<text>正在从云端加载题库数据...</text>
 		</view>
@@ -121,6 +131,7 @@
 			ref="subjectPopup"
 			type="bottom"
 			:background-color="nightMode ? '#1b222a' : '#ffffff'"
+			@change="handleSubjectPopupChange"
 		>
 			<view class="subject-sheet">
 				<view class="sheet-header">
@@ -165,13 +176,16 @@
 		subjectGroups
 	} from '@/data/practice.js'
 	import { getCatalog, getCatalogSummaries } from '@/services/question-bank.js'
+	import { markQuestionBankTabNoticeSeen } from '@/services/question-bank-tab-notice.js'
 	import {
 		flushPracticeEvents,
 		getCachedPracticeSummary,
 		getLocalPracticePreferences,
 		getPracticePreferences,
+		getPracticeReconciliationState,
 		getPracticeSummary,
-		pendingPracticeEventCount
+		pendingPracticeEventCount,
+		preparePracticeReconciliation
 	} from '@/services/user-practice.js'
 	import {
 		getCachedMembership,
@@ -185,6 +199,7 @@
 			return {
 				wideScreen: windowWidth >= 768,
 				nightMode: Boolean(localPreferences.nightMode),
+				subjectPickerVisible: false,
 				membership: getCachedMembership(),
 				membershipLoaded: false,
 				currentSubjectId: '',
@@ -197,6 +212,7 @@
 				userDataError: '',
 				userDataSyncing: false,
 				userDataPendingCount: pendingPracticeEventCount(),
+				reconciliationState: getPracticeReconciliationState(),
 				stats: {
 					total: 0,
 					attempted: 0,
@@ -216,6 +232,26 @@
 			}
 		},
 		computed: {
+			cloudSyncPending() {
+				return ['checking', 'required', 'replacing', 'restoring'].indexOf(
+					this.reconciliationState.status
+				) > -1
+			},
+			cloudSyncNoticeText() {
+				if (this.reconciliationState.error) {
+					return `${this.reconciliationState.error}，点击继续处理`
+				}
+				if (this.reconciliationState.status === 'required') {
+					return '本机与云端学习进度不同，点击选择保留哪一份'
+				}
+				if (this.reconciliationState.status === 'replacing') {
+					return '正在用本机进度重建云端，点击查看进度'
+				}
+				if (this.reconciliationState.status === 'restoring') {
+					return '正在恢复云端学习进度，点击查看进度'
+				}
+				return '正在检查本机与云端学习进度'
+			},
 			userDataSyncText() {
 				const pending = this.userDataPendingCount
 				return `正在同步${pending ? `，剩余 ${pending} 条` : ''}，请保持小程序在前台`
@@ -268,7 +304,11 @@
 			}
 		},
 		async onShow() {
-			this.syncCustomTabBar(this.nightMode)
+			this.subjectPickerVisible = false
+			// #ifdef MP-WEIXIN
+			uni.showTabBar({ animation: false })
+			// #endif
+			markQuestionBankTabNoticeSeen()
 			this.userDataPendingCount = pendingPracticeEventCount()
 			const membershipTask = this.refreshMembership()
 			try {
@@ -289,13 +329,16 @@
 			this.wideScreen = (width || uni.getSystemInfoSync().windowWidth) >= 768
 		},
 		onHide() {
+			this.subjectPickerVisible = false
 			this.applyTabBarTheme(false)
 		},
 		methods: {
-			syncCustomTabBar(nightMode) {
-				const page = this.$mp && this.$mp.page
-				const tabBar = page && typeof page.getTabBar === 'function' && page.getTabBar()
-				if (tabBar) tabBar.setData({ selected: 1, nightMode: Boolean(nightMode) })
+			handleSubjectPopupChange(event) {
+				this.subjectPickerVisible = Boolean(event && event.show)
+				// #ifdef MP-WEIXIN
+				if (this.subjectPickerVisible) uni.hideTabBar({ animation: false })
+				else uni.showTabBar({ animation: false })
+				// #endif
 			},
 			async refreshMembership() {
 				try {
@@ -305,7 +348,31 @@
 				} finally {
 					this.membershipLoaded = true
 				}
+				if (this.membership.isMember) {
+					try {
+						this.reconciliationState = await preparePracticeReconciliation({
+							subjectIds: this.allSubjectIds(),
+							onProgress: state => { this.reconciliationState = Object.assign({}, state) }
+						})
+					} catch (error) {
+						this.reconciliationState = getPracticeReconciliationState()
+					}
+				} else {
+					this.reconciliationState = getPracticeReconciliationState()
+				}
+				if (this.reconciliationState.status === 'ready' && this.currentSubjectId) {
+					this.refreshStats(this.subjectQuestionCount(this.currentSubjectId))
+					this.loadCloudStats(this.currentSubjectId)
+				}
 				return this.membership
+			},
+			allSubjectIds() {
+				return this.subjectGroups.reduce((result, group) => (
+					result.concat(group.items.map(item => item.id))
+				), [])
+			},
+			openSyncConflict() {
+				uni.navigateTo({ url: '/practice-pages/sync-conflict/sync-conflict' })
 			},
 			applyNightMode(preferences) {
 				this.nightMode = Boolean(preferences && preferences.nightMode)
@@ -322,7 +389,6 @@
 					backgroundColor: nightMode ? '#171c22' : '#ffffff',
 					borderStyle: 'black'
 				})
-				this.syncCustomTabBar(nightMode)
 			},
 			async refreshNightMode() {
 				this.applyNightMode(getLocalPracticePreferences())
@@ -376,6 +442,11 @@
 			},
 			async retryUserData() {
 				if (this.userDataSyncing) return
+				this.reconciliationState = getPracticeReconciliationState()
+				if (this.cloudSyncPending) {
+					this.openSyncConflict()
+					return
+				}
 				this.userDataSyncing = true
 				this.userDataError = ''
 				this.userDataPendingCount = pendingPracticeEventCount()
@@ -688,14 +759,17 @@
 	.feature-title { font-size: 29rpx; font-weight: 600; line-height: 1.25; }
 	.feature-desc { margin-top: 7rpx; color: #8c949d; font-size: 25rpx; line-height: 1.35; }
 	.bank-note { display: flex; align-items: center; gap: 10rpx; margin: 11rpx 32rpx 0; padding: 20rpx 22rpx; border-radius: 8rpx; background: #f5f6f8; font-size: 25rpx; color: #6f747d; }
+	.bank-note.sync-warning { background: #fff7e7; color: #8c5a00; }
+	.bank-note.sync-warning text { flex: 1; }
 	.bank-note.error { background: #fff2f2; color: #bd3f3f; }
 	.subject-sheet { padding: 28rpx; border-radius: 16rpx 16rpx 0 0; background: #ffffff; }
 	.sheet-header { padding: 0 4rpx 24rpx; border-bottom: 1rpx solid #edf0f3; }
 	.sheet-title { font-size: 33rpx; font-weight: 600; }
 	.sheet-caption { margin-top: 6rpx; }
 	.sheet-close { padding: 12rpx; }
-	.subject-scroll { max-height: 68vh; }
+	.subject-scroll { height: 60vh; }
 	.subject-group { padding: 26rpx 4rpx 4rpx; }
+	.subject-group:last-child { padding-bottom: 28rpx; }
 	.group-title { font-size: 31rpx; font-weight: 600; }
 	.subject-options { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16rpx; margin-top: 18rpx; }
 	.subject-option { display: flex; align-items: flex-start; flex-direction: column; justify-content: center; min-height: 82rpx; padding: 12rpx 18rpx; border: 2rpx solid transparent; border-radius: 8rpx; box-sizing: border-box; background: #f3f4f6; font-size: 29rpx; }
@@ -725,6 +799,7 @@
 	.night-mode .feature-badge { border-color: #12171d; }
 	.night-mode .feature-member-badge { border-color: #12171d; background: #49637f; }
 	.night-mode .bank-note { background: #1b222a; color: #aeb7c1; }
+	.night-mode .bank-note.sync-warning { background: #352d1f; color: #e0b45e; }
 	.night-mode .bank-note.error { background: #3b2327; color: #ef9a9a; }
 	.night-mode .subject-sheet { background: #1b222a; color: #e6e9ed; }
 	.night-mode .sheet-header { border-color: #303943; }
@@ -782,9 +857,32 @@
 		.subject-status { margin-top: 4px; font-size: 23px; }
 	}
 
-	/* #ifdef MP-WEIXIN */
-	@media screen and (min-width: 768px) {
-		.practice-home { padding-bottom: calc(24px + 76px + env(safe-area-inset-bottom)); }
+	/* 竖屏小尺寸平板：宽度够用，但纵向空间接近手机。 */
+	@media screen and (min-width: 768px) and (max-height: 1050px) {
+		.subject-bar { min-height: 78px; padding: 8px 22px; }
+		.subject-copy { margin-left: 20px; }
+		.subject-label { font-size: 21px; }
+		.subject-name { margin-top: 2px; font-size: 27px; }
+		.subject-switch { padding: 8px 10px; font-size: 23px; }
+		.overview-card,
+		.practice-card { margin: 10px 20px 0; padding: 16px 20px; border-radius: 14px; }
+		.overview-card { margin-top: 12px; }
+		.card-title { font-size: 28px; }
+		.completion-heading { margin-top: 12px; }
+		.overview-subtitle { font-size: 22px; }
+		.completion-value { font-size: 34px; }
+		.completion-progress { height: 8px; margin-top: 10px; }
+		.stat-grid { gap: 10px; margin-top: 11px; padding-top: 11px; }
+		.stat-item { min-height: 58px; }
+		.stat-value { font-size: 26px; }
+		.stat-label { margin-top: 4px; font-size: 20px; }
+		.search-entry { height: 58px; margin-top: 10px; padding: 0 14px; font-size: 23px; }
+		.feature-grid { gap: 8px; margin-top: 10px; }
+		.feature-item { min-height: 84px; padding: 10px; }
+		.feature-icon { width: 56px; height: 56px; flex-basis: 56px; }
+		.feature-copy { margin-left: 14px; }
+		.feature-title { font-size: 25px; }
+		.feature-desc { margin-top: 3px; font-size: 21px; }
 	}
-	/* #endif */
+
 </style>

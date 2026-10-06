@@ -36,6 +36,7 @@ async function run() {
 	let queryCalls = 0
 	let membershipCalls = 0
 	let syncScheduleCalls = 0
+	let reconciliationTransitionCalls = 0
 	let forcedLoginCalls = 0
 	let tokenFailureOnce = false
 	const examServerNow = Date.parse('2026-09-21T16:00:00.000Z')
@@ -62,6 +63,11 @@ async function run() {
 		markPracticePreferencesRefreshRequired: () => {},
 		markPracticeRecordsRefreshRequired: () => {},
 		markPracticeSummaryRefreshRequired: () => {},
+		markMembershipReconciliationTransition: options => {
+			reconciliationTransitionCalls += 1
+			assert.equal(typeof options.currentMember, 'boolean')
+		},
+		practiceCloudSyncReady: () => true,
 		schedulePracticeSync: options => {
 			syncScheduleCalls += 1
 			assert.equal(options.immediate, true)
@@ -100,7 +106,7 @@ async function run() {
 								order: {
 									outTradeNo: 'Mpaymentorder1',
 									productId: 'membership_1m',
-									amountFen: 10,
+									amountFen: 100,
 									status: 'pending'
 								},
 								payData: { signData: '{}', mode: 'short_series_goods', paySig: 'sig', signature: 'user-sig' }
@@ -161,6 +167,7 @@ async function run() {
 	assert.equal(paymentCalls, 1)
 	assert.equal(queryCalls, 1)
 	assert.equal(pending.order.status, 'pending')
+	assert.equal(pending.order.amountFen, 100)
 	assert.equal(pending.confirmationPending, true)
 	assert.equal(pending.queryError.errCode, 'VIRTUAL_PAYMENT_QUERY_FAILED')
 	assert.equal(storage.get('uni-learn-membership-last-order-v1:member-user').outTradeNo, 'Mpaymentorder1')
@@ -171,6 +178,7 @@ async function run() {
 	assert.equal(restored.membership.isMember, true)
 	assert.equal(service.getCachedMembership().isMember, true)
 	assert.equal(syncScheduleCalls, 1)
+	assert.equal(reconciliationTransitionCalls, 1)
 
 	const membershipStorageKey = 'uni-learn-membership-v1:member-user'
 	const cachedMembership = storage.get(membershipStorageKey)

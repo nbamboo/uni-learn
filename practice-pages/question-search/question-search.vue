@@ -350,4 +350,26 @@
 		.empty-caption { margin-top: 10px; font-size: 25px; }
 		.search-ad-container { margin-top: 28px; border-radius: 8px; }
 	}
+
+	@media screen and (min-width: 768px) and (max-height: 1050px) {
+		.search-page { padding: 18px 20px; }
+		.search-bar { height: 64px; padding: 0 16px; }
+		.search-bar input { font-size: 25px; }
+		.section-heading, .result-heading { padding: 20px 4px 12px; }
+		.result-counts { font-size: 21px; }
+		.section-heading text:first-child, .result-heading text:first-child { font-size: 27px; }
+		.section-heading text:last-child, .result-heading text:last-child { font-size: 21px; }
+		.keyword-list { gap: 10px; }
+		.keyword-chip { min-height: 68px; padding: 10px 14px; }
+		.keyword-chip text:first-child { font-size: 25px; }
+		.keyword-chip text:last-child { font-size: 21px; }
+		.result-item { min-height: 108px; margin-bottom: 10px; padding: 16px; }
+		.result-index { width: 42px; height: 42px; flex-basis: 42px; margin-right: 14px; font-size: 22px; }
+		.result-title { font-size: 26px; }
+		.result-meta { margin-top: 8px; font-size: 21px; }
+		.empty-state { padding-top: 90px; }
+		.empty-title { font-size: 27px; }
+		.empty-caption { font-size: 21px; }
+		.search-ad-container { margin-top: 18px; }
+	}
 </style>

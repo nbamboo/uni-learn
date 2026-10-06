@@ -8,6 +8,10 @@ const KNOWLEDGE_POSITION_STORAGE_KEY = 'uni-learn-practice-knowledge-position-v1
 const PRACTICE_ROUNDS_STORAGE_KEY = 'uni-learn-practice-rounds-v1'
 const EXAM_DRAFTS_STORAGE_KEY = 'uni-learn-exam-drafts-v1'
 const PREFERENCES_STORAGE_KEY = 'uni-learn-practice-preferences-v1'
+const DEVICE_THEME_STORAGE_KEY = 'uni-learn-device-theme-v1'
+const RECONCILIATION_STORAGE_KEY = 'uni-learn-practice-reconciliation-v1'
+const RECONCILIATION_PAYLOAD_STORAGE_KEY = 'uni-learn-practice-reconciliation-payload-v1'
+const LOCAL_CLEAR_MARKER_STORAGE_KEY = 'uni-learn-practice-local-clear-v1'
 const PRACTICE_STATE_STORAGE_KEY = 'uni-learn-practice-state-v1'
 const SUMMARY_STORAGE_KEY = 'uni-learn-practice-summary-v1'
 const MEMBERSHIP_STORAGE_KEY = 'uni-learn-membership-v1'
@@ -15,6 +19,8 @@ const MEMBERSHIP_LAST_USER_ID_KEY = 'uni-learn-membership-last-user-id-v1'
 const MIGRATION_KEY_PREFIX = 'uni-learn-practice-cloud-migration-v1:'
 const UNI_ID_STORAGE_KEYS = ['uni_id_token', 'uni_id_token_expired', 'uniIdToken', 'uniIdTokenExpired']
 const SYNC_BATCH_SIZE = 20
+const REPLACEMENT_STATE_BATCH_SIZE = 50
+const REPLACEMENT_PROGRESS_BATCH_SIZE = 50
 const SNAPSHOT_CACHE_TTL = 2 * 60 * 1000
 const PRACTICE_BOOTSTRAP_CACHE_TTL = 2 * 60 * 1000
 const SUMMARY_CACHE_TTL = 10 * 60 * 1000
@@ -55,6 +61,7 @@ let progressFlushRequested = false
 let eventSequence = 0
 let observedPreferencesUserId = getCurrentPracticeUser().uid || ''
 let preferencesRefreshRequired = false
+let reconciliationRequest = null
 
 export class UserPracticeServiceError extends Error {
 	constructor(errCode, errMsg, options) {
@@ -308,6 +315,84 @@ function readLocalPracticeState(value) {
 	return normalizeLocalPracticeState(getStorage(userScopedStorageKey(PRACTICE_STATE_STORAGE_KEY)))
 }
 
+function readReconciliationState() {
+	const saved = getStorage(userScopedStorageKey(RECONCILIATION_STORAGE_KEY))
+	if (!saved || saved.version !== 1 || !isObject(saved)) {
+		return { version: 1, status: 'none' }
+	}
+	return cloneValue(saved)
+}
+
+function writeReconciliationState(value) {
+	const next = Object.assign({ version: 1, status: 'none' }, cloneValue(value || {}), {
+		version: 1,
+		updatedAt: Date.now()
+	})
+	setStorage(userScopedStorageKey(RECONCILIATION_STORAGE_KEY), next)
+	return cloneValue(next)
+}
+
+function readReconciliationPayload() {
+	const saved = getStorage(userScopedStorageKey(RECONCILIATION_PAYLOAD_STORAGE_KEY))
+	return saved && saved.version === 1 && isObject(saved.payload)
+		? cloneValue(saved.payload)
+		: null
+}
+
+function writeReconciliationPayload(payload) {
+	const saved = setStorage(userScopedStorageKey(RECONCILIATION_PAYLOAD_STORAGE_KEY), {
+		version: 1,
+		payload: cloneValue(payload),
+		updatedAt: Date.now()
+	})
+	if (!saved) {
+		throw new UserPracticeServiceError(
+			'QUESTION_BANK_USER_LOCAL_STORAGE_FAILED',
+			'本机空间不足，无法安全保存学习进度快照'
+		)
+	}
+	return payload
+}
+
+function clearReconciliationPayload() {
+	removeStorage(userScopedStorageKey(RECONCILIATION_PAYLOAD_STORAGE_KEY))
+}
+
+function reconciliationBlocksCloud() {
+	return ['checking', 'required', 'replacing', 'restoring'].indexOf(
+		readReconciliationState().status
+	) > -1
+}
+
+function readLocalClearMarkers() {
+	const saved = getStorage(userScopedStorageKey(LOCAL_CLEAR_MARKER_STORAGE_KEY))
+	return saved && saved.version === 1 && isObject(saved.subjects)
+		? cloneValue(saved.subjects)
+		: {}
+}
+
+function markLocalSubjectCleared(subjectId) {
+	if (!subjectId) return 0
+	const subjects = readLocalClearMarkers()
+	const clearedAt = Date.now()
+	subjects[subjectId] = clearedAt
+	setStorage(userScopedStorageKey(LOCAL_CLEAR_MARKER_STORAGE_KEY), { version: 1, subjects })
+	return clearedAt
+}
+
+function clearLocalClearMarkers() {
+	removeStorage(userScopedStorageKey(LOCAL_CLEAR_MARKER_STORAGE_KEY))
+}
+
+function writeLocalClearMarkers(subjects) {
+	const storageKey = userScopedStorageKey(LOCAL_CLEAR_MARKER_STORAGE_KEY)
+	if (!Object.keys(subjects).length) {
+		removeStorage(storageKey)
+		return
+	}
+	setStorage(storageKey, { version: 1, subjects })
+}
+
 export function practiceCloudSyncEnabled() {
 	const membership = getStorage(userScopedStorageKey(MEMBERSHIP_STORAGE_KEY))
 	const expiresAt = Number(membership && membership.expiresAt) || 0
@@ -317,6 +402,33 @@ export function practiceCloudSyncEnabled() {
 		&& membership.status !== 'revoked'
 		&& expiresAt + MEMBER_EXPIRY_GRACE_MS > Date.now()
 	)
+}
+
+export function practiceCloudSyncReady() {
+	return practiceCloudSyncEnabled() && !reconciliationBlocksCloud()
+}
+
+export function getPracticeReconciliationState() {
+	return readReconciliationState()
+}
+
+export function markMembershipReconciliationTransition(options) {
+	const input = options || {}
+	const previousMember = Boolean(input.previousMember)
+	const currentMember = Boolean(input.currentMember)
+	if (!currentMember || previousMember) return readReconciliationState()
+	const current = readReconciliationState()
+	if (['required', 'replacing', 'restoring'].indexOf(current.status) > -1) return current
+	if (scheduledFlush) clearTimeout(scheduledFlush)
+	scheduledFlush = null
+	scheduledSyncOptions = null
+	clearReconciliationPayload()
+	return writeReconciliationState({
+		status: 'checking',
+		knownRenewal: Boolean(input.hadCachedMembership),
+		detectedAt: Date.now(),
+		membershipExpiresAt: Number(input.expiresAt) || 0
+	})
 }
 
 function deactivateCachedMembership() {
@@ -354,6 +466,27 @@ function cacheValidatedMembership(value) {
 	})
 	const user = getCurrentPracticeUser()
 	if (user.uid) setStorage(MEMBERSHIP_LAST_USER_ID_KEY, user.uid)
+}
+
+function readDeviceNightMode(fallbackValue) {
+	const storageKey = userScopedStorageKey(DEVICE_THEME_STORAGE_KEY)
+	const saved = getStorage(storageKey)
+	if (saved && saved.version === 1 && typeof saved.nightMode === 'boolean') {
+		return saved.nightMode
+	}
+	const nightMode = Boolean(fallbackValue)
+	setStorage(storageKey, { version: 1, nightMode, updatedAt: Date.now() })
+	return nightMode
+}
+
+function saveDeviceNightMode(value) {
+	const nightMode = Boolean(value)
+	setStorage(userScopedStorageKey(DEVICE_THEME_STORAGE_KEY), {
+		version: 1,
+		nightMode,
+		updatedAt: Date.now()
+	})
+	return nightMode
 }
 
 function normalizePracticePreferences(value) {
@@ -404,14 +537,18 @@ function readPreferencesEntry() {
 		saved = getStorage(PREFERENCES_STORAGE_KEY)
 	}
 	if (!saved || saved.version !== 1 || !isObject(saved.preferences)) {
+		const preferences = normalizePracticePreferences()
+		preferences.nightMode = readDeviceNightMode(preferences.nightMode)
 		return {
-			preferences: normalizePracticePreferences(),
+			preferences,
 			dirty: false,
 			syncedAt: 0
 		}
 	}
+	const preferences = normalizePracticePreferences(saved.preferences)
+	preferences.nightMode = readDeviceNightMode(preferences.nightMode)
 	return {
-		preferences: normalizePracticePreferences(saved.preferences),
+		preferences,
 		dirty: Boolean(saved.dirty),
 		syncedAt: Number(saved.syncedAt) || 0
 	}
@@ -419,6 +556,7 @@ function readPreferencesEntry() {
 
 function savePreferencesEntry(preferences, dirty, syncedAt) {
 	const normalized = normalizePracticePreferences(preferences)
+	normalized.nightMode = readDeviceNightMode(normalized.nightMode)
 	const storageKey = preferencesStorageKey()
 	setStorage(storageKey, {
 		version: 1,
@@ -1215,7 +1353,7 @@ function enqueueEvent(event) {
 	}
 	events.push(cloneValue(event))
 	saveOutbox(events)
-	if (practiceCloudSyncEnabled()) {
+	if (practiceCloudSyncReady()) {
 		schedulePracticeSync({
 			includeProgress: false,
 			immediate: events.length >= SYNC_BATCH_TRIGGER
@@ -1639,7 +1777,7 @@ function markMigrationComplete(userId, remainingEvents) {
 
 export async function flushPracticeEvents(options) {
 	const config = options || {}
-	if (!practiceCloudSyncEnabled()) {
+	if (!practiceCloudSyncReady()) {
 		if (scheduledFlush) clearTimeout(scheduledFlush)
 		scheduledFlush = null
 		scheduledSyncOptions = null
@@ -1721,7 +1859,7 @@ export async function flushPracticeEvents(options) {
 }
 
 export function schedulePracticeSync(options) {
-	if (!practiceCloudSyncEnabled()) return
+	if (!practiceCloudSyncReady()) return
 	const input = options || {}
 	const nextOptions = {
 		includeProgress: input.includeProgress !== false,
@@ -1919,8 +2057,9 @@ function getLocalPracticeRecords(params) {
 	const input = params || {}
 	const subjectId = input.subjectId
 	const type = input.type === 'favorite' ? 'favorite' : 'wrong'
+	const idsOnly = Boolean(input.idsOnly)
 	const page = Math.max(1, Number(input.page) || 1)
-	const pageSize = Math.max(1, Math.min(50, Number(input.pageSize) || 20))
+	const pageSize = idsOnly ? 2000 : Math.max(1, Math.min(50, Number(input.pageSize) || 20))
 	const state = readLocalPracticeState(input.localState)
 	let rows
 	if (type === 'favorite') {
@@ -1947,6 +2086,20 @@ function getLocalPracticeRecords(params) {
 	}
 	rows.sort((left, right) => right.timestamp - left.timestamp)
 	const offset = (page - 1) * pageSize
+	if (idsOnly) {
+		const selected = rows.slice(0, pageSize)
+		return {
+			subjectId,
+			type,
+			total: rows.length,
+			hasMore: rows.length > selected.length,
+			questionIds: selected.map(row => row.questionId),
+			favoriteQuestionIds: selected.filter(row => (
+				state.favorites.indexOf(row.questionId) > -1
+			)).map(row => row.questionId),
+			_localOnly: true
+		}
+	}
 	const items = rows.slice(offset, offset + pageSize).map(row => ({
 		recordId: `${type}-${row.questionId}`,
 		question: { id: row.questionId },
@@ -1987,7 +2140,7 @@ export function invalidateUserPracticeCache(subjectId) {
 
 export function getCachedPracticeSummary(subjectId) {
 	observePracticePreferencesUser()
-	if (!practiceCloudSyncEnabled() || pendingPracticeEventCount() > 0) return null
+	if (!practiceCloudSyncReady() || pendingPracticeEventCount() > 0) return null
 	const cacheKey = summaryCacheKey(subjectId)
 	const memorySummary = getCached(summaryCache, cacheKey)
 	if (memorySummary) return memorySummary
@@ -1998,7 +2151,7 @@ export function getCachedPracticeSummary(subjectId) {
 export async function getPracticeSummary(subjectId, options) {
 	const config = options || {}
 	observePracticePreferencesUser()
-	if (!practiceCloudSyncEnabled()) {
+	if (!practiceCloudSyncReady()) {
 		return getLocalPracticeSummary(subjectId, config.localState)
 	}
 	const cacheKey = summaryCacheKey(subjectId)
@@ -2028,7 +2181,7 @@ export async function getPracticeSummary(subjectId, options) {
 
 export async function getPracticeStateSnapshot(subjectId, options) {
 	const config = options || {}
-	if (!practiceCloudSyncEnabled()) {
+	if (!practiceCloudSyncReady()) {
 		return getLocalPracticeSnapshot(subjectId, config)
 	}
 	const questionIds = Array.isArray(config.questionIds)
@@ -2067,7 +2220,7 @@ export async function getPracticeBootstrap(options) {
 			'答题页初始化参数无效'
 		)
 	}
-	if (!practiceCloudSyncEnabled()) return null
+	if (!practiceCloudSyncReady()) return null
 	const questionIds = Array.isArray(input.questionIds)
 		? Array.from(new Set(input.questionIds.filter(Boolean))).slice(0, MAX_SNAPSHOT_QUESTION_IDS)
 		: []
@@ -2080,13 +2233,17 @@ export async function getPracticeBootstrap(options) {
 	await flushPracticeEvents({ includeProgress: false })
 	let result
 	try {
+		const examScope = mode === 'smart'
+			? null
+			: getExamDraftScope(Object.assign({}, input, { subjectId, mode }))
 		result = await executeCloudCall('getPracticeBootstrap', {
 			subjectId,
 			mode,
-			chapterId: input.chapterId,
-			section: input.section,
-			knowledge: input.knowledge,
-			keyword: input.keyword,
+			chapterId: examScope ? examScope.chapterId : input.chapterId,
+			section: examScope ? examScope.section : input.section,
+			knowledge: examScope ? examScope.knowledge : input.knowledge,
+			keyword: examScope ? examScope.keyword : input.keyword,
+			scopeKey: examScope ? examScope.scopeKey : undefined,
 			questionIds
 		})
 	} catch (error) {
@@ -2131,7 +2288,7 @@ export async function getPracticeBootstrap(options) {
 		}
 	}
 	if (result && result.preferences) {
-		savePreferencesEntry(result.preferences, false, Date.now())
+		result.preferences = savePreferencesEntry(result.preferences, false, Date.now())
 		preferencesRefreshRequired = false
 	}
 	if (result && result.practiceRound) {
@@ -2169,7 +2326,7 @@ export async function getPracticeRound(options) {
 			'章节练习轮次参数无效'
 		)
 	}
-	if (!practiceCloudSyncEnabled()) {
+	if (!practiceCloudSyncReady()) {
 		return Object.assign(getLocalPracticeRound(subjectId, chapterId, section), {
 			_localOnly: true
 		})
@@ -2189,7 +2346,7 @@ export async function getPracticeRound(options) {
 export async function getExamDraft(options) {
 	const scope = getExamDraftScope(options)
 	if (!scope) return null
-	if (!practiceCloudSyncEnabled()) return getLocalExamDraft(scope)
+	if (!practiceCloudSyncReady()) return getLocalExamDraft(scope)
 	try {
 		await flushPracticeEvents({ includeProgress: false })
 		const result = await executeCloudCall('getExamDraft', scope)
@@ -2213,7 +2370,7 @@ export async function getExamDraftSummaries(subjectId) {
 	if (!normalizedSubjectId) {
 		throw new UserPracticeServiceError('QUESTION_BANK_USER_CLIENT_ERROR', '考试科目信息无效')
 	}
-	if (!practiceCloudSyncEnabled()) return getLocalExamDraftSummaries(normalizedSubjectId)
+	if (!practiceCloudSyncReady()) return getLocalExamDraftSummaries(normalizedSubjectId)
 	try {
 		await flushPracticeEvents({ includeProgress: false })
 		return await executeCloudCall('getExamDraftSummaries', { subjectId: normalizedSubjectId })
@@ -2252,8 +2409,8 @@ export async function resetPracticeRound(options) {
 	enqueueEvent(event)
 	return Object.assign(toPracticeRoundResult(round, section), {
 		reset: true,
-		localOnly: !practiceCloudSyncEnabled(),
-		syncPending: practiceCloudSyncEnabled()
+		localOnly: !practiceCloudSyncReady(),
+		syncPending: practiceCloudSyncReady()
 	})
 }
 
@@ -2265,6 +2422,7 @@ export async function getPracticeRecords(params) {
 			'错题集与收藏夹为会员权益，请先开通会员'
 		)
 	}
+	if (!practiceCloudSyncReady()) return getLocalPracticeRecords(input)
 	const subjectId = input.subjectId
 	const type = input.type || 'wrong'
 	const idsOnly = Boolean(input.idsOnly)
@@ -2289,7 +2447,7 @@ export async function getPracticeRecords(params) {
 	})
 	if (result && result.membership) cacheValidatedMembership(result.membership)
 	if (result && result.preferences) {
-		savePreferencesEntry(result.preferences, false, Date.now())
+		result.preferences = savePreferencesEntry(result.preferences, false, Date.now())
 		preferencesRefreshRequired = false
 	}
 	if (!idsOnly) requireRecordQuestionTypes(result)
@@ -2306,7 +2464,7 @@ export async function getPracticeRecordIds(params) {
 
 export async function getSmartPracticeQuestions(options) {
 	const input = options || {}
-	if (!practiceCloudSyncEnabled()) {
+	if (!practiceCloudSyncReady()) {
 		throw new UserPracticeServiceError(
 			'QUESTION_BANK_LOCAL_SMART_REQUIRED',
 			'非会员智能练习应使用本地状态与题库服务生成'
@@ -2326,7 +2484,7 @@ export async function getSmartPracticeQuestions(options) {
 	})
 	if (result && result.membership) cacheValidatedMembership(result.membership)
 	if (result && result.preferences) {
-		savePreferencesEntry(result.preferences, false, Date.now())
+		result.preferences = savePreferencesEntry(result.preferences, false, Date.now())
 		preferencesRefreshRequired = false
 	}
 	requireSmartQuestionResult(result)
@@ -2334,7 +2492,7 @@ export async function getSmartPracticeQuestions(options) {
 }
 
 export async function getSmartPracticeState(subjectId) {
-	if (!practiceCloudSyncEnabled()) {
+	if (!practiceCloudSyncReady()) {
 		throw new UserPracticeServiceError(
 			'QUESTION_BANK_MEMBERSHIP_REQUIRED',
 			'云端智能取题状态为会员权益，请先开通会员'
@@ -2344,7 +2502,7 @@ export async function getSmartPracticeState(subjectId) {
 	const result = await executeCloudCall('getSmartPracticeState', { subjectId })
 	if (result && result.membership) cacheValidatedMembership(result.membership)
 	if (result && result.preferences) {
-		savePreferencesEntry(result.preferences, false, Date.now())
+		result.preferences = savePreferencesEntry(result.preferences, false, Date.now())
 		preferencesRefreshRequired = false
 	}
 	return result
@@ -2352,7 +2510,7 @@ export async function getSmartPracticeState(subjectId) {
 
 export async function getPracticeProgress(options) {
 	const input = options || {}
-	if (!practiceCloudSyncEnabled()) {
+	if (!practiceCloudSyncReady()) {
 		const mode = ['section', 'knowledge'].indexOf(input.mode) > -1 ? input.mode : 'chapter'
 		const position = mode === 'section'
 			? getSectionPracticePosition(input.subjectId, input.chapterId, input.section)
@@ -2430,6 +2588,1052 @@ export async function submitQuestionFeedback(options) {
 	})
 }
 
+function normalizeReconciliationSubjectIds(values) {
+	const result = []
+	;(Array.isArray(values) ? values : []).forEach(value => {
+		const subjectId = typeof value === 'string' ? value.trim() : ''
+		if (subjectId && result.indexOf(subjectId) === -1) result.push(subjectId)
+	})
+	return result.slice(0, 32)
+}
+
+function collectReconciliationSubjectIds(subjectIds) {
+	const values = normalizeReconciliationSubjectIds(subjectIds)
+	const add = value => {
+		if (typeof value === 'string' && value && values.indexOf(value) === -1) values.push(value)
+	}
+	const state = readLocalPracticeState()
+	Object.keys(state.answers).forEach(questionId => {
+		const answer = state.answers[questionId]
+		add(answer && answer.subjectId)
+		if (!answer || !answer.subjectId) {
+			add(state.favoriteSubjects[questionId])
+			if (questionId.indexOf('ipf-') === 0) add('junior-personal-finance')
+		}
+	})
+	state.favorites.forEach(questionId => {
+		add(state.favoriteSubjects[questionId])
+		if (!state.favoriteSubjects[questionId] && questionId.indexOf('ipf-') === 0) {
+			add('junior-personal-finance')
+		}
+	})
+	Object.keys(state.dailyAttempts).forEach(add)
+	const rounds = readPracticeRounds()
+	Object.keys(rounds).forEach(key => add(rounds[key].subjectId))
+	const drafts = readExamDrafts()
+	Object.keys(drafts).forEach(key => add(drafts[key].subjectId))
+	;[CHAPTER_POSITION_STORAGE_KEY, SECTION_POSITION_STORAGE_KEY, KNOWLEDGE_POSITION_STORAGE_KEY]
+		.forEach(storageKey => {
+			const positions = readPracticePositions(storageKey)
+			Object.keys(positions).forEach(key => add(positions[key] && positions[key].subjectId))
+		})
+	readOutbox().forEach(event => add(event.subjectId))
+	readPendingProgresses().forEach(progress => add(progress.subjectId))
+	Object.keys(readLocalClearMarkers()).forEach(add)
+	return values.slice(0, 32)
+}
+
+function localStateSubjectId(state, questionId) {
+	const answer = state.answers[questionId]
+	return answer && answer.subjectId
+		|| state.favoriteSubjects[questionId]
+		|| (questionId.indexOf('ipf-') === 0 ? 'junior-personal-finance' : '')
+}
+
+function buildLocalReplacementStates(subjectId, state) {
+	const questionIds = new Set(Object.keys(state.answers).concat(state.favorites))
+	return Array.from(questionIds).filter(questionId => (
+		localStateSubjectId(state, questionId) === subjectId
+	)).map(questionId => {
+		const answer = state.answers[questionId]
+		const selected = answer && Array.isArray(answer.selected)
+			? Array.from(new Set(answer.selected.filter(Boolean)))
+			: []
+		const attempted = Boolean(answer && selected.length)
+		const answeredAt = attempted ? (Number(answer.timestamp) || Date.now()) : 0
+		return {
+			questionId,
+			chapterId: attempted && answer.chapterId !== undefined ? String(answer.chapterId) : '',
+			section: attempted && typeof answer.section === 'string' ? answer.section : '',
+			knowledge: attempted && typeof answer.knowledge === 'string' ? answer.knowledge : '',
+			attempted,
+			attempts: attempted ? Math.max(1, Number(answer.attempts) || 1) : 0,
+			lastCorrect: attempted ? Boolean(answer.correct) : false,
+			lastSelected: selected,
+			practiceModes: attempted && Array.isArray(answer.practiceModes)
+				? answer.practiceModes.filter(mode => PRACTICE_ENTRY_MODES.indexOf(mode) > -1)
+				: [],
+			favorite: state.favorites.indexOf(questionId) > -1,
+			firstAnsweredAt: answeredAt,
+			lastAnsweredAt: answeredAt,
+			favoriteUpdatedAt: Number(state.favoriteUpdatedAt[questionId]) || 0
+		}
+	}).filter(item => item.attempted || item.favorite)
+}
+
+function buildLocalReplacementProgress(subjectId) {
+	const resources = [
+		{ storageKey: CHAPTER_POSITION_STORAGE_KEY, mode: 'chapter' },
+		{ storageKey: SECTION_POSITION_STORAGE_KEY, mode: 'section' },
+		{ storageKey: KNOWLEDGE_POSITION_STORAGE_KEY, mode: 'knowledge' }
+	]
+	const latest = {}
+	resources.forEach(resource => {
+		const positions = readPracticePositions(resource.storageKey)
+		Object.keys(positions).forEach(key => {
+			const position = positions[key]
+			if (!position || position.subjectId !== subjectId || !position.questionId) return
+			const row = {
+				mode: resource.mode,
+				chapterId: String(position.chapterId || ''),
+				section: resource.mode === 'section' ? position.section || '' : '',
+				knowledge: resource.mode === 'knowledge' ? position.knowledge || '' : '',
+				questionId: position.questionId,
+				progressAt: Number(position.updatedAt) || Date.now()
+			}
+			if (!row.chapterId || resource.mode === 'section' && !row.section
+				|| resource.mode === 'knowledge' && !row.knowledge) return
+			const scope = resource.mode === 'chapter'
+				? row.chapterId
+				: (resource.mode === 'section'
+					? getSectionScopeKey(row.chapterId, row.section)
+					: getKnowledgeScopeKey(row.chapterId, row.knowledge))
+			const identity = `${resource.mode}|${scope}`
+			if (!latest[identity] || latest[identity].progressAt <= row.progressAt) latest[identity] = row
+		})
+	})
+	return Object.keys(latest).map(key => latest[key])
+}
+
+function buildLocalReplacementRounds(subjectId) {
+	const rounds = readPracticeRounds()
+	return Object.keys(rounds).map(key => rounds[key]).filter(round => (
+		round && round.subjectId === subjectId
+	)).map(round => ({
+		chapterId: String(round.chapterId),
+		answers: Object.keys(round.answers).map(questionId => {
+			const answer = round.answers[questionId]
+			return {
+				questionId,
+				section: answer.section || '',
+				selected: answer.selected.slice(),
+				correct: Boolean(answer.correct),
+				answeredAt: Number(answer.answeredAt) || Date.now()
+			}
+		}),
+		chapterPosition: round.chapterPosition && round.chapterPosition.questionId ? {
+			questionId: round.chapterPosition.questionId,
+			section: round.chapterPosition.section || '',
+			progressAt: Number(round.chapterPosition.updatedAt) || Date.now()
+		} : null,
+		sectionPositions: Object.keys(round.sectionPositions).map(section => ({
+			section,
+			questionId: round.sectionPositions[section].questionId,
+			progressAt: Number(round.sectionPositions[section].updatedAt) || Date.now()
+		})),
+		chapterResetAt: Number(round.chapterResetAt) || 0,
+		sectionResets: Object.keys(round.sectionResetAt).map(section => ({
+			section,
+			resetAt: Number(round.sectionResetAt[section]) || 0
+		}))
+	})).filter(round => (
+		round.answers.length || round.chapterPosition || round.sectionPositions.length
+		|| round.chapterResetAt || round.sectionResets.length
+	))
+}
+
+function buildLocalReplacementDrafts(subjectId) {
+	const drafts = readExamDrafts()
+	return Object.keys(drafts).map(key => drafts[key]).filter(draft => (
+		draft && draft.subjectId === subjectId && draft.active && draft.questionIds.length
+	)).map(draft => ({
+		mode: draft.mode,
+		chapterId: draft.chapterId || '',
+		section: draft.section || '',
+		knowledge: draft.knowledge || '',
+		keyword: draft.keyword || '',
+		roundId: draft.roundId,
+		questionVersion: draft.questionVersion || '',
+		questionIds: draft.questionIds.slice(),
+		answers: Object.keys(draft.answers).map(questionId => ({
+			questionId,
+			selected: draft.answers[questionId].selected.slice(),
+			updatedAt: Number(draft.answers[questionId].updatedAt) || Date.now()
+		})),
+		initialQuestionId: draft.initialQuestionId,
+		positionQuestionId: draft.positionQuestionId,
+		positionAt: Number(draft.positionAt) || Date.now(),
+		startedAt: Number(draft.startedAt) || Date.now(),
+		stateAt: Number(draft.updatedAt) || Date.now()
+	}))
+}
+
+function buildLocalReconciliationPayload(subjectIds, capturedAt) {
+	const state = readLocalPracticeState()
+	const subjects = {}
+	subjectIds.forEach(subjectId => {
+		const summary = getLocalPracticeSummary(subjectId, state)
+		subjects[subjectId] = {
+			states: buildLocalReplacementStates(subjectId, state),
+			progress: buildLocalReplacementProgress(subjectId),
+			rounds: buildLocalReplacementRounds(subjectId),
+			examDrafts: buildLocalReplacementDrafts(subjectId),
+			todayAttempts: summary.todayAttempts
+		}
+	})
+	const preferences = readPreferencesEntry().preferences
+	return {
+		direction: 'local',
+		capturedAt,
+		subjectIds: subjectIds.slice(),
+		subjects,
+		preferences: {
+			answerMode: preferences.answerMode,
+			smartPractice: cloneValue(preferences.smartPractice),
+			updatedAt: Number(preferences.updatedAt) || 0
+		}
+	}
+}
+
+function latestLocalSubjectUpdate(subjectId, subject) {
+	return [].concat(subject.states, subject.progress, subject.rounds, subject.examDrafts)
+		.reduce((latest, item) => {
+			if (!item) return latest
+			const times = [
+				item.lastAnsweredAt, item.favoriteUpdatedAt, item.progressAt,
+				item.positionAt, item.stateAt, item.startedAt, item.chapterResetAt
+			]
+			if (Array.isArray(item.answers)) item.answers.forEach(answer => times.push(answer.answeredAt, answer.updatedAt))
+			return Math.max(latest, ...times.map(value => Number(value) || 0))
+		}, 0)
+}
+
+function buildLocalReconciliationOverview(subjectIds) {
+	const payload = buildLocalReconciliationPayload(subjectIds, Date.now())
+	const pendingEvents = readOutbox()
+	const pendingProgress = readPendingProgresses()
+	const clearMarkers = readLocalClearMarkers()
+	const preferencesDirty = readPreferencesEntry().dirty
+	const subjects = subjectIds.map(subjectId => {
+		const resource = payload.subjects[subjectId]
+		const attemptedRows = resource.states.filter(item => item.attempted)
+		const localChanges = pendingEvents.some(item => item.subjectId === subjectId)
+			|| pendingProgress.some(item => item.subjectId === subjectId)
+			|| Boolean(clearMarkers[subjectId])
+		return {
+			subjectId,
+			attempted: attemptedRows.length,
+			wrong: attemptedRows.filter(item => item.lastCorrect === false).length,
+			favorite: resource.states.filter(item => item.favorite).length,
+			totalAttempts: attemptedRows.reduce((total, item) => total + item.attempts, 0),
+			hasLocalData: Boolean(resource.states.length || resource.progress.length
+				|| resource.rounds.length || resource.examDrafts.length || clearMarkers[subjectId]),
+			hasLocalChanges: localChanges,
+			updatedAt: Math.max(latestLocalSubjectUpdate(subjectId, resource), Number(clearMarkers[subjectId]) || 0)
+		}
+	})
+	return {
+		subjects,
+		attempted: subjects.reduce((total, item) => total + item.attempted, 0),
+		wrong: subjects.reduce((total, item) => total + item.wrong, 0),
+		favorite: subjects.reduce((total, item) => total + item.favorite, 0),
+		subjectCount: subjects.filter(item => item.hasLocalData).length,
+		updatedAt: subjects.reduce((latest, item) => Math.max(latest, item.updatedAt), 0),
+		hasData: subjects.some(item => item.hasLocalData),
+		hasChanges: preferencesDirty || subjects.some(item => item.hasLocalChanges),
+		hasClearMarker: subjects.some(item => Boolean(clearMarkers[item.subjectId]))
+	}
+}
+
+function aggregateCloudReconciliationOverview(result) {
+	const subjects = Array.isArray(result && result.subjects) ? result.subjects : []
+	return {
+		subjects: cloneValue(subjects),
+		attempted: subjects.reduce((total, item) => total + (Number(item.attempted) || 0), 0),
+		wrong: subjects.reduce((total, item) => total + (Number(item.wrong) || 0), 0),
+		favorite: subjects.reduce((total, item) => total + (Number(item.favorite) || 0), 0),
+		subjectCount: subjects.filter(item => item.hasCloudData).length,
+		updatedAt: subjects.reduce((latest, item) => Math.max(latest, Number(item.updatedAt) || 0), 0),
+		hasData: subjects.some(item => item.hasCloudData),
+		preferences: result && result.preferences ? cloneValue(result.preferences) : null,
+		serverNow: Number(result && result.serverNow) || 0
+	}
+}
+
+function reconciliationErrorMessage(error) {
+	return error && (error.errMsg || error.message) || '学习进度处理失败，请稍后重试'
+}
+
+function updateReconciliationProgress(patch) {
+	return writeReconciliationState(Object.assign({}, readReconciliationState(), patch, {
+		error: ''
+	}))
+}
+
+function removeQueuedPracticeDataThrough(capturedAt) {
+	const cutoff = Number(capturedAt) || 0
+	const events = readOutbox().filter(item => (Number(item.occurredAt) || 0) > cutoff)
+	if (events.length) saveOutbox(events)
+	else removeStorage(userScopedStorageKey(OUTBOX_STORAGE_KEY))
+	writePendingProgresses(readPendingProgresses().filter(item => (
+		(Number(item.occurredAt) || 0) > cutoff
+	)))
+	const user = getCurrentPracticeUser()
+	if (user.uid) {
+		setStorage(`${MIGRATION_KEY_PREFIX}${user.uid}`, {
+			version: 1,
+			prepared: true,
+			complete: true,
+			completedAt: Date.now()
+		})
+	}
+}
+
+function replayQueuedPracticeDataAfter(capturedAt) {
+	const cutoff = Number(capturedAt) || 0
+	const events = readOutbox().filter(item => (Number(item.occurredAt) || 0) > cutoff)
+		.sort((left, right) => Number(left.occurredAt) - Number(right.occurredAt))
+	const storageKey = userScopedStorageKey(PRACTICE_STATE_STORAGE_KEY)
+	const raw = getStorage(storageKey)
+	const state = readLocalPracticeState(raw)
+	let drafts = readExamDrafts()
+	events.forEach(event => {
+		const occurredAt = Number(event.occurredAt) || Date.now()
+		if (event.type === 'answer' && event.questionId && Array.isArray(event.selected)
+			&& event.selected.length && typeof event.correct === 'boolean') {
+			const previous = state.answers[event.questionId]
+			const modes = previous && Array.isArray(previous.practiceModes)
+				? previous.practiceModes.slice()
+				: []
+			if (event.practiceMode && modes.indexOf(event.practiceMode) === -1) modes.push(event.practiceMode)
+			state.answers[event.questionId] = {
+				subjectId: event.subjectId,
+				chapterId: String(event.chapterId || previous && previous.chapterId || ''),
+				section: event.section || '',
+				knowledge: event.knowledge || '',
+				selected: event.selected.slice(),
+				correct: event.correct,
+				attempts: Math.max(0, Number(previous && previous.attempts) || 0) + 1,
+				practiceModes: modes,
+				timestamp: occurredAt
+			}
+			const dayKey = localDayKey(occurredAt)
+			const daily = state.dailyAttempts[event.subjectId]
+			state.dailyAttempts[event.subjectId] = {
+				dayKey,
+				attempts: daily && daily.dayKey === dayKey ? (Number(daily.attempts) || 0) + 1 : 1
+			}
+			updateLocalPracticeRoundAnswer(event)
+			return
+		}
+		if (event.type === 'favorite' && event.questionId) {
+			const index = state.favorites.indexOf(event.questionId)
+			if (event.favorite && index === -1) state.favorites.unshift(event.questionId)
+			if (!event.favorite && index > -1) state.favorites.splice(index, 1)
+			if (event.favorite) state.favoriteSubjects[event.questionId] = event.subjectId
+			else delete state.favoriteSubjects[event.questionId]
+			state.favoriteUpdatedAt[event.questionId] = occurredAt
+			return
+		}
+		if (event.type === 'roundReset') {
+			resetLocalPracticeRound(event.subjectId, event.chapterId, event.section || '', occurredAt)
+			return
+		}
+		if (!event.type || event.type.indexOf('exam') !== 0) return
+		const scope = getExamDraftScope(event)
+		if (!scope) return
+		const key = examDraftStorageKey(scope)
+		if (event.type === 'examStart') {
+			const draft = normalizeExamDraft(Object.assign({}, event, {
+				active: true,
+				answers: [],
+				startedAt: occurredAt,
+				positionAt: occurredAt,
+				updatedAt: occurredAt
+			}), scope)
+			if (draft) drafts[key] = draft
+			return
+		}
+		const draft = drafts[key]
+		if (!draft || draft.roundId !== event.roundId) return
+		if (event.type === 'examReset' || event.type === 'examComplete') {
+			delete drafts[key]
+			return
+		}
+		if (event.type === 'examAnswer' && event.questionId) {
+			if (Array.isArray(event.selected) && event.selected.length) {
+				draft.answers[event.questionId] = {
+					questionId: event.questionId,
+					selected: event.selected.slice(),
+					updatedAt: occurredAt
+				}
+			} else delete draft.answers[event.questionId]
+		}
+		if (event.type === 'examReconcile' && Array.isArray(event.questionIds)) {
+			const validIds = new Set(event.questionIds)
+			draft.questionIds = event.questionIds.slice()
+			Object.keys(draft.answers).forEach(questionId => {
+				if (!validIds.has(questionId)) delete draft.answers[questionId]
+			})
+			if (validIds.has(event.initialQuestionId)) draft.initialQuestionId = event.initialQuestionId
+		}
+		const nextPosition = event.positionQuestionId || event.questionId
+		if (draft.questionIds.indexOf(nextPosition) > -1) draft.positionQuestionId = nextPosition
+		draft.positionAt = occurredAt
+		draft.updatedAt = occurredAt
+		drafts[key] = draft
+	})
+	setStorage(storageKey, Object.assign({}, state, {
+		currentSubjectId: raw && raw.currentSubjectId || 'junior-personal-finance'
+	}))
+	writeExamDrafts(drafts)
+	readPendingProgresses().filter(item => (Number(item.occurredAt) || 0) > cutoff)
+		.forEach(progress => {
+			if (progress.mode === 'knowledge') {
+				savePracticePosition(
+					KNOWLEDGE_POSITION_STORAGE_KEY,
+					`${progress.subjectId}|${getKnowledgeScopeKey(progress.chapterId, progress.knowledge)}`,
+					progress
+				)
+			} else {
+				updateLocalPracticeRoundPosition(progress, progress.section || '')
+			}
+		})
+}
+
+function writePracticePositions(storageKey, positions) {
+	const key = userScopedStorageKey(storageKey)
+	if (!Object.keys(positions).length) {
+		return removeStorage(key)
+	}
+	return setStorage(key, { version: 1, positions })
+}
+
+function clearLocalSubjectSnapshotPreservingQueue(subjectId) {
+	const storageKey = userScopedStorageKey(PRACTICE_STATE_STORAGE_KEY)
+	const raw = getStorage(storageKey)
+	const state = readLocalPracticeState(raw)
+	const removedQuestionIds = new Set()
+	Object.keys(state.answers).concat(state.favorites).forEach(questionId => {
+		if (!localRecordBelongsToSubject(state, questionId, subjectId)) return
+		removedQuestionIds.add(questionId)
+		delete state.answers[questionId]
+		delete state.favoriteSubjects[questionId]
+		delete state.favoriteUpdatedAt[questionId]
+	})
+	state.favorites = state.favorites.filter(questionId => !removedQuestionIds.has(questionId))
+	delete state.dailyAttempts[subjectId]
+	if (!setStorage(storageKey, Object.assign({}, state, {
+		currentSubjectId: raw && raw.currentSubjectId || 'junior-personal-finance'
+	}))) {
+		throw new UserPracticeServiceError(
+			'QUESTION_BANK_USER_LOCAL_STORAGE_FAILED',
+			'本机空间不足，无法应用最新的科目清空操作'
+		)
+	}
+	removeSubjectPracticePositions(CHAPTER_POSITION_STORAGE_KEY, subjectId)
+	removeSubjectPracticePositions(SECTION_POSITION_STORAGE_KEY, subjectId)
+	removeSubjectPracticePositions(KNOWLEDGE_POSITION_STORAGE_KEY, subjectId)
+	const rounds = readPracticeRounds()
+	Object.keys(rounds).forEach(key => {
+		if (rounds[key] && rounds[key].subjectId === subjectId) delete rounds[key]
+	})
+	writePracticeRounds(rounds)
+	const drafts = readExamDrafts()
+	Object.keys(drafts).forEach(key => {
+		if (drafts[key] && drafts[key].subjectId === subjectId) delete drafts[key]
+	})
+	writeExamDrafts(drafts)
+	removePersistedSummary(subjectId)
+	invalidateUserPracticeCache(subjectId)
+}
+
+async function applyPostCaptureSubjectClears(capturedAt, clearLocalSnapshot) {
+	const cutoff = Number(capturedAt) || 0
+	let processed = 0
+	while (processed < 64) {
+		const markers = readLocalClearMarkers()
+		const next = Object.keys(markers)
+			.map(subjectId => ({ subjectId, clearedAt: Number(markers[subjectId]) || 0 }))
+			.filter(item => item.clearedAt > cutoff)
+			.sort((left, right) => left.clearedAt - right.clearedAt)[0]
+		if (!next) {
+			clearLocalClearMarkers()
+			return
+		}
+		await executeCloudCall('clearCurrentSubjectData', {
+			subjectId: next.subjectId,
+			confirmation: 'CLEAR_CURRENT_SUBJECT',
+			clearedAt: next.clearedAt
+		}, { retry: false })
+		if (clearLocalSnapshot) clearLocalSubjectSnapshotPreservingQueue(next.subjectId)
+		const latest = readLocalClearMarkers()
+		if (Number(latest[next.subjectId]) === next.clearedAt) delete latest[next.subjectId]
+		writeLocalClearMarkers(latest)
+		processed += 1
+	}
+	throw new UserPracticeServiceError(
+		'QUESTION_BANK_USER_RECONCILIATION_CLEAR_LIMIT',
+		'处理期间清空科目次数过多，请停止操作后重试'
+	)
+}
+
+function replaceLocalSubjectFromCloud(subjectId, resources, summary) {
+	const storageKey = userScopedStorageKey(PRACTICE_STATE_STORAGE_KEY)
+	const raw = getStorage(storageKey)
+	const state = readLocalPracticeState(raw)
+	const existingSubjectQuestionIds = new Set(
+		Array.from(new Set(Object.keys(state.answers).concat(state.favorites)))
+			.filter(questionId => localRecordBelongsToSubject(state, questionId, subjectId))
+	)
+	Object.keys(state.answers).forEach(questionId => {
+		if (existingSubjectQuestionIds.has(questionId)) delete state.answers[questionId]
+	})
+	state.favorites = state.favorites.filter(questionId => {
+		if (!existingSubjectQuestionIds.has(questionId)) return true
+		delete state.favoriteSubjects[questionId]
+		delete state.favoriteUpdatedAt[questionId]
+		return false
+	})
+	;(resources.states || []).forEach(item => {
+		if (!item || !item.questionId) return
+		if (item.attempted && Array.isArray(item.lastSelected) && item.lastSelected.length) {
+			state.answers[item.questionId] = {
+				subjectId,
+				chapterId: String(item.chapterId || ''),
+				section: item.section || '',
+				knowledge: item.knowledge || '',
+				selected: item.lastSelected.slice(),
+				correct: Boolean(item.lastCorrect),
+				attempts: Math.max(1, Number(item.attempts) || 1),
+				practiceModes: Array.isArray(item.practiceModes) ? item.practiceModes.slice() : [],
+				timestamp: Number(item.lastAnsweredAt) || 0
+			}
+		}
+		if (item.favorite) {
+			if (state.favorites.indexOf(item.questionId) === -1) state.favorites.push(item.questionId)
+			state.favoriteSubjects[item.questionId] = subjectId
+			state.favoriteUpdatedAt[item.questionId] = Number(item.favoriteUpdatedAt) || 0
+		}
+	})
+	state.dailyAttempts[subjectId] = {
+		dayKey: summary && summary.todayKey || localDayKey(),
+		attempts: Number(summary && summary.todayAttempts) || 0
+	}
+	if (!setStorage(storageKey, Object.assign({}, state, {
+		currentSubjectId: raw && raw.currentSubjectId || 'junior-personal-finance'
+	}))) {
+		throw new UserPracticeServiceError(
+			'QUESTION_BANK_USER_LOCAL_STORAGE_FAILED',
+			'本机空间不足，无法写入云端学习进度'
+		)
+	}
+
+	const positionStores = {
+		chapter: CHAPTER_POSITION_STORAGE_KEY,
+		section: SECTION_POSITION_STORAGE_KEY,
+		knowledge: KNOWLEDGE_POSITION_STORAGE_KEY
+	}
+	Object.keys(positionStores).forEach(mode => {
+		const positionStorageKey = positionStores[mode]
+		const positions = readPracticePositions(positionStorageKey)
+		Object.keys(positions).forEach(key => {
+			if (positions[key] && positions[key].subjectId === subjectId) delete positions[key]
+		})
+		;(resources.progress || []).filter(item => item.mode === mode).forEach(item => {
+			const scope = mode === 'chapter'
+				? item.chapterId
+				: (mode === 'section'
+					? getSectionScopeKey(item.chapterId, item.section)
+					: getKnowledgeScopeKey(item.chapterId, item.knowledge))
+			if (!scope || !item.questionId) return
+			positions[`${subjectId}|${scope}`] = {
+				subjectId,
+				chapterId: String(item.chapterId || ''),
+				section: item.section || '',
+				knowledge: item.knowledge || '',
+				questionId: item.questionId,
+				updatedAt: Number(item.progressAt) || 0
+			}
+		})
+		if (!writePracticePositions(positionStorageKey, positions) && Object.keys(positions).length) {
+			throw new UserPracticeServiceError(
+				'QUESTION_BANK_USER_LOCAL_STORAGE_FAILED',
+				'本机空间不足，无法写入学习位置'
+			)
+		}
+	})
+
+	const rounds = readPracticeRounds()
+	Object.keys(rounds).forEach(key => {
+		if (rounds[key] && rounds[key].subjectId === subjectId) delete rounds[key]
+	})
+	;(resources.rounds || []).forEach(item => {
+		if (!item || item.chapterId === undefined) return
+		const source = {
+			subjectId,
+			chapterId: String(item.chapterId),
+			answers: {},
+			chapterPosition: item.chapterPosition ? {
+				questionId: item.chapterPosition.questionId,
+				section: item.chapterPosition.section || '',
+				updatedAt: Number(item.chapterPosition.progressAt) || 0
+			} : null,
+			sectionPositions: {},
+			chapterResetAt: Number(item.chapterResetAt) || 0,
+			sectionResetAt: {},
+			updatedAt: Date.now()
+		}
+		;(item.answers || []).forEach(answer => {
+			source.answers[answer.questionId] = {
+				questionId: answer.questionId,
+				section: answer.section || '',
+				selected: Array.isArray(answer.selected) ? answer.selected.slice() : [],
+				correct: Boolean(answer.correct),
+				answeredAt: Number(answer.answeredAt) || 0
+			}
+		})
+		;(item.sectionPositions || []).forEach(position => {
+			source.sectionPositions[position.section] = {
+				questionId: position.questionId,
+				section: position.section,
+				updatedAt: Number(position.progressAt) || 0
+			}
+		})
+		;(item.sectionResets || []).forEach(reset => {
+			source.sectionResetAt[reset.section] = Number(reset.resetAt) || 0
+		})
+		rounds[practiceRoundKey(subjectId, source.chapterId)] = normalizePracticeRound(
+			source,
+			subjectId,
+			source.chapterId
+		)
+	})
+	if (!writePracticeRounds(rounds) && Object.keys(rounds).length) {
+		throw new UserPracticeServiceError(
+			'QUESTION_BANK_USER_LOCAL_STORAGE_FAILED',
+			'本机空间不足，无法写入章节练习进度'
+		)
+	}
+
+	const drafts = readExamDrafts()
+	Object.keys(drafts).forEach(key => {
+		if (drafts[key] && drafts[key].subjectId === subjectId) delete drafts[key]
+	})
+	;(resources.examDrafts || []).forEach(item => {
+		const draft = normalizeExamDraft(Object.assign({}, item, { subjectId, active: true }))
+		if (draft && draft.roundId && draft.questionIds.length) drafts[examDraftStorageKey(draft)] = draft
+	})
+	if (!writeExamDrafts(drafts) && Object.keys(drafts).length) {
+		throw new UserPracticeServiceError(
+			'QUESTION_BANK_USER_LOCAL_STORAGE_FAILED',
+			'本机空间不足，无法写入考试草稿'
+		)
+	}
+	if (summary) cacheCloudSummary(subjectId, summary)
+	else removePersistedSummary(subjectId)
+	invalidateUserPracticeCache(subjectId)
+}
+
+async function uploadReplacementResource(subjectId, replacementId, resource, items, state) {
+	const size = resource === 'states'
+		? REPLACEMENT_STATE_BATCH_SIZE
+		: (resource === 'progress' ? REPLACEMENT_PROGRESS_BATCH_SIZE : 1)
+	for (let offset = 0; offset < items.length; offset += size) {
+		await executeCloudCall('uploadSubjectDataBatch', {
+			subjectId,
+			replacementId,
+			resource,
+			items: items.slice(offset, offset + size)
+		})
+		updateReconciliationProgress(Object.assign({}, state, {
+			currentSubjectId: subjectId,
+			currentResource: resource,
+			resourceCompleted: Math.min(items.length, offset + size),
+			resourceTotal: items.length
+		}))
+	}
+}
+
+async function runLocalReplacement(state, options) {
+	const config = options || {}
+	let payload = readReconciliationPayload()
+	let current = state
+	if (!payload || payload.direction !== 'local' || payload.replacementId !== current.replacementId) {
+		const persisted = readReconciliationState()
+		if (persisted.status === 'replacing'
+			&& persisted.replacementId
+			&& persisted.replacementId === current.replacementId) {
+			const missingSnapshotError = new UserPracticeServiceError(
+				'QUESTION_BANK_USER_RECONCILIATION_SNAPSHOT_MISSING',
+				'本机进度快照已丢失，为避免覆盖云端数据，已停止继续处理'
+			)
+			writeReconciliationState(Object.assign({}, persisted, {
+				error: missingSnapshotError.message,
+				errorCode: missingSnapshotError.errCode,
+				failedAt: Date.now()
+			}))
+			throw missingSnapshotError
+		}
+		const capturedAt = Number(current.capturedAt) || Date.now()
+		const replacementId = current.replacementId || createPracticeEventId('replacement')
+		payload = buildLocalReconciliationPayload(current.subjectIds, capturedAt)
+		payload.replacementId = replacementId
+		writeReconciliationPayload(payload)
+		current = writeReconciliationState(Object.assign({}, current, {
+			status: 'replacing',
+			choice: 'local',
+			capturedAt,
+			replacementId,
+			subjectIndex: 0,
+			subjectTotal: current.subjectIds.length,
+			error: ''
+		}))
+	}
+	try {
+		for (let index = Number(current.subjectIndex) || 0; index < payload.subjectIds.length; index += 1) {
+			const subjectId = payload.subjectIds[index]
+			const subject = payload.subjects[subjectId] || {
+				states: [], progress: [], rounds: [], examDrafts: [], todayAttempts: 0
+			}
+			current = updateReconciliationProgress(Object.assign({}, current, {
+				status: 'replacing',
+				subjectIndex: index,
+				currentSubjectId: subjectId,
+				currentResource: '准备云端空间',
+				resourceCompleted: 0,
+				resourceTotal: 0
+			}))
+			const begun = await executeCloudCall('beginSubjectDataReplacement', {
+				subjectId,
+				replacementId: payload.replacementId,
+				capturedAt: payload.capturedAt
+			})
+			if (!begun || begun.status !== 'ready') {
+				for (const resource of ['states', 'progress', 'rounds', 'examDrafts']) {
+					await uploadReplacementResource(
+						subjectId,
+						payload.replacementId,
+						resource,
+						subject[resource] || [],
+						current
+					)
+				}
+				await executeCloudCall('completeSubjectDataReplacement', {
+					subjectId,
+					replacementId: payload.replacementId,
+					todayAttempts: Number(subject.todayAttempts) || 0
+				})
+			}
+			current = updateReconciliationProgress(Object.assign({}, current, {
+				subjectIndex: index + 1,
+				currentSubjectId: '',
+				currentResource: ''
+			}))
+			if (typeof config.onProgress === 'function') config.onProgress(cloneValue(current))
+		}
+		let currentPreferenceEntry = readPreferencesEntry()
+		let preferenceResult = await executeCloudCall('updatePreferences', {
+			answerMode: payload.preferences.answerMode,
+			smartPractice: payload.preferences.smartPractice
+		})
+		if (currentPreferenceEntry.dirty
+			&& Number(currentPreferenceEntry.preferences.updatedAt) > Number(payload.capturedAt)) {
+			preferenceResult = await executeCloudCall('updatePreferences', {
+				answerMode: currentPreferenceEntry.preferences.answerMode,
+				smartPractice: currentPreferenceEntry.preferences.smartPractice
+			})
+		}
+		savePreferencesEntry(Object.assign({}, preferenceResult, {
+			nightMode: readDeviceNightMode(false)
+		}), false, Date.now())
+		await applyPostCaptureSubjectClears(payload.capturedAt, false)
+		removeQueuedPracticeDataThrough(payload.capturedAt)
+		clearReconciliationPayload()
+		preferencesRefreshRequired = false
+		markPracticeSummaryRefreshRequired()
+		const completed = writeReconciliationState(Object.assign({}, current, {
+			status: 'ready',
+			completedAt: Date.now(),
+			currentSubjectId: '',
+			currentResource: '',
+			resourceCompleted: 0,
+			resourceTotal: 0,
+			error: ''
+		}))
+		if (pendingPracticeEventCount()) schedulePracticeSync({ immediate: true })
+		return completed
+	} catch (error) {
+		writeReconciliationState(Object.assign({}, current, {
+			status: 'replacing',
+			error: reconciliationErrorMessage(error),
+			errorCode: error && error.errCode || '',
+			failedAt: Date.now()
+		}))
+		throw error
+	}
+}
+
+async function downloadCloudReplacementResource(subjectId, resource, state, onProgress) {
+	const items = []
+	let cursor = 0
+	let page = 0
+	do {
+		const result = await executeCloudCall('getSubjectDataExportPage', {
+			subjectId,
+			resource,
+			cursor,
+			pageSize: resource === 'states'
+				? REPLACEMENT_STATE_BATCH_SIZE
+				: (resource === 'progress' ? REPLACEMENT_PROGRESS_BATCH_SIZE : 1)
+		})
+		if (!result || !Array.isArray(result.items)) {
+			throw new UserPracticeServiceError('QUESTION_BANK_USER_INVALID_RESPONSE', '云端学习数据分页格式不正确')
+		}
+		items.push(...result.items)
+		page += 1
+		const progress = updateReconciliationProgress(Object.assign({}, state, {
+			currentSubjectId: subjectId,
+			currentResource: resource,
+			resourceCompleted: items.length,
+			resourceTotal: result.hasMore ? items.length + 1 : items.length
+		}))
+		if (typeof onProgress === 'function') onProgress(cloneValue(progress))
+		if (!result.hasMore) break
+		if (!Number.isInteger(result.nextCursor) || result.nextCursor <= cursor || page > 10000) {
+			throw new UserPracticeServiceError('QUESTION_BANK_USER_INVALID_RESPONSE', '云端学习数据分页游标无效')
+		}
+		cursor = result.nextCursor
+	} while (true)
+	return items
+}
+
+async function runCloudRestoration(state, options) {
+	const config = options || {}
+	let current = state
+	current = writeReconciliationState(Object.assign({}, current, {
+		status: 'restoring',
+		choice: 'cloud',
+		capturedAt: Number(current.capturedAt) || Date.now(),
+		subjectIndex: Number(current.subjectIndex) || 0,
+		subjectTotal: current.subjectIds.length,
+		error: ''
+	}))
+	try {
+		for (let index = Number(current.subjectIndex) || 0; index < current.subjectIds.length; index += 1) {
+			const subjectId = current.subjectIds[index]
+			const resources = { states: [], progress: [], rounds: [], examDrafts: [] }
+			const cloudSubjects = current.overview && current.overview.cloud
+				&& Array.isArray(current.overview.cloud.subjects)
+				? current.overview.cloud.subjects
+				: []
+			const summary = cloudSubjects.find(item => item.subjectId === subjectId) || null
+			if (summary && summary.hasCloudData) {
+				for (const resource of Object.keys(resources)) {
+					resources[resource] = await downloadCloudReplacementResource(
+						subjectId,
+						resource,
+						current,
+						config.onProgress
+					)
+				}
+			}
+			replaceLocalSubjectFromCloud(subjectId, resources, summary)
+			current = updateReconciliationProgress(Object.assign({}, current, {
+				subjectIndex: index + 1,
+				currentSubjectId: '',
+				currentResource: '',
+				resourceCompleted: 0,
+				resourceTotal: 0
+			}))
+			if (typeof config.onProgress === 'function') config.onProgress(cloneValue(current))
+		}
+		const cloudPreferences = current.cloudPreferences
+			|| current.overview && current.overview.cloud && current.overview.cloud.preferences
+		const currentPreferenceEntry = readPreferencesEntry()
+		const hasNewerPreferences = currentPreferenceEntry.dirty
+			&& Number(currentPreferenceEntry.preferences.updatedAt) > Number(current.capturedAt)
+		let restoredPreferences = cloudPreferences
+		if (hasNewerPreferences) {
+			restoredPreferences = await executeCloudCall('updatePreferences', {
+				answerMode: currentPreferenceEntry.preferences.answerMode,
+				smartPractice: currentPreferenceEntry.preferences.smartPractice
+			})
+		}
+		if (restoredPreferences) {
+			savePreferencesEntry(Object.assign({}, restoredPreferences, {
+				nightMode: readDeviceNightMode(false)
+			}), false, Date.now())
+		}
+		await applyPostCaptureSubjectClears(current.capturedAt, true)
+		replayQueuedPracticeDataAfter(current.capturedAt)
+		removeQueuedPracticeDataThrough(current.capturedAt)
+		clearReconciliationPayload()
+		preferencesRefreshRequired = false
+		markPracticeSummaryRefreshRequired()
+		const completed = writeReconciliationState(Object.assign({}, current, {
+			status: 'ready',
+			completedAt: Date.now(),
+			currentSubjectId: '',
+			currentResource: '',
+			resourceCompleted: 0,
+			resourceTotal: 0,
+			error: ''
+		}))
+		if (pendingPracticeEventCount()) schedulePracticeSync({ immediate: true })
+		return completed
+	} catch (error) {
+		writeReconciliationState(Object.assign({}, current, {
+			status: 'restoring',
+			error: reconciliationErrorMessage(error),
+			errorCode: error && error.errCode || '',
+			failedAt: Date.now()
+		}))
+		throw error
+	}
+}
+
+async function preparePracticeReconciliationInternal(options) {
+	const config = options || {}
+	let current = readReconciliationState()
+	if (!practiceCloudSyncEnabled()) return current
+	if (current.status === 'replacing' && current.choice === 'local') {
+		return config.autoResume === false ? current : runLocalReplacement(current, config)
+	}
+	if (current.status === 'restoring' && current.choice === 'cloud') {
+		return config.autoResume === false ? current : runCloudRestoration(current, config)
+	}
+	if (current.status !== 'checking' && !config.force) return current
+	const subjectIds = collectReconciliationSubjectIds(config.subjectIds || current.subjectIds)
+	if (!subjectIds.length) {
+		return writeReconciliationState(Object.assign({}, current, {
+			status: 'ready',
+			subjectIds: [],
+			completedAt: Date.now(),
+			error: ''
+		}))
+	}
+	current = writeReconciliationState(Object.assign({}, current, {
+		status: 'checking',
+		subjectIds,
+		error: ''
+	}))
+	try {
+		const [cloudResult, local] = await Promise.all([
+			executeCloudCall('getSyncReconciliationOverview', { subjectIds }),
+			Promise.resolve(buildLocalReconciliationOverview(subjectIds))
+		])
+		const cloud = aggregateCloudReconciliationOverview(cloudResult)
+		current = writeReconciliationState(Object.assign({}, current, {
+			subjectIds,
+			overview: { local, cloud },
+			cloudPreferences: cloud.preferences,
+			checkedAt: Date.now(),
+			error: ''
+		}))
+		const needsChoice = cloud.hasData && (
+			local.hasClearMarker
+			|| current.knownRenewal && local.hasChanges
+			|| !current.knownRenewal && local.hasData
+		)
+		if (needsChoice) {
+			return writeReconciliationState(Object.assign({}, current, {
+				status: 'required',
+				choice: '',
+				error: ''
+			}))
+		}
+		if (local.hasData && (!cloud.hasData || local.hasChanges)) {
+			return runLocalReplacement(Object.assign({}, current, {
+				status: 'replacing',
+				choice: 'local',
+				capturedAt: Date.now(),
+				replacementId: createPracticeEventId('replacement'),
+				subjectIndex: 0,
+				subjectTotal: subjectIds.length
+			}), config)
+		}
+		if (cloud.hasData && !local.hasData) {
+			return runCloudRestoration(Object.assign({}, current, {
+				status: 'restoring',
+				choice: 'cloud',
+				capturedAt: Date.now(),
+				subjectIndex: 0,
+				subjectTotal: subjectIds.length
+			}), config)
+		}
+		clearReconciliationPayload()
+		clearLocalClearMarkers()
+		return writeReconciliationState(Object.assign({}, current, {
+			status: 'ready',
+			completedAt: Date.now(),
+			error: ''
+		}))
+	} catch (error) {
+		const unsupported = error && error.errCode === 'QUESTION_BANK_USER_UNSUPPORTED_ACTION'
+		writeReconciliationState(Object.assign({}, current, {
+			status: 'checking',
+			error: unsupported
+				? '云同步升级尚未部署，本机数据已保留，请部署云函数后重试'
+				: reconciliationErrorMessage(error),
+			errorCode: error && error.errCode || '',
+			failedAt: Date.now()
+		}))
+		throw error
+	}
+}
+
+export async function preparePracticeReconciliation(options) {
+	if (reconciliationRequest) return reconciliationRequest
+	reconciliationRequest = preparePracticeReconciliationInternal(options).then(result => {
+		reconciliationRequest = null
+		return result
+	}, error => {
+		reconciliationRequest = null
+		throw error
+	})
+	return reconciliationRequest
+}
+
+export async function choosePracticeReconciliation(choice, options) {
+	if (['local', 'cloud'].indexOf(choice) === -1) {
+		throw new UserPracticeServiceError('QUESTION_BANK_USER_CLIENT_ERROR', '请选择要保留的学习进度')
+	}
+	if (reconciliationRequest) return reconciliationRequest
+	const config = options || {}
+	const current = readReconciliationState()
+	if (['replacing', 'restoring'].indexOf(current.status) > -1
+		&& current.choice && current.choice !== choice) {
+		throw new UserPracticeServiceError(
+			'QUESTION_BANK_USER_RECONCILIATION_CHOICE_LOCKED',
+			'学习进度覆盖已经开始，只能继续当前操作'
+		)
+	}
+	const subjectIds = collectReconciliationSubjectIds(config.subjectIds || current.subjectIds)
+	const operation = Object.assign({}, current, {
+		subjectIds,
+		choice,
+		capturedAt: Number(current.capturedAt) || Date.now(),
+		subjectIndex: Number(current.subjectIndex) || 0,
+		subjectTotal: subjectIds.length,
+		error: ''
+	})
+	if (choice === 'local' && !operation.replacementId) {
+		operation.replacementId = createPracticeEventId('replacement')
+	}
+	reconciliationRequest = (choice === 'local'
+		? runLocalReplacement(Object.assign(operation, { status: 'replacing' }), config)
+		: runCloudRestoration(Object.assign(operation, { status: 'restoring' }), config)
+	).then(result => {
+		reconciliationRequest = null
+		return result
+	}, error => {
+		reconciliationRequest = null
+		throw error
+	})
+	return reconciliationRequest
+}
+
 function removeSubjectPracticePositions(storageKey, subjectId) {
 	const positions = readPracticePositions(storageKey)
 	Object.keys(positions).forEach(key => {
@@ -2484,8 +3688,9 @@ export async function clearCurrentSubjectPracticeData(subjectId) {
 	scheduledFlush = null
 	scheduledSyncOptions = null
 	if (flushRequest) await flushRequest
-	if (!practiceCloudSyncEnabled()) {
+	if (!practiceCloudSyncReady()) {
 		clearSubjectLocalSyncData(normalizedSubjectId)
+		markLocalSubjectCleared(normalizedSubjectId)
 		return {
 			cleared: true,
 			subjectId: normalizedSubjectId,
@@ -2493,9 +3698,11 @@ export async function clearCurrentSubjectPracticeData(subjectId) {
 			localOnly: true
 		}
 	}
+	const clearedAt = Date.now()
 	const result = await executeCloudCall('clearCurrentSubjectData', {
 		subjectId: normalizedSubjectId,
-		confirmation: 'CLEAR_CURRENT_SUBJECT'
+		confirmation: 'CLEAR_CURRENT_SUBJECT',
+		clearedAt
 	}, { retry: false })
 	const pending = clearSubjectLocalSyncData(normalizedSubjectId)
 	if (pending.remainingEvents || pending.remainingProgress) {
@@ -2520,7 +3727,7 @@ export async function getPracticePreferences(options) {
 	const userId = observePracticePreferencesUser()
 	const forceRefresh = Boolean(config.forceRefresh || preferencesRefreshRequired)
 	const localEntry = readPreferencesEntry()
-	if (!practiceCloudSyncEnabled()) {
+	if (!practiceCloudSyncReady()) {
 		return Object.assign({}, localEntry.preferences, {
 			_syncPending: false,
 			_localOnly: true
@@ -2535,7 +3742,10 @@ export async function getPracticePreferences(options) {
 	preferencesRequest = (async () => {
 		try {
 			const result = localEntry.dirty
-				? await executeCloudCall('updatePreferences', localEntry.preferences)
+				? await executeCloudCall('updatePreferences', {
+					answerMode: localEntry.preferences.answerMode,
+					smartPractice: localEntry.preferences.smartPractice
+				})
 				: await executeCloudCall('getPreferences')
 			const saved = savePreferencesEntry(result, false, Date.now())
 			if (userId && getCurrentPracticeUser().uid === userId) {
@@ -2569,16 +3779,29 @@ export async function getPracticePreferences(options) {
 export async function updatePracticePreferences(preferences, options) {
 	const config = options || {}
 	if (preferences && preferences.smartPractice !== undefined) validateSmartPractice(preferences.smartPractice)
+	const previous = readPreferencesEntry()
+	const syncPreferenceChanged = Boolean(preferences && (
+		preferences.answerMode !== undefined || preferences.smartPractice !== undefined
+	))
+	if (preferences && preferences.nightMode !== undefined) {
+		saveDeviceNightMode(preferences.nightMode)
+	}
 	const next = normalizePracticePreferences(Object.assign(
 		{},
-		readPreferencesEntry().preferences,
+		previous.preferences,
 		preferences,
 		{ updatedAt: Date.now() }
 	))
-	const previous = readPreferencesEntry()
-	savePreferencesEntry(next, true, previous.syncedAt)
+	next.nightMode = readDeviceNightMode(next.nightMode)
+	savePreferencesEntry(next, previous.dirty || syncPreferenceChanged, previous.syncedAt)
 	invalidatePracticeBootstrapCache()
-	if (!practiceCloudSyncEnabled()) {
+	if (!syncPreferenceChanged) {
+		return Object.assign({}, next, {
+			_syncPending: previous.dirty,
+			_localOnly: true
+		})
+	}
+	if (!practiceCloudSyncReady()) {
 		return Object.assign({}, next, {
 			_syncPending: false,
 			_localOnly: true
@@ -2589,7 +3812,10 @@ export async function updatePracticePreferences(preferences, options) {
 	}
 	let result
 	try {
-		result = await executeCloudCall('updatePreferences', next)
+		result = await executeCloudCall('updatePreferences', {
+			answerMode: next.answerMode,
+			smartPractice: next.smartPractice
+		})
 	} catch (error) {
 		if (error && error.errCode === 'QUESTION_BANK_MEMBERSHIP_REQUIRED') {
 			deactivateCachedMembership()
@@ -2608,11 +3834,11 @@ export async function updatePracticePreferences(preferences, options) {
 }
 
 export function pendingPracticeEventCount() {
-	if (!practiceCloudSyncEnabled()) return 0
 	return readOutbox().length + readPendingProgresses().length
 }
 
 export default {
+	choosePracticeReconciliation,
 	clearCurrentSubjectPracticeData,
 	completeExamDraft,
 	examDraftHasProgress,
@@ -2644,6 +3870,8 @@ export default {
 	getPracticeSummary,
 	getPracticeUserProfile,
 	getLocalPracticePreferences,
+	getPracticeReconciliationState,
+	markMembershipReconciliationTransition,
 	getLocalExamDraft,
 	getLocalExamDraftSummaries,
 	markPracticePreferencesRefreshRequired,
@@ -2651,7 +3879,9 @@ export default {
 	markPracticeSummaryRefreshRequired,
 	pendingPracticeEventCount,
 	practiceCloudSyncEnabled,
+	practiceCloudSyncReady,
 	practiceUserLoggedIn,
+	preparePracticeReconciliation,
 	queuePracticeAnswer,
 	queuePracticeFavorite,
 	reconcileExamDraft,

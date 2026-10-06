@@ -54,6 +54,7 @@ async function run() {
 	const navigationUrls = []
 	const switchTabUrls = []
 	const tabBarStyles = []
+	const tabBarVisibility = []
 	const modalOptions = []
 	const actionSheetOptions = []
 	let flushCalls = 0
@@ -114,6 +115,7 @@ async function run() {
 		plans: []
 	}
 	let membershipResponse = activeMembership
+	let reconciliationState = { status: 'ready' }
 	const membershipPurchaseCalls = []
 	const environment = {
 		getQuestionTypeDisplayLabel: question => question.type === 'material'
@@ -231,6 +233,9 @@ async function run() {
 			return { synced: true }
 		},
 		pendingPracticeEventCount: () => pendingPracticeEvents,
+			getPracticeReconciliationState: () => reconciliationState,
+			preparePracticeReconciliation: async () => reconciliationState,
+			markQuestionBankTabNoticeSeen: () => {},
 			getLocalPracticePreferences: () => preferenceResponse,
 			getPracticePreferences: async () => preferenceResponse,
 			getCachedPracticeSummary: () => null,
@@ -481,6 +486,8 @@ async function run() {
 			setNavigationBarColor: options => navigationColors.push(options),
 			setNavigationBarTitle: options => navigationTitles.push(options.title),
 			setTabBarStyle: options => tabBarStyles.push(options),
+			hideTabBar: () => tabBarVisibility.push('hide'),
+			showTabBar: () => tabBarVisibility.push('show'),
 			navigateTo: options => navigationUrls.push(options.url),
 			switchTab: options => switchTabUrls.push(options.url),
 			navigateBack: () => {},
@@ -1520,6 +1527,11 @@ async function run() {
 	const catalogCallsBeforeHomeShow = catalogCalls
 	const summaryCallsBeforeHomeShow = catalogSummaryCalls
 	await homeComponent.onShow.call(home)
+	assert.equal(tabBarVisibility.slice(-1)[0], 'show')
+	home.handleSubjectPopupChange({ show: true })
+	assert.equal(tabBarVisibility.slice(-1)[0], 'hide')
+	home.handleSubjectPopupChange({ show: false })
+	assert.equal(tabBarVisibility.slice(-1)[0], 'show')
 	assert.equal(catalogCalls, catalogCallsBeforeHomeShow + 1)
 	assert.equal(catalogSummaryCalls, summaryCallsBeforeHomeShow)
 	assert.equal(home.stats.total, 10)
@@ -1621,6 +1633,8 @@ async function run() {
 	assert.equal(freeSettings.answerMode, 'exam')
 
 	const pagesConfig = JSON.parse(fs.readFileSync(path.resolve(__dirname, '../pages.json'), 'utf8'))
+	assert.notEqual(pagesConfig.tabBar.custom, true)
+	assert.equal(fs.existsSync(path.resolve(__dirname, '../custom-tab-bar/index.js')), false)
 	assert.equal(pagesConfig.pages.some(page => page.path === 'pages/privacy/privacy'), false)
 	const aboutPageSource = fs.readFileSync(path.resolve(__dirname, '../pages/about/about.vue'), 'utf8')
 	const practicePageSource = fs.readFileSync(path.resolve(__dirname, '../practice-pages/practice/practice.vue'), 'utf8')
@@ -1660,6 +1674,10 @@ async function run() {
 		})
 	})
 	const monthlyPlan = membershipPage.plans.find(plan => plan.productId === 'membership_1m')
+	assert.equal(monthlyPlan.priceFen, 100)
+	assert.equal(monthlyPlan.days, 31)
+	assert.equal(monthlyPlan.regularPriceFen, 1200)
+	assert.equal(membershipPage.formatPrice(monthlyPlan.priceFen), '1')
 	assert.equal(membershipPage.planUnavailableForCurrentMember(monthlyPlan), true)
 	membershipPage.selectedProductId = 'membership_1m'
 	membershipPage.ensureSelectedPlanAvailable()
@@ -1673,6 +1691,7 @@ async function run() {
 	membershipPage.membership = { isMember: false, status: 'inactive', expiresAt: 0, plans: [] }
 	membershipPage.selectPlan(monthlyPlan)
 	assert.equal(membershipPage.selectedProductId, 'membership_1m')
+	assert.equal(membershipPage.purchaseButtonText, '立即开通 全科31天 · ¥1')
 	membershipPage.membership = activeMembership
 	membershipPage.selectedProductId = 'membership_1m'
 	const purchaseCallsBeforeRestriction = membershipPurchaseCalls.length
@@ -1772,6 +1791,10 @@ async function run() {
 		toolHomeComponent.methods,
 		{ $refs: {} }
 	)
+	toolHomePage.handleKeyboardChange(true)
+	assert.equal(tabBarVisibility.slice(-1)[0], 'hide')
+	toolHomePage.handleKeyboardChange(false)
+	assert.equal(tabBarVisibility.slice(-1)[0], 'show')
 	assert.equal(toolHomeComponent.computed.showAds.call(toolHomePage), false)
 	toolHomePage.membershipLoaded = true
 	assert.equal(toolHomeComponent.computed.showAds.call(toolHomePage), true)
@@ -1781,17 +1804,22 @@ async function run() {
 	assert.match(toolHomeSource, /unit-id="adunit-9ff96a0edd39a741"/)
 	assert.match(toolHomeSource, /showAds && item\.url === '\/pages\/flzzb\/flzzb'/)
 	assert.match(toolHomeSource, /\.parameter-ad-container\s*\{[\s\S]*?margin:\s*10px;/)
-	assert.match(toolHomeSource, /@media screen and \(min-width: 768px\)[\s\S]*?\.mode-tabs \{[\s\S]*?height: 64px;/)
+	assert.match(toolHomeSource, /\.mode-tabs \{ height: 58px; \}/)
 	const financeCalculatorSource = fs.readFileSync(path.resolve(__dirname, '../components/finance-calculator/finance-calculator.vue'), 'utf8')
 	assert.match(financeCalculatorSource, /class="field-checkbox-visual"/)
 	assert.match(financeCalculatorSource, /\.field-checkbox-visual \{[^}]*width: 28rpx;[^}]*height: 28rpx;/)
 	assert.match(financeCalculatorSource, /\.field-checkbox \{[^}]*opacity: 0;/)
 	assert.doesNotMatch(financeCalculatorSource, /\.field-checkbox \{[^}]*transform: scale\(0\.5\)/)
-	assert.match(financeCalculatorSource, /@media screen and \(min-width: 768px\)[\s\S]*?\.finance-calculator--tool-page \.custom-input \{[\s\S]*?height: 56px;/)
-	assert.match(financeCalculatorSource, /\.finance-calculator--tool-page \.result-wrapper \{[\s\S]*?padding: 32px 0;/)
+	assert.match(financeCalculatorSource, /\.finance-calculator--embedded\.finance-calculator--tool-page \.custom-input \{ height: 52px; \}/)
+	assert.match(financeCalculatorSource, /\.finance-calculator--embedded\.finance-calculator--tool-page \.result-wrapper \{ margin-top: 16px; padding: 24px 0; \}/)
+	assert.match(financeCalculatorSource, /\.finance-calculator--embedded\.finance-calculator--tool-page \.field-label \{ flex-basis: 36%;/)
 	const parameterCardSource = fs.readFileSync(path.resolve(__dirname, '../components/myUnit/myUnit.vue'), 'utf8')
 	assert.match(parameterCardSource, /<uni-card\s+margin="10px"/)
-	assert.match(parameterCardSource, /@media screen and \(min-width: 768px\)[\s\S]*?\.tool-title \{[\s\S]*?font-size: 32px;/)
+	assert.match(parameterCardSource, /@media screen and \(min-width: 768px\)[\s\S]*?\.tool-title \{\s*font-size: 26px;/)
+	const numberKeyboardSource = fs.readFileSync(path.resolve(__dirname, '../components/num-keyboard/num-keyboard.vue'), 'utf8')
+	assert.match(numberKeyboardSource, /@media screen and \(min-width: 700px\)[\s\S]*?\.keyboard-container \{[\s\S]*?max-width: 520px;/)
+	assert.match(numberKeyboardSource, /\.key-btn \{ height: 56px;/)
+	assert.match(numberKeyboardSource, /\.key-text,\s*\.tool-page \.key-text \{ font-size: 28px;/)
 	const compoundFutureValueSource = fs.readFileSync(path.resolve(__dirname, '../pages/flzzb/flzzb.vue'), 'utf8')
 	assert.doesNotMatch(compoundFutureValueSource, /adunit-9ff96a0edd39a741|<ad-custom/)
 	const wideScreenPagePaths = [
@@ -1809,6 +1837,11 @@ async function run() {
 		const source = fs.readFileSync(path.resolve(__dirname, relativePath), 'utf8')
 		assert.match(source, /@media screen and \(min-width: 768px\)/, `${relativePath} 应包含宽屏尺寸封顶规则`)
 		assert.match(source, /max-width:\s*820px/, `${relativePath} 应限制主要内容区宽度`)
+	})
+	const compactAboutPagePaths = ['../pages/about/about.vue', '../pages/membership/membership.vue', '../pages/course/course.vue']
+	compactAboutPagePaths.forEach(relativePath => {
+		const source = fs.readFileSync(path.resolve(__dirname, relativePath), 'utf8')
+		assert.match(source, /@media screen and \(min-width: 700px\) and \(max-height: 1150px\)/, `${relativePath} 应适配短竖屏平板`)
 	})
 	const parameterTablePaths = [
 		'../pages/njzzb/njzzb.vue',

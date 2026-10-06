@@ -714,4 +714,51 @@
 		.smart-editor-ratio-control .smart-editor-step { width: 88px; height: 88px; }
 		.smart-editor-percent { width: 104px; font-size: 35px; }
 	}
+
+	/* 768×1024 等短屏平板：设置卡片更紧凑，固定保存栏仍保留可滚动余量。 */
+	@media screen and (min-width: 768px) and (max-height: 1050px) {
+		.settings-page { padding: 16px 20px calc(116px + env(safe-area-inset-bottom)); }
+		.settings-section { margin-bottom: 18px; }
+		.section-heading { margin-bottom: 10px; }
+		.section-title { font-size: 27px; }
+		.section-desc { font-size: 21px; }
+		.mode-card { padding: 12px; }
+		.mode-segment { height: 54px; font-size: 24px; }
+		.mode-member-badge { font-size: 15px; }
+		.mode-active-desc { padding: 12px 8px 4px 20px; font-size: 21px; }
+		.smart-card { padding: 14px; }
+		.strategy-segment { height: 52px; font-size: 23px; }
+		.smart-summary-list { margin-top: 5px; }
+		.smart-summary-row { min-height: 60px; padding-left: 20px; }
+		.smart-summary-label { font-size: 23px; }
+		.smart-summary-count { font-size: 25px; }
+		.ratio-summary-values { font-size: 22px; }
+		.other-card { padding: 0 18px; }
+		.setting-row { min-height: 84px; }
+		.setting-icon { width: 48px; height: 48px; flex-basis: 48px; margin-right: 14px; }
+		.setting-divider { margin-left: 62px; }
+		.setting-title { font-size: 25px; }
+		.setting-desc { margin-top: 3px; font-size: 21px; }
+		.sync-note { margin-top: 12px; font-size: 21px; }
+		.settings-ad-container { margin-top: 18px; }
+		.save-bar { padding: 12px 20px calc(12px + env(safe-area-inset-bottom)); }
+		.save-button { height: 64px; font-size: 26px; }
+		.smart-editor-header { min-height: 80px; padding: 12px 22px; }
+		.smart-editor-title { font-size: 27px; }
+		.smart-editor-caption { font-size: 20px; }
+		.smart-editor-done { font-size: 23px; }
+		.smart-editor-body { max-height: calc(82vh - 80px - env(safe-area-inset-bottom)); padding: 18px 22px 24px; }
+		.smart-editor-section-title { font-size: 25px; }
+		.smart-editor-section-note { font-size: 20px; }
+		.smart-editor-stepper { gap: 18px; margin-top: 16px; }
+		.smart-editor-step { width: 86px; height: 68px; font-size: 32px; }
+		.smart-editor-value { min-width: 120px; font-size: 32px; }
+		.ratio-editor-section { margin-top: 20px; padding-top: 18px; }
+		.smart-editor-ratio-row { min-height: 90px; }
+		.smart-editor-ratio-name { font-size: 24px; }
+		.smart-editor-ratio-count { font-size: 21px; }
+		.smart-editor-ratio-control { gap: 10px; margin-left: 16px; }
+		.smart-editor-ratio-control .smart-editor-step { width: 68px; height: 68px; }
+		.smart-editor-percent { width: 82px; font-size: 28px; }
+	}
 </style>

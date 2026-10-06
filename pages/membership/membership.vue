@@ -67,15 +67,20 @@
 </template>
 
 <script>
+	import { subjectGroups } from '@/data/practice.js'
 	import {
 		getCachedMembership,
 		getExamCountdownDays,
 		getMembership,
 		purchaseMembership
 	} from '@/services/membership.js'
+	import {
+		getPracticeReconciliationState,
+		preparePracticeReconciliation
+	} from '@/services/user-practice.js'
 
 	const FALLBACK_PLANS = [
-		{ productId: 'membership_1m', name: '全科31天', months: 1, days: 31, priceFen: 10, regularPriceFen: 1200, showRegularPrice: true, activeMemberPurchasable: false },
+		{ productId: 'membership_1m', name: '全科31天', months: 1, days: 31, priceFen: 100, regularPriceFen: 1200, showRegularPrice: true, activeMemberPurchasable: false },
 		{ productId: 'membership_3m', name: '全科93天', months: 3, days: 93, priceFen: 1900, regularPriceFen: 2900, activeMemberPurchasable: true },
 		{ productId: 'membership_6m', name: '全科186天', months: 6, days: 186, priceFen: 3500, regularPriceFen: 5200, activeMemberPurchasable: true },
 		{ productId: 'membership_12m', name: '全科366天', months: 12, days: 366, priceFen: 5900, regularPriceFen: 8900, activeMemberPurchasable: true }
@@ -136,6 +141,23 @@
 			this.stopExamCountdown()
 		},
 		methods: {
+			allSubjectIds() {
+				return subjectGroups.reduce((result, group) => (
+					result.concat(group.items.map(item => item.id))
+				), [])
+			},
+			async refreshPracticeReconciliation() {
+				if (!this.membership.isMember) return getPracticeReconciliationState()
+				try {
+					return await preparePracticeReconciliation({ subjectIds: this.allSubjectIds() })
+				} catch (error) {
+					return getPracticeReconciliationState()
+				}
+			},
+			openPracticeReconciliation(state) {
+				if (['checking', 'required', 'replacing', 'restoring'].indexOf(state && state.status) === -1) return
+				uni.navigateTo({ url: '/practice-pages/sync-conflict/sync-conflict' })
+			},
 			planUnavailableForCurrentMember(plan) {
 				return Boolean(
 					this.membership.isMember
@@ -203,6 +225,7 @@
 				this.loading = true
 				try {
 					this.applyMembership(await getMembership({ forceRefresh: true }))
+					await this.refreshPracticeReconciliation()
 				} catch (error) {
 					uni.showToast({ title: error && (error.errMsg || error.message) || '会员状态加载失败', icon: 'none' })
 				} finally {
@@ -220,10 +243,14 @@
 					const result = await purchaseMembership(this.selectedPlan.productId)
 					if (result && result.membership) this.applyMembership(result.membership)
 					const delivered = result && result.order && result.order.status === 'delivered'
+					const reconciliation = delivered
+						? await this.refreshPracticeReconciliation()
+						: getPracticeReconciliationState()
 					uni.showModal({
 						title: delivered ? '会员已开通' : '支付结果确认中',
 						content: delivered ? '会员权益已到账，有效期已更新。' : '服务器正在确认微信订单，请稍后重新进入会员中心查看。',
-						showCancel: false
+						showCancel: false,
+						success: () => this.openPracticeReconciliation(reconciliation)
 					})
 				} catch (error) {
 					if (error && error.errCode === 'VIRTUAL_PAYMENT_CANCELLED') return
@@ -314,5 +341,33 @@
 		.plan-regular-price,
 		.plan-average { margin-top: 4px; font-size: 19px; }
 		.purchase-button { height: 88px; margin-top: 26px; border-radius: 46px; font-size: 29px; line-height: 88px; }
+	}
+
+	@media screen and (min-width: 700px) and (max-height: 1150px) {
+		.membership-page { padding: 16px 18px calc(32px + env(safe-area-inset-bottom)); }
+		.hero-card { min-height: 148px; padding: 22px; }
+		.hero-title { font-size: 20px; }
+		.countdown-value { font-size: 34px; }
+		.countdown-unit { font-size: 18px; }
+		.hero-caption { font-size: 20px; }
+		.hero-caption-top { font-size: 27px; }
+		.member-badge { padding: 6px 12px; font-size: 18px; }
+		.section-card { margin-top: 14px; padding: 20px; }
+		.section-title { font-size: 26px; }
+		.section-note { font-size: 19px; }
+		.benefit-list { margin-top: 8px; }
+		.benefit-item { padding: 12px 0; }
+		.benefit-icon { width: 56px; height: 56px; flex-basis: 56px; margin-right: 16px; }
+		.benefit-title { font-size: 23px; }
+		.benefit-desc { margin-top: 4px; font-size: 19px; }
+		.plan-grid { gap: 12px; margin-top: 16px; }
+		.plan-item { min-height: 124px; padding: 16px 10px; }
+		.plan-name { font-size: 22px; }
+		.plan-price { margin-top: 6px; }
+		.price-symbol { font-size: 19px; }
+		.price-value { font-size: 33px; }
+		.plan-regular-price,
+		.plan-average { font-size: 17px; }
+		.purchase-button { height: 64px; margin-top: 18px; font-size: 24px; line-height: 64px; }
 	}
 </style>

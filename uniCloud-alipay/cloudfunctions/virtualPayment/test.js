@@ -138,7 +138,7 @@ async function testReconcileFairness() {
 	assert.equal(queriedOrderIds[50], 'Mreconcile51')
 }
 
-async function testMissingOrderCleanup() {
+async function testMissingOrderCleanup(amountFen = 300) {
 	const currentTime = new Date('2026-09-02T01:00:00.000Z')
 	const outTradeNo = 'Mmissingorder123456'
 	// 历史订单即使金额与当前商品价不同，仍应按创建时保存的金额完成发货。
@@ -152,7 +152,7 @@ async function testMissingOrderCleanup() {
 			productName: '1个月会员',
 			months: 1,
 			quantity: 1,
-			amountFen: 300,
+			amountFen,
 			env: 0,
 			status: 'pending',
 			createdAt: new Date('2026-09-02T00:29:00.000Z'),
@@ -199,7 +199,7 @@ async function testMissingOrderCleanup() {
 		httpMethod: 'POST',
 		headers: { 'content-type': 'text/xml' },
 		queryStringParameters: { timestamp, nonce, signature },
-		body: `<xml><Event><![CDATA[xpay_goods_deliver_notify]]></Event><OpenId><![CDATA[missing-openid]]></OpenId><OutTradeNo><![CDATA[${outTradeNo}]]></OutTradeNo><Env>0</Env><WeChatPayInfo><MchOrderNo><![CDATA[late-wx-order]]></MchOrderNo><PaidTime>1788235200</PaidTime></WeChatPayInfo><GoodsInfo><ProductId><![CDATA[membership_1m]]></ProductId><Quantity>1</Quantity><Attach><![CDATA[${outTradeNo}]]></Attach></GoodsInfo></xml>`
+		body: `<xml><Event><![CDATA[xpay_goods_deliver_notify]]></Event><OpenId><![CDATA[missing-openid]]></OpenId><OutTradeNo><![CDATA[${outTradeNo}]]></OutTradeNo><Env>0</Env><WeChatPayInfo><MchOrderNo><![CDATA[late-wx-order]]></MchOrderNo><PaidTime>1788235200</PaidTime></WeChatPayInfo><GoodsInfo><ProductId><![CDATA[membership_1m]]></ProductId><Quantity>1</Quantity><ActualPrice>${amountFen}</ActualPrice><Attach><![CDATA[${outTradeNo}]]></Attach></GoodsInfo></xml>`
 	})
 	assert.match(notifyResult.body, /<ErrCode>0<\/ErrCode>/)
 	assert.equal(environment.collections.question_bank_payment_orders.get(outTradeNo).status, 'delivered')
@@ -338,8 +338,8 @@ async function run() {
 						order: {
 							order_id: createdOrderId,
 							status: 2,
-							order_fee: 10,
-							paid_fee: 10,
+							order_fee: 100,
+							paid_fee: 100,
 							paid_time: 1788235200,
 							wx_order_id: 'wx-order-one',
 							wxpay_order_id: 'transaction-one',
@@ -356,7 +356,7 @@ async function run() {
 	const availablePlans = membershipSnapshot.plans
 	assert.deepEqual(
 		availablePlans.map(plan => plan.priceFen),
-		[10, 1900, 3500, 5900]
+		[100, 1900, 3500, 5900]
 	)
 	assert.equal(availablePlans[0].regularPriceFen, 1200)
 	assert.equal(availablePlans[0].name, '全科31天')
@@ -408,13 +408,13 @@ async function run() {
 		productId: 'membership_1m',
 		code: 'login-code'
 	}, 'expired-user')
-	assert.equal(expiredMonthlyOrder.order.amountFen, 10)
+	assert.equal(expiredMonthlyOrder.order.amountFen, 100)
 	const revokedMonthlyOrder = await service.execute({
 		action: 'createOrder',
 		productId: 'membership_1m',
 		code: 'login-code'
 	}, 'revoked-user')
-	assert.equal(revokedMonthlyOrder.order.amountFen, 10)
+	assert.equal(revokedMonthlyOrder.order.amountFen, 100)
 
 	const created = await service.execute({
 		action: 'createOrder',
@@ -422,13 +422,16 @@ async function run() {
 		code: 'login-code'
 	}, 'user-one')
 	createdOrderId = created.order.outTradeNo
-	assert.equal(created.order.amountFen, 10)
+	assert.equal(created.order.amountFen, 100)
 	assert.equal(created.payData.mode, 'short_series_goods')
 	assert.equal(
 		created.payData.paySig,
 		calculatePaySignature('requestVirtualPayment', created.payData.signData, 'app-key-test')
 	)
 	const signData = JSON.parse(created.payData.signData)
+	assert.equal(signData.productId, 'membership_1m')
+	assert.equal(signData.goodsPrice, 100)
+	assert.equal(signData.buyQuantity, 1)
 	assert.equal(signData.outTradeNo, created.order.outTradeNo)
 	assert.equal(signData.attach, created.order.outTradeNo)
 
@@ -508,7 +511,7 @@ async function run() {
 		httpMethod: 'POST',
 		headers: { 'content-type': 'text/xml' },
 		queryStringParameters: { timestamp, nonce, signature },
-		body: `<xml><Event><![CDATA[xpay_refund_notify]]></Event><MchOrderId><![CDATA[${created.order.outTradeNo}]]></MchOrderId><WxOrderId><![CDATA[wx-order-one]]></WxOrderId><WxRefundId><![CDATA[refund-one]]></WxRefundId><RefundFee>10</RefundFee><RetCode>0</RetCode><RefundSuccTimestamp>1788235400</RefundSuccTimestamp></xml>`
+		body: `<xml><Event><![CDATA[xpay_refund_notify]]></Event><MchOrderId><![CDATA[${created.order.outTradeNo}]]></MchOrderId><WxOrderId><![CDATA[wx-order-one]]></WxOrderId><WxRefundId><![CDATA[refund-one]]></WxRefundId><RefundFee>100</RefundFee><RetCode>0</RetCode><RefundSuccTimestamp>1788235400</RefundSuccTimestamp></xml>`
 	})
 	assert.match(refundResult.body, /<ErrCode>0<\/ErrCode>/)
 	assert.equal(environment.collections.question_bank_payment_orders.get(created.order.outTradeNo).status, 'refunded')
@@ -519,9 +522,10 @@ async function run() {
 		productId: 'membership_1m',
 		code: 'login-code'
 	}, 'user-one')
-	assert.equal(repurchasedMonthlyOrder.order.amountFen, 10)
+	assert.equal(repurchasedMonthlyOrder.order.amountFen, 100)
 	await testReconcileFairness()
 	await testMissingOrderCleanup()
+	await testMissingOrderCleanup(10)
 
 	console.log('virtualPayment service tests passed')
 }

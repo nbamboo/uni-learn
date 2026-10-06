@@ -325,6 +325,7 @@
 		examDraftHasProgress,
 		flushPracticeEvents,
 		getEffectiveAnswerMode,
+		getExamDraft,
 		getLocalExamDraft,
 		getLocalPracticePreferences,
 		getPracticeBootstrap,
@@ -840,9 +841,11 @@
 						}
 						snapshot = bootstrap && bootstrap.snapshot
 					}
-					const resumableDraft = bootstrap && bootstrap.examDraft
+					const resumableDraft = bootstrap
 						? bootstrap.examDraft
-						: (!this.membership.isMember ? getLocalExamDraft(this.examDraftOptions()) : null)
+						: (this.examDraftEnabled()
+							? await getExamDraft(this.examDraftOptions())
+							: getLocalExamDraft(this.examDraftOptions()))
 					if (this.examDraftEnabled()
 						&& this.practiceConfig.examAction !== 'restart'
 						&& resumableDraft
@@ -1725,5 +1728,57 @@
 		.empty-state { padding: 40px; font-size: 29px; }
 		.empty-state text { margin-top: 20px; }
 		.empty-state button { margin-top: 30px; border-radius: 40px; font-size: 29px; }
+	}
+
+	/* 竖屏短屏平板保留题目滚动空间，底部操作栏与可视区同步收紧。 */
+	@media screen and (min-width: 768px) and (max-height: 1050px) {
+		.question-swiper { height: calc(100vh - 86px - env(safe-area-inset-bottom)); }
+		.question-shell { margin: 16px; padding: 20px 22px 32px; }
+		.type-badge { padding: 7px 14px; font-size: 23px; }
+		.question-count { font-size: 25px; }
+		.question-count text { font-size: 32px; }
+		.question-meta { margin-top: 20px; padding-top: 16px; }
+		.chapter-name { font-size: 21px; }
+		.knowledge-name { margin-top: 3px; font-size: 20px; }
+		.calculator-button { width: 50px; height: 50px; }
+		.question-title { margin-top: 20px; font-size: 28px; line-height: 1.6; }
+		.material-block { margin-top: 20px; padding: 18px; }
+		.material-text { font-size: 26px; line-height: 1.65; }
+		.question-stem { margin-top: 20px; }
+		.question-stem.material-question-stem { padding-top: 18px; }
+		.option-list { margin-top: 22px; }
+		.option-item { min-height: 78px; margin-top: 12px; padding: 12px 16px; }
+		.option-alias { width: 46px; height: 46px; flex-basis: 46px; margin-right: 16px; font-size: 24px; }
+		.option-text { font-size: 26px; }
+		.confirm-answer-button { height: 64px; margin-top: 22px; font-size: 26px; line-height: 64px; }
+		.analysis-panel { margin-top: 24px; padding-top: 20px; }
+		.result-line { font-size: 26px; }
+		.answer-line { margin-top: 16px; }
+		.analysis-label { font-size: 24px; }
+		.answer-value { font-size: 26px; }
+		.explanation-block { margin-top: 20px; }
+		.explanation-text { margin-top: 10px; font-size: 24px; }
+		.question-nav { margin-top: 24px; }
+		.question-nav button { height: 64px; font-size: 25px; line-height: 64px; }
+		.bottom-toolbar { height: calc(80px + env(safe-area-inset-bottom)); }
+		.toolbar-stat, .toolbar-command { gap: 4px; font-size: 22px; }
+		.toolbar-submit { height: 54px; font-size: 23px; }
+		.answer-sheet { padding: 20px 24px calc(20px + env(safe-area-inset-bottom)); }
+		.answer-sheet-header { padding-bottom: 16px; }
+		.answer-sheet-title { font-size: 28px; }
+		.answer-grid { gap: 14px; padding-top: 20px; }
+		.answer-number { width: 60px; height: 60px; font-size: 23px; }
+		.answer-sheet-submit { height: 64px; margin-top: 18px; font-size: 25px; line-height: 64px; }
+		.calculator-sheet-header { height: 76px; }
+		.calculator-sheet-title { font-size: 28px; }
+		.calculator-sheet-scroll { height: calc(86vh - 76px); }
+		.result-hero { padding: 28px 30px 24px; }
+		.result-summary-card { padding: 32px 24px 28px; }
+		.accuracy-ring { width: 250px; height: 250px; }
+		.accuracy-ring-inner { width: 196px; height: 196px; }
+		.accuracy-value { font-size: 56px; }
+		.result-stats-grid { margin-top: 28px; }
+		.result-actions { padding-top: 22px; }
+		.result-actions button { height: 66px; font-size: 25px; line-height: 66px; }
 	}
 </style>

@@ -830,4 +830,30 @@
 		.empty-state text { margin-top: 18px; }
 		.empty-state button { min-width: 220px; height: 76px; margin-top: 28px; border-radius: 38px; font-size: 28px; line-height: 76px; }
 	}
+
+	/* 短屏平板的章节、知识点目录沿用题库首页的视觉尺度。 */
+	@media screen and (min-width: 768px) and (max-height: 1050px) {
+		.catalog-summary { padding: 20px 24px; }
+		.summary-label { font-size: 21px; }
+		.summary-title { margin-top: 4px; font-size: 28px; }
+		.catalog-search { height: 62px; margin: 16px 20px 0; padding: 0 16px; }
+		.catalog-search input { font-size: 24px; }
+		.catalog-list { padding: 14px 20px 0; }
+		.catalog-item { min-height: 108px; margin-bottom: 10px; padding: 16px; }
+		.chapter-card { margin-bottom: 10px; }
+		.chapter-item { min-height: 104px; padding: 16px; }
+		.chapter-expand { width: 44px; height: 44px; flex-basis: 44px; margin-right: 14px; }
+		.practice-action { width: 84px; height: 48px; flex-basis: 84px; margin-left: 14px; font-size: 22px; }
+		.section-item { min-height: 88px; padding: 14px 16px 14px 42px; }
+		.section-guide { margin-right: 18px; }
+		.section-title { font-size: 24px; }
+		.section-action { width: 84px; flex-basis: 84px; }
+		.knowledge-ad-container { margin-bottom: 10px; }
+		.item-index { width: 46px; height: 46px; flex-basis: 46px; margin-right: 14px; font-size: 23px; }
+		.item-title { font-size: 26px; }
+		.item-meta { margin-top: 4px; font-size: 21px; }
+		.item-progress-row { margin-top: 8px; font-size: 20px; }
+		.item-action { width: 46px; height: 46px; margin-left: 12px; }
+		.empty-state { padding: 80px 24px; font-size: 24px; }
+	}
 </style>

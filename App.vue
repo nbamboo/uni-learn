@@ -1,15 +1,29 @@
 <script>
-	import { getPracticeState } from '@/data/practice.js'
+	import { getPracticeState, subjectGroups } from '@/data/practice.js'
+	import { getMembership } from '@/services/membership.js'
 	import {
 		flushPracticeEvents,
 		markPracticePreferencesRefreshRequired,
 		markPracticeRecordsRefreshRequired,
 		markPracticeSummaryRefreshRequired,
+		preparePracticeReconciliation,
 		schedulePracticeSync
 	} from '@/services/user-practice.js'
 
 	const FOREGROUND_REFRESH_INTERVAL = 15 * 60 * 1000
 	let lastForegroundRefreshAt = 0
+	const allSubjectIds = subjectGroups.reduce((result, group) => (
+		result.concat(group.items.map(item => item.id))
+	), [])
+
+	function refreshMembershipReconciliation() {
+		getMembership({ forceRefresh: true }).then(membership => {
+			if (!membership || !membership.isMember) return null
+			return preparePracticeReconciliation({ subjectIds: allSubjectIds })
+		}).catch(() => {
+			// 网络失败时保留本机数据和待处理状态，下一次回到前台继续。
+		})
+	}
 
 	export default {
 		globalData: {
@@ -34,6 +48,7 @@
 				markPracticePreferencesRefreshRequired()
 				markPracticeRecordsRefreshRequired()
 				markPracticeSummaryRefreshRequired()
+				refreshMembershipReconciliation()
 			}
 			schedulePracticeSync({ localState: getPracticeState() })
 		},

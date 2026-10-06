@@ -376,4 +376,26 @@
 		.empty-caption { margin-top: 12px; font-size: 25px; }
 		.empty-state button { height: 76px; margin-top: 30px; padding: 0 42px; border-radius: 40px; font-size: 29px; line-height: 76px; }
 	}
+
+	@media screen and (min-width: 768px) and (max-height: 1050px) {
+		.records-header { padding: 20px 20px 16px; }
+		.subject-label { font-size: 21px; }
+		.subject-name { margin-top: 4px; font-size: 27px; }
+		.record-tabs { height: 58px; margin-top: 16px; padding: 5px; }
+		.record-tab { font-size: 25px; }
+		.records-summary { min-height: 92px; margin: 12px 20px 0; padding: 14px 18px; }
+		.exam-progress-copy { font-size: 21px; }
+		.summary-value { font-size: 32px; }
+		.summary-label { font-size: 23px; }
+		.records-summary button { height: 52px; margin-left: 16px; padding: 0 20px; font-size: 23px; }
+		.record-list { padding: 12px 20px 0; }
+		.record-item { min-height: 108px; margin-bottom: 10px; padding: 16px; }
+		.record-index { width: 42px; height: 42px; flex-basis: 42px; margin-right: 14px; font-size: 22px; }
+		.record-title { font-size: 26px; }
+		.record-meta { margin-top: 8px; font-size: 21px; }
+		.record-status { width: 42px; height: 42px; flex-basis: 42px; }
+		.empty-state { padding: 80px 40px; }
+		.empty-title { font-size: 27px; }
+		.empty-caption { font-size: 21px; }
+	}
 </style>

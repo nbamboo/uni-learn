@@ -209,6 +209,7 @@ function loadSeed() {
 		question_bank_exam_drafts: [],
 		question_bank_user_preferences: [],
 		question_bank_feedbacks: [],
+		question_bank_sync_controls: [],
 		question_bank_memberships: [{
 			_id: 'user-one',
 			userId: 'user-one',
@@ -681,7 +682,12 @@ async function run() {
 		'getSmartPracticeState',
 		'getPreferences',
 		'updatePreferences',
-		'clearCurrentSubjectData'
+		'clearCurrentSubjectData',
+		'getSyncReconciliationOverview',
+		'beginSubjectDataReplacement',
+		'uploadSubjectDataBatch',
+		'completeSubjectDataReplacement',
+		'getSubjectDataExportPage'
 	]) {
 		await assert.rejects(
 			() => service.execute({ action }, 'user-nonmember'),
@@ -759,7 +765,21 @@ async function run() {
 		smartPractice: customPreference }, userId)
 	const legacySaved = await service.execute({ action: 'updatePreferences', answerMode: 'practice', nightMode: false }, userId)
 	assert.deepEqual(legacySaved.smartPractice, customPreference)
+	const localThemeClientSaved = await service.execute({
+		action: 'updatePreferences',
+		answerMode: 'exam',
+		smartPractice: customPreference
+	}, userId)
+	assert.equal(localThemeClientSaved.nightMode, false)
 	assert.deepEqual((await service.execute({ action: 'getPreferences' }, userId)).smartPractice, customPreference)
+	const examBootstrapWithoutScopeKey = await service.execute({
+		action: 'getPracticeBootstrap',
+		subjectId,
+		mode: 'chapter',
+		chapterId: question.chapterId,
+		questionIds: [question.questionId]
+	}, userId)
+	assert.equal(examBootstrapWithoutScopeKey.examDraft.scopeKey, `chapter|${question.chapterId}`)
 	await assert.rejects(service.execute({ action: 'updatePreferences', answerMode: 'practice', nightMode: false,
 		smartPractice: { strategy: 'custom', questionCount: 20, custom: { fresh: 61, wrong: 29, mastered: 10 } } }, userId),
 		error => error.errCode === 'QUESTION_BANK_USER_INVALID_ARGUMENT')
@@ -1515,6 +1535,26 @@ async function run() {
 	assert.equal(cleared.cleared, true)
 	assert.equal(cleared.subjectId, subjectId)
 	assert.ok(cleared.deletedRecords >= 3)
+	assert.equal(cleared.clearedAt, currentTime.getTime())
+	const clearControl = environment.collections.question_bank_sync_controls
+		.get(`${userId}|${subjectId}`)
+	assert.equal(clearControl.status, 'ready')
+	assert.equal(clearControl.clearedAt.getTime(), currentTime.getTime())
+	const delayedAfterManualClear = await service.execute({
+		action: 'syncEvents',
+		events: [{
+			type: 'favorite',
+			eventId: 'favorite-delayed-after-manual-clear',
+			subjectId,
+			questionId: question.questionId,
+			favorite: true,
+			occurredAt: currentTime.getTime() - 1000
+		}]
+	}, userId)
+	assert.deepEqual(
+		delayedAfterManualClear.rejectedEventIds,
+		['favorite-delayed-after-manual-clear']
+	)
 	assert.deepEqual(
 		Array.from(environment.collections.question_bank_user_states.values()).map(item => item.subjectId),
 		[otherSubjectId]
@@ -1539,6 +1579,212 @@ async function run() {
 	assert.equal(environment.collections['uni-id-log'].has('log-one'), true)
 	assert.equal(environment.collections['uni-id-log'].has('log-two'), true)
 	assert.ok(environment.collections.question_bank_questions.size > 0)
+
+	const replacementEnvironment = createDatabase(loadSeed(), currentTime)
+	const replacementService = createQuestionBankUserService(replacementEnvironment.db, {
+		now: () => new Date(currentTime)
+	})
+	const replacementQuestion = Array.from(
+		replacementEnvironment.collections.question_bank_questions.values()
+	)[0]
+	const replacementSubjectId = replacementQuestion.subjectId
+	await replacementService.execute({
+		action: 'syncEvents',
+		events: [{
+			type: 'answer',
+			eventId: 'answer-before-replacement',
+			subjectId: replacementSubjectId,
+			questionId: replacementQuestion.questionId,
+			selected: replacementQuestion.answer,
+			practiceMode: 'chapter',
+			judgedLocally: true,
+			correct: true,
+			chapterId: replacementQuestion.chapterId,
+			section: replacementQuestion.section,
+			knowledge: replacementQuestion.knowledge,
+			occurredAt: currentTime.getTime() - 10000
+		}]
+	}, userId)
+	const replacementOverview = await replacementService.execute({
+		action: 'getSyncReconciliationOverview',
+		subjectIds: [replacementSubjectId]
+	}, userId)
+	assert.equal(replacementOverview.subjects[0].hasCloudData, true)
+	assert.equal(replacementOverview.subjects[0].attempted, 1)
+	const replacementId = 'replacement-test-one'
+	const capturedAt = currentTime.getTime() - 5000
+	const begun = await replacementService.execute({
+		action: 'beginSubjectDataReplacement',
+		subjectId: replacementSubjectId,
+		replacementId,
+		capturedAt
+	}, userId)
+	assert.equal(begun.status, 'replacing')
+	assert.equal(begun.resumed, false)
+	assert.equal(replacementEnvironment.collections.question_bank_user_states.size, 0)
+	const resumedBegin = await replacementService.execute({
+		action: 'beginSubjectDataReplacement',
+		subjectId: replacementSubjectId,
+		replacementId,
+		capturedAt
+	}, userId)
+	assert.equal(resumedBegin.resumed, true)
+	await assert.rejects(
+		() => replacementService.execute({
+			action: 'getSummary', subjectId: replacementSubjectId
+		}, userId),
+		error => error && error.errCode === 'QUESTION_BANK_USER_RECONCILIATION_IN_PROGRESS'
+	)
+	await replacementService.execute({
+		action: 'uploadSubjectDataBatch',
+		subjectId: replacementSubjectId,
+		replacementId,
+		resource: 'states',
+		items: [{
+			questionId: replacementQuestion.questionId,
+			chapterId: replacementQuestion.chapterId,
+			section: replacementQuestion.section,
+			knowledge: replacementQuestion.knowledge,
+			attempted: true,
+			attempts: 3,
+			lastCorrect: false,
+			lastSelected: [replacementQuestion.options.map(item => item.alias)
+				.find(alias => replacementQuestion.answer.indexOf(alias) === -1)],
+			practiceModes: ['chapter'],
+			favorite: true,
+			firstAnsweredAt: currentTime.getTime() - 8000,
+			lastAnsweredAt: currentTime.getTime() - 6000,
+			favoriteUpdatedAt: currentTime.getTime() - 6000
+		}]
+	}, userId)
+	await replacementService.execute({
+		action: 'uploadSubjectDataBatch',
+		subjectId: replacementSubjectId,
+		replacementId,
+		resource: 'progress',
+		items: [{
+			mode: 'knowledge',
+			chapterId: replacementQuestion.chapterId,
+			knowledge: replacementQuestion.knowledge,
+			questionId: replacementQuestion.questionId,
+			progressAt: currentTime.getTime() - 6000
+		}]
+	}, userId)
+	await replacementService.execute({
+		action: 'uploadSubjectDataBatch',
+		subjectId: replacementSubjectId,
+		replacementId,
+		resource: 'rounds',
+		items: [{
+			chapterId: replacementQuestion.chapterId,
+			answers: [{
+				questionId: replacementQuestion.questionId,
+				section: replacementQuestion.section,
+				selected: replacementQuestion.answer,
+				correct: true,
+				answeredAt: currentTime.getTime() - 6000
+			}],
+			chapterPosition: {
+				questionId: replacementQuestion.questionId,
+				section: replacementQuestion.section,
+				progressAt: currentTime.getTime() - 6000
+			},
+			sectionPositions: [],
+			chapterResetAt: 0,
+			sectionResets: []
+		}]
+	}, userId)
+	await replacementService.execute({
+		action: 'uploadSubjectDataBatch',
+		subjectId: replacementSubjectId,
+		replacementId,
+		resource: 'examDrafts',
+		items: [{
+			mode: 'sequence',
+			roundId: 'exam-round-restore',
+			questionVersion: replacementQuestion.version,
+			questionIds: [replacementQuestion.questionId],
+			answers: [{
+				questionId: replacementQuestion.questionId,
+				selected: replacementQuestion.answer,
+				updatedAt: currentTime.getTime() - 6000
+			}],
+			initialQuestionId: replacementQuestion.questionId,
+			positionQuestionId: replacementQuestion.questionId,
+			positionAt: currentTime.getTime() - 6000,
+			startedAt: currentTime.getTime() - 7000,
+			stateAt: currentTime.getTime() - 6000
+		}]
+	}, userId)
+	const replacementCompleted = await replacementService.execute({
+		action: 'completeSubjectDataReplacement',
+		subjectId: replacementSubjectId,
+		replacementId,
+		todayAttempts: 3
+	}, userId)
+	assert.equal(replacementCompleted.status, 'ready')
+	assert.equal(replacementCompleted.summary.attempted, 1)
+	assert.equal(replacementCompleted.summary.wrong, 1)
+	assert.equal(replacementCompleted.summary.favorite, 1)
+	assert.equal(replacementCompleted.summary.totalAttempts, 3)
+	assert.equal(replacementCompleted.summary.todayAttempts, 3)
+	const exportedStates = await replacementService.execute({
+		action: 'getSubjectDataExportPage',
+		subjectId: replacementSubjectId,
+		resource: 'states',
+		cursor: 0,
+		pageSize: 50
+	}, userId)
+	assert.equal(exportedStates.items.length, 1)
+	assert.equal(exportedStates.items[0].attempts, 3)
+	assert.equal(exportedStates.items[0].favorite, true)
+	const exportedDrafts = await replacementService.execute({
+		action: 'getSubjectDataExportPage',
+		subjectId: replacementSubjectId,
+		resource: 'examDrafts',
+		cursor: 0,
+		pageSize: 1
+	}, userId)
+	assert.equal(exportedDrafts.items[0].active, true)
+	const staleSync = await replacementService.execute({
+		action: 'syncEvents',
+		events: [{
+			type: 'favorite',
+			eventId: 'favorite-stale-after-clear',
+			subjectId: replacementSubjectId,
+			questionId: replacementQuestion.questionId,
+			favorite: false,
+			occurredAt: capturedAt
+		}]
+	}, userId)
+	assert.deepEqual(staleSync.rejectedEventIds, ['favorite-stale-after-clear'])
+	const freshSync = await replacementService.execute({
+		action: 'syncEvents',
+		events: [{
+			type: 'answer',
+			eventId: 'answer-fresh-after-clear',
+			subjectId: replacementSubjectId,
+			questionId: replacementQuestion.questionId,
+			selected: replacementQuestion.answer,
+			practiceMode: 'chapter',
+			judgedLocally: true,
+			correct: true,
+			chapterId: replacementQuestion.chapterId,
+			section: replacementQuestion.section,
+			knowledge: replacementQuestion.knowledge,
+			occurredAt: currentTime.getTime()
+		}]
+	}, userId)
+	assert.deepEqual(freshSync.acceptedEventIds, ['answer-fresh-after-clear'])
+	assert.equal(freshSync.summaries[replacementSubjectId].totalAttempts, 4)
+	const completedBeginRetry = await replacementService.execute({
+		action: 'beginSubjectDataReplacement',
+		subjectId: replacementSubjectId,
+		replacementId,
+		capturedAt
+	}, userId)
+	assert.equal(completedBeginRetry.status, 'ready')
+	assert.equal(completedBeginRetry.resumed, true)
 
 	const oldCatalogSeed = loadSeed()
 	oldCatalogSeed.question_bank_catalogs[0].questionSchemaVersion = 2

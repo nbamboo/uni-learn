@@ -30,6 +30,7 @@ async function run() {
 		DAILY_GOAL: 20,
 		DEFAULT_SUBJECT_ID: 'junior-personal-finance',
 		practiceCloudSyncEnabled: () => member,
+		practiceCloudSyncReady: () => member,
 		hasCompleteQuestionBankCache: () => false,
 		getEffectiveSmartPractice: value => value,
 		getLocalPracticePreferences: () => ({ smartPractice: {

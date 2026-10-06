@@ -121,4 +121,15 @@
 			border-radius: 12px;
 		}
 	}
+
+	@media screen and (min-width: 700px) and (max-height: 1150px) {
+		.course-container {
+			width: calc(100% - 36px);
+			margin: 18px auto;
+			padding: 22px;
+			font-size: 24px;
+			line-height: 1.6;
+		}
+		.image-content { margin-top: 12px; margin-bottom: 22px; }
+	}
 </style>

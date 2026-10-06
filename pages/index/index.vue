@@ -20,6 +20,8 @@
 					ref="calculator"
 					:embedded="true"
 					:tool-page="true"
+					:wide-screen="wideScreen"
+					@keyboard-change="handleKeyboardChange"
 				></finance-calculator>
 			</view>
 
@@ -56,6 +58,7 @@
 	import FinanceCalculator from '@/components/finance-calculator/finance-calculator.vue'
 	import MyUnit from '@/components/myUnit/myUnit.vue'
 	import { getCachedMembership, getMembership } from '@/services/membership.js'
+	import { syncQuestionBankTabNotice } from '@/services/question-bank-tab-notice.js'
 
 	export default {
 		components: {
@@ -72,7 +75,7 @@
 				activeMode: 0,
 				modes: [
 					{ key: 'calculator', label: '理财计算器' },
-					{ key: 'parameters', label: '参数表' }
+					{ key: 'parameters', label: '速算系数表' }
 				],
 				parameterTools: [
 					{
@@ -149,20 +152,26 @@
 			if (this.$refs.calculator) {
 				this.$refs.calculator.dismissKeyboard()
 			}
+			this.handleKeyboardChange(false)
 		},
 		onShow() {
-			this.syncCustomTabBar()
+			this.handleKeyboardChange(false)
+			syncQuestionBankTabNotice()
 			if (this.activeMode === 1) this.refreshMembership()
+		},
+		onReady() {
+			syncQuestionBankTabNotice()
 		},
 		onResize(event) {
 			const width = Number(event && event.size && event.size.windowWidth)
 			this.wideScreen = (width || uni.getSystemInfoSync().windowWidth) >= 768
 		},
 		methods: {
-			syncCustomTabBar() {
-				const page = this.$mp && this.$mp.page
-				const tabBar = page && typeof page.getTabBar === 'function' && page.getTabBar()
-				if (tabBar) tabBar.setData({ selected: 0, nightMode: false })
+			handleKeyboardChange(visible) {
+				// #ifdef MP-WEIXIN
+				if (visible) uni.hideTabBar({ animation: false })
+				else uni.showTabBar({ animation: false })
+				// #endif
 			},
 			switchMode(index) {
 				if (index === this.activeMode) return
@@ -339,12 +348,9 @@
 		}
 	}
 
-	/* #ifdef MP-WEIXIN */
 	@media screen and (min-width: 768px) {
-		.calculator-pane,
-		.parameter-pane {
-			padding-bottom: calc(76px + env(safe-area-inset-bottom));
-		}
+		.workspace-header { padding-top: 10px; padding-bottom: 10px; }
+		.mode-tabs { height: 58px; }
+		.mode-tab { font-size: 26px; }
 	}
-	/* #endif */
 </style>

@@ -1,0 +1,25 @@
+[
+  {
+    "IndexName": "uq_user_subject_sync_control",
+    "MgoKeySchema": {
+      "MgoIndexKeys": [
+        { "Name": "userId", "Direction": "1", "Type": "varchar" },
+        { "Name": "subjectId", "Direction": "1", "Type": "varchar" }
+      ],
+      "MgoIsUnique": true,
+      "MgoIsSparse": false
+    }
+  },
+  {
+    "IndexName": "sync_control_user_status_updated",
+    "MgoKeySchema": {
+      "MgoIndexKeys": [
+        { "Name": "userId", "Direction": "1", "Type": "varchar" },
+        { "Name": "status", "Direction": "1", "Type": "varchar" },
+        { "Name": "updatedAt", "Direction": "-1", "Type": "datetime" }
+      ],
+      "MgoIsUnique": false,
+      "MgoIsSparse": false
+    }
+  }
+]

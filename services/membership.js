@@ -1,9 +1,11 @@
 import {
 	ensurePracticeUser,
 	getCurrentPracticeUser,
+	markMembershipReconciliationTransition,
 	markPracticePreferencesRefreshRequired,
 	markPracticeRecordsRefreshRequired,
 	markPracticeSummaryRefreshRequired,
+	practiceCloudSyncReady,
 	schedulePracticeSync
 } from '@/services/user-practice.js'
 
@@ -122,7 +124,13 @@ function saveMembership(value) {
 	storageSet(storageKey, normalized)
 	const user = getCurrentPracticeUser()
 	if (user && user.uid) storageSet(LAST_USER_ID_KEY, user.uid)
-	if (normalized.isMember) schedulePracticeSync({ immediate: true })
+	markMembershipReconciliationTransition({
+		previousMember: previous.isMember,
+		currentMember: normalized.isMember,
+		hadCachedMembership: Boolean(saved && typeof saved === 'object' && saved.cachedAt),
+		expiresAt: normalized.expiresAt
+	})
+	if (normalized.isMember && practiceCloudSyncReady()) schedulePracticeSync({ immediate: true })
 	if (previous.isMember !== normalized.isMember || previous.expiresAt !== normalized.expiresAt) {
 		markPracticePreferencesRefreshRequired()
 		markPracticeRecordsRefreshRequired()

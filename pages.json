@@ -135,6 +135,12 @@
 				"navigationBarTitleText": "答题设置",
 				"enablePullDownRefresh": false
 			}
+		}, {
+			"path": "sync-conflict/sync-conflict",
+			"style": {
+				"navigationBarTitleText": "选择学习进度",
+				"enablePullDownRefresh": false
+			}
 		}]
 	}],
 	"globalStyle": {
@@ -147,7 +153,6 @@
 		}
 	},
 	"tabBar": {
-		"custom": true,
 		"color": "#7A7E83",
 		"selectedColor": "#008cff",
 		"borderStyle": "black",

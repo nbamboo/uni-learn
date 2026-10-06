@@ -13,7 +13,7 @@ import {
 	getEffectiveSmartPractice,
 	getLocalPracticePreferences,
 	pendingPracticeEventCount,
-	practiceCloudSyncEnabled
+	practiceCloudSyncReady
 } from '@/services/user-practice.js'
 
 const MAX_SMART_STATE_IDS = 2000
@@ -93,7 +93,7 @@ export async function buildPracticeQuestions(options) {
 		if (!effectiveLimit) effectiveLimit = smartPractice.questionCount
 		const pageSize = effectiveLimit
 		let result
-		if (practiceCloudSyncEnabled()) {
+		if (practiceCloudSyncReady()) {
 			if (pendingPracticeEventCount() > 0) {
 				result = await getLocalSmartPracticeQuestions(subjectId, pageSize, smartPractice)
 			} else {

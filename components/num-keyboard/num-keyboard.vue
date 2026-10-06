@@ -383,10 +383,28 @@ export default {
 	font-size: 34rpx;
 }
 
-@media screen and (min-width: 768px) {
-	.tool-page .key-text { font-size: 42px; }
-	.tool-page .key-btn-clear .key-text { font-size: 30px; }
-	.tool-page .key-btn-confirm .confirm-text { font-size: 34px; }
+/* 平板上的工具页和题库弹层共用紧凑键盘，避免 rpx 随屏宽放大。 */
+@media screen and (min-width: 700px) {
+	.keyboard-container {
+		width: calc(100% - 32px);
+		max-width: 520px;
+		margin: 0 auto;
+		padding: 10px;
+		border-radius: 16px 16px 0 0;
+	}
+	.keyboard-body,
+	.keyboard-left,
+	.keyboard-right,
+	.key-row { gap: 8px; }
+	.key-btn { height: 56px; border-radius: 9px; }
+	.key-btn-confirm { min-height: 120px; }
+	.key-text,
+	.tool-page .key-text { font-size: 28px; }
+	.key-btn-clear .key-text,
+	.tool-page .key-btn-clear .key-text { font-size: 22px; }
+	.key-btn-confirm .confirm-text,
+	.tool-page .key-btn-confirm .confirm-text { font-size: 26px; }
+	.backspace-icon-svg { width: 38px; height: 38px; }
 }
 
 /* iOS 安全区域 */

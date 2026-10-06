@@ -16,6 +16,7 @@ function loadService(environment) {
 		createPracticeEventId,
 		clearCurrentSubjectPracticeData,
 		completeExamDraft,
+		choosePracticeReconciliation,
 		examDraftHasProgress,
 		ensurePracticeUser,
 		flushPracticeEvents,
@@ -36,6 +37,7 @@ function loadService(environment) {
 		getPracticeBootstrap,
 		getPracticeProgress,
 		getPracticePreferences,
+		getPracticeReconciliationState,
 		getPracticeRound,
 		getPracticeRecords,
 		getSmartPracticeQuestions,
@@ -45,8 +47,11 @@ function loadService(environment) {
 		markPracticePreferencesRefreshRequired,
 		markPracticeRecordsRefreshRequired,
 		markPracticeSummaryRefreshRequired,
+		markMembershipReconciliationTransition,
 		pendingPracticeEventCount,
 		practiceCloudSyncEnabled,
+		practiceCloudSyncReady,
+		preparePracticeReconciliation,
 		queuePracticeAnswer,
 		queuePracticeFavorite,
 		reconcileExamDraft,
@@ -492,7 +497,7 @@ async function testNonMemberLocalOnly() {
 		occurredAt: Date.now()
 	})
 	assert.equal(service.practiceCloudSyncEnabled(), false)
-	assert.equal(service.pendingPracticeEventCount(), 0)
+	assert.equal(service.pendingPracticeEventCount(), 2)
 	assert.equal(storage.get(`uni-learn-practice-cloud-outbox-v1:${user.uid}`).events.length, 1)
 	const summary = await service.getPracticeSummary(subjectId)
 	assert.equal(summary.attempted, 1)
@@ -818,6 +823,7 @@ async function testPracticeBootstrapFallsBackForOlderCloudFunction() {
 				const action = request.data.action
 				actions.push(action)
 				if (action === 'getPracticeBootstrap') {
+					assert.equal(request.data.scopeKey, 'chapter|1')
 					return {
 						result: {
 							errCode: 'QUESTION_BANK_USER_UNSUPPORTED_ACTION',
@@ -1120,11 +1126,11 @@ async function testForegroundRefreshesCachedPreferencesOnce() {
 	service.markPracticePreferencesRefreshRequired()
 	const refreshed = await service.getPracticePreferences()
 	assert.equal(refreshed.answerMode, 'review')
-	assert.equal(refreshed.nightMode, true)
+	assert.equal(refreshed.nightMode, false)
 	assert.equal(cloudCalls, 1)
 
 	const reused = await service.getPracticePreferences()
-	assert.equal(reused.nightMode, true)
+	assert.equal(reused.nightMode, false)
 	assert.equal(cloudCalls, 1)
 }
 
@@ -1200,6 +1206,234 @@ async function testPersistentSummaryAndForegroundRefresh() {
 
 	await service.clearCurrentSubjectPracticeData(subjectId)
 	assert.equal(storage.has(summaryStorageKey), false)
+}
+
+async function testPracticeReconciliationChoices() {
+	const subjectId = 'junior-personal-finance'
+	const preference = {
+		answerMode: 'review',
+		nightMode: true,
+		smartPractice: {
+			strategy: 'balanced',
+			questionCount: 20,
+			custom: { fresh: 50, wrong: 30, mastered: 20 }
+		},
+		updatedAt: Date.now()
+	}
+
+	{
+		const storage = new Map()
+		const calls = []
+		let clearDuringReplacementAt = 0
+		const user = { uid: 'reconcile-local-user', tokenExpired: Date.now() + 60 * 60 * 1000 }
+		storage.set(`uni-learn-membership-v1:${user.uid}`, activeMembership())
+		storage.set(`uni-learn-practice-preferences-v1:${user.uid}`, {
+			version: 1,
+			preferences: Object.assign({}, preference, { answerMode: 'practice', nightMode: false }),
+			dirty: false,
+			syncedAt: Date.now()
+		})
+		storage.set(`uni-learn-practice-state-v1:${user.uid}`, {
+			currentSubjectId: subjectId,
+			answers: {
+				'ipf-local-1': {
+					subjectId,
+					chapterId: '1',
+					section: '第一节',
+					knowledge: '本机进度',
+					selected: ['B'],
+					correct: false,
+					attempts: 4,
+					practiceModes: ['chapter'],
+					timestamp: Date.now() - 1000
+				}
+			},
+			favorites: ['ipf-local-1'],
+			favoriteSubjects: { 'ipf-local-1': subjectId },
+			favoriteUpdatedAt: { 'ipf-local-1': Date.now() - 900 },
+			dailyAttempts: { [subjectId]: { dayKey: new Date().toISOString().slice(0, 10), attempts: 4 } }
+		})
+		const environment = {
+			uni: {
+				getStorageSync: key => storage.get(key),
+				setStorageSync: (key, value) => storage.set(key, value),
+				removeStorageSync: key => storage.delete(key)
+			},
+			uniCloud: {
+				getCurrentUserInfo: () => user,
+				async callFunction(request) {
+					calls.push(request.data)
+					const action = request.data.action
+					if (action === 'getSyncReconciliationOverview') {
+						return { result: { errCode: 0, data: {
+							subjects: [{ subjectId, attempted: 8, wrong: 2, favorite: 1,
+								totalAttempts: 10, todayAttempts: 0, todayKey: '2026-09-29',
+								hasCloudData: true, hasSessionData: false, updatedAt: Date.now() - 5000 }],
+							preferences: preference,
+							serverNow: Date.now()
+						} } }
+					}
+					if (action === 'beginSubjectDataReplacement') {
+						return { result: { errCode: 0, data: { subjectId, status: 'replacing', resumed: false } } }
+					}
+					if (action === 'uploadSubjectDataBatch') {
+						return { result: { errCode: 0, data: { accepted: request.data.items.length } } }
+					}
+					if (action === 'completeSubjectDataReplacement') {
+						clearDuringReplacementAt = Date.now() + 1
+						storage.set(`uni-learn-practice-local-clear-v1:${user.uid}`, {
+							version: 1,
+							subjects: { [subjectId]: clearDuringReplacementAt }
+						})
+						storage.set(`uni-learn-practice-state-v1:${user.uid}`, {
+							currentSubjectId: subjectId,
+							answers: {},
+							favorites: [],
+							favoriteSubjects: {},
+							favoriteUpdatedAt: {},
+							dailyAttempts: {}
+						})
+						return { result: { errCode: 0, data: { subjectId, status: 'ready' } } }
+					}
+					if (action === 'clearCurrentSubjectData') {
+						assert.equal(request.data.clearedAt, clearDuringReplacementAt)
+						return { result: { errCode: 0, data: {
+							cleared: true,
+							subjectId,
+							clearedAt: request.data.clearedAt
+						} } }
+					}
+					if (action === 'updatePreferences') {
+						assert.equal(Object.prototype.hasOwnProperty.call(request.data, 'nightMode'), false)
+						return { result: { errCode: 0, data: Object.assign({}, request.data, { nightMode: true }) } }
+					}
+					throw new Error(`unexpected action ${action}`)
+				}
+			},
+			console, setTimeout, clearTimeout, Date, Map, Set, Promise, Math, JSON,
+			Error, Array, Object, Number, String, Boolean
+		}
+		const service = loadService(environment)
+		service.markMembershipReconciliationTransition({
+			previousMember: false,
+			currentMember: true,
+			hadCachedMembership: true
+		})
+		service.queuePracticeAnswer({
+			id: 'ipf-local-1', subjectId, chapterId: '1', section: '第一节',
+			knowledge: '本机进度', answer: ['A']
+		}, ['B'], {
+			eventId: 'reconcile-local-answer',
+			correct: false,
+			practiceMode: 'chapter',
+			occurredAt: Date.now() - 500
+		})
+		const checked = await service.preparePracticeReconciliation({ subjectIds: [subjectId] })
+		assert.equal(checked.status, 'required')
+		assert.equal(service.practiceCloudSyncReady(), false)
+		const completed = await service.choosePracticeReconciliation('local', { subjectIds: [subjectId] })
+		assert.equal(completed.status, 'ready')
+		assert.equal(service.practiceCloudSyncReady(), true)
+		assert.equal(service.pendingPracticeEventCount(), 0)
+		const stateUpload = calls.find(call => call.action === 'uploadSubjectDataBatch'
+			&& call.resource === 'states')
+		assert.equal(stateUpload.items[0].attempts, 4)
+		assert.equal(stateUpload.items[0].favorite, true)
+		assert.equal(calls.filter(call => call.action === 'beginSubjectDataReplacement').length, 1)
+		assert.equal(calls.filter(call => call.action === 'clearCurrentSubjectData').length, 1)
+		assert.equal(storage.has(`uni-learn-practice-local-clear-v1:${user.uid}`), false)
+		assert.equal(service.getLocalPracticePreferences().nightMode, false)
+	}
+
+	{
+		const storage = new Map()
+		const calls = []
+		const user = { uid: 'reconcile-cloud-user', tokenExpired: Date.now() + 60 * 60 * 1000 }
+		storage.set(`uni-learn-membership-v1:${user.uid}`, activeMembership())
+		storage.set(`uni-learn-practice-preferences-v1:${user.uid}`, {
+			version: 1,
+			preferences: Object.assign({}, preference, { answerMode: 'practice', nightMode: false }),
+			dirty: false,
+			syncedAt: Date.now()
+		})
+		storage.set(`uni-learn-practice-state-v1:${user.uid}`, {
+			currentSubjectId: subjectId,
+			answers: {
+				'ipf-cloud-1': {
+					subjectId, chapterId: '1', section: '第一节', knowledge: '冲突',
+					selected: ['B'], correct: false, attempts: 1,
+					practiceModes: ['chapter'], timestamp: Date.now() - 1000
+				}
+			},
+			favorites: [], favoriteSubjects: {}, favoriteUpdatedAt: {}, dailyAttempts: {}
+		})
+		const environment = {
+			uni: {
+				getStorageSync: key => storage.get(key),
+				setStorageSync: (key, value) => storage.set(key, value),
+				removeStorageSync: key => storage.delete(key)
+			},
+			uniCloud: {
+				getCurrentUserInfo: () => user,
+				async callFunction(request) {
+					calls.push(request.data)
+					const action = request.data.action
+					if (action === 'getSyncReconciliationOverview') {
+						return { result: { errCode: 0, data: {
+							subjects: [{ subjectId, attempted: 1, wrong: 0, favorite: 1,
+								totalAttempts: 2, todayAttempts: 2, todayKey: '2026-09-29',
+								hasCloudData: true, hasSessionData: false, updatedAt: Date.now() }],
+							preferences: preference,
+							serverNow: Date.now()
+						} } }
+					}
+					if (action === 'getSubjectDataExportPage') {
+						const items = request.data.resource === 'states' ? [{
+							questionId: 'ipf-cloud-1', chapterId: '1', section: '第一节', knowledge: '冲突',
+							attempted: true, attempts: 2, lastCorrect: true, lastSelected: ['A'],
+							practiceModes: ['chapter'], favorite: true,
+							firstAnsweredAt: Date.now() - 5000,
+							lastAnsweredAt: Date.now() - 2000,
+							favoriteUpdatedAt: Date.now() - 1500
+						}] : []
+						return { result: { errCode: 0, data: {
+							subjectId, resource: request.data.resource, cursor: 0,
+							nextCursor: null, hasMore: false, items
+						} } }
+					}
+					throw new Error(`unexpected action ${action}`)
+				}
+			},
+			console, setTimeout, clearTimeout, Date, Map, Set, Promise, Math, JSON,
+			Error, Array, Object, Number, String, Boolean
+		}
+		const service = loadService(environment)
+		service.markMembershipReconciliationTransition({
+			previousMember: false,
+			currentMember: true,
+			hadCachedMembership: false
+		})
+		service.queuePracticeAnswer({
+			id: 'ipf-cloud-1', subjectId, chapterId: '1', section: '第一节',
+			knowledge: '冲突', answer: ['A']
+		}, ['B'], {
+			eventId: 'reconcile-cloud-answer',
+			correct: false,
+			practiceMode: 'chapter',
+			occurredAt: Date.now() - 500
+		})
+		assert.equal((await service.preparePracticeReconciliation({ subjectIds: [subjectId] })).status, 'required')
+		const completed = await service.choosePracticeReconciliation('cloud', { subjectIds: [subjectId] })
+		assert.equal(completed.status, 'ready')
+		const localState = storage.get(`uni-learn-practice-state-v1:${user.uid}`)
+		assert.deepEqual(Array.from(localState.answers['ipf-cloud-1'].selected), ['A'])
+		assert.equal(localState.answers['ipf-cloud-1'].attempts, 2)
+		assert.equal(localState.favorites.indexOf('ipf-cloud-1') > -1, true)
+		assert.equal(service.pendingPracticeEventCount(), 0)
+		assert.equal(service.getLocalPracticePreferences().answerMode, 'review')
+		assert.equal(service.getLocalPracticePreferences().nightMode, false)
+		assert.equal(calls.filter(call => call.action === 'getSubjectDataExportPage').length, 4)
+	}
 }
 
 async function run() {
@@ -1710,6 +1944,7 @@ async function run() {
 	await testServerRevocationClearsLocalMembership()
 	await testForegroundRefreshesCachedPreferencesOnce()
 	await testPersistentSummaryAndForegroundRefresh()
+	await testPracticeReconciliationChoices()
 
 	console.log('user-practice service tests passed')
 }

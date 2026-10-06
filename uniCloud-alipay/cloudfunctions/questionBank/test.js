@@ -455,7 +455,10 @@ async function run() {
 		})
 		smartMaterialQuestions.push(question)
 	}
-	const smartMaterialCatalog = Object.assign({}, fixtureCatalog, { questionCount: 22 })
+	const smartMaterialCatalog = Object.assign({}, fixtureCatalog, {
+		questionCount: 22,
+		smartPracticeUnits: undefined
+	})
 	const smartMaterialService = createQuestionBankService(createFakeDatabase({
 		question_bank_catalogs: [smartMaterialCatalog],
 		question_bank_questions: smartMaterialQuestions

@@ -18,7 +18,7 @@
 								<text class="input-value" v-if="inputItems.rate.enabled">{{ keyboardValue && currentField === 'rate' ? keyboardValue : valiFormData.rate }}</text>
 								<text class="input-value" v-else>{{ valiFormData.rate }}</text>
 								<view v-if="currentField === 'rate' && keyboardVisible" class="cursor"></view>
-								<uni-icons class="input-icon" custom-prefix="iconfont" type="icon-icon-" size="20"></uni-icons>
+								<uni-icons class="input-icon" custom-prefix="iconfont" type="icon-icon-" :size="toolPage && wideScreen ? 24 : 20"></uni-icons>
 							</view>
 							<text class="input-suffix">%</text>
 						</view>
@@ -49,7 +49,7 @@
 								<text class="input-value" v-if="inputItems.nper.enabled">{{ keyboardValue && currentField === 'nper' ? keyboardValue : valiFormData.nper }}</text>
 								<text class="input-value" v-else>{{ valiFormData.nper }}</text>
 								<view v-if="currentField === 'nper' && keyboardVisible" class="cursor"></view>
-								<uni-icons class="input-icon" custom-prefix="iconfont" type="icon-icon-" size="20"></uni-icons>
+								<uni-icons class="input-icon" custom-prefix="iconfont" type="icon-icon-" :size="toolPage && wideScreen ? 24 : 20"></uni-icons>
 							</view>
 						</view>
 					</view>
@@ -79,7 +79,7 @@
 								<text class="input-value" v-if="inputItems.pv.enabled">{{ keyboardValue && currentField === 'pv' ? keyboardValue : valiFormData.pv }}</text>
 								<text class="input-value" v-else>{{ valiFormData.pv }}</text>
 								<view v-if="currentField === 'pv' && keyboardVisible" class="cursor"></view>
-								<uni-icons class="input-icon" custom-prefix="iconfont" type="icon-icon-" size="20"></uni-icons>
+								<uni-icons class="input-icon" custom-prefix="iconfont" type="icon-icon-" :size="toolPage && wideScreen ? 24 : 20"></uni-icons>
 							</view>
 						</view>
 					</view>
@@ -109,7 +109,7 @@
 								<text class="input-value" v-if="inputItems.fv.enabled">{{ keyboardValue && currentField === 'fv' ? keyboardValue : valiFormData.fv }}</text>
 								<text class="input-value" v-else>{{ valiFormData.fv }}</text>
 								<view v-if="currentField === 'fv' && keyboardVisible" class="cursor"></view>
-								<uni-icons class="input-icon" custom-prefix="iconfont" type="icon-icon-" size="20"></uni-icons>
+								<uni-icons class="input-icon" custom-prefix="iconfont" type="icon-icon-" :size="toolPage && wideScreen ? 24 : 20"></uni-icons>
 							</view>
 						</view>
 					</view>
@@ -139,7 +139,7 @@
 								<text class="input-value" v-if="inputItems.pmt.enabled">{{ keyboardValue && currentField === 'pmt' ? keyboardValue : valiFormData.pmt }}</text>
 								<text class="input-value" v-else>{{ valiFormData.pmt }}</text>
 								<view v-if="currentField === 'pmt' && keyboardVisible" class="cursor"></view>
-								<uni-icons class="input-icon" custom-prefix="iconfont" type="icon-icon-" size="20"></uni-icons>
+								<uni-icons class="input-icon" custom-prefix="iconfont" type="icon-icon-" :size="toolPage && wideScreen ? 24 : 20"></uni-icons>
 							</view>
 						</view>
 					</view>
@@ -205,6 +205,10 @@
 				default: false
 			},
 			toolPage: {
+				type: Boolean,
+				default: false
+			},
+			wideScreen: {
 				type: Boolean,
 				default: false
 			},
@@ -1119,6 +1123,33 @@
 		.finance-calculator--embedded.finance-calculator--tool-page .pmt-btn-cal { font-size: 32px; }
 		.finance-calculator--embedded.finance-calculator--tool-page .result-caption { font-size: 36px; }
 		.finance-calculator--embedded.finance-calculator--tool-page .result { font-size: 44px; }
+	}
+
+	/* 工具页平板布局：缩小排版与纵向占用，长标签不会贴到输入框。 */
+	@media screen and (min-width: 768px) {
+		.finance-calculator--embedded.finance-calculator--tool-page .example { padding: 24px 32px 20px; }
+		.finance-calculator--embedded.finance-calculator--tool-page .content_size,
+		.finance-calculator--embedded.finance-calculator--tool-page .input-suffix,
+		.finance-calculator--embedded.finance-calculator--tool-page .input-value { font-size: 26px; }
+		.finance-calculator--embedded.finance-calculator--tool-page .field-label { flex-basis: 36%; min-height: 52px; }
+		.finance-calculator--embedded.finance-calculator--tool-page .field-label--plain { padding-left: 44px; }
+		.finance-calculator--embedded.finance-calculator--tool-page .radio-option:first-child { flex-basis: 36%; }
+		.finance-calculator--embedded.finance-calculator--tool-page .field-checkbox-wrap,
+		.finance-calculator--embedded.finance-calculator--tool-page .field-radio-wrap { height: 52px; }
+		.finance-calculator--embedded.finance-calculator--tool-page .custom-input { height: 52px; }
+		.finance-calculator--embedded.finance-calculator--tool-page .result-wrapper { margin-top: 16px; padding: 24px 0; }
+		.finance-calculator--embedded.finance-calculator--tool-page .result-caption { font-size: 29px; }
+		.finance-calculator--embedded.finance-calculator--tool-page .result { font-size: 34px; }
+		.finance-calculator--embedded.finance-calculator--tool-page .calculator-actions { display: flex; justify-content: flex-end; gap: 12px; }
+		.finance-calculator--embedded.finance-calculator--tool-page .pmt-btn-clear,
+		.finance-calculator--embedded.finance-calculator--tool-page .pmt-btn-cal {
+			min-width: 112px;
+			height: 52px;
+			margin: 0;
+			padding: 0 18px;
+			font-size: 25px;
+			line-height: 52px;
+		}
 	}
 
 	.btn-hover {

@@ -20,7 +20,12 @@ const EXAM_DRAFT_COLLECTION = 'question_bank_exam_drafts'
 const PREFERENCES_COLLECTION = 'question_bank_user_preferences'
 const MEMBERSHIP_COLLECTION = 'question_bank_memberships'
 const FEEDBACK_COLLECTION = 'question_bank_feedbacks'
+const SYNC_CONTROL_COLLECTION = 'question_bank_sync_controls'
 const MAX_SYNC_EVENTS = 50
+const MAX_RECONCILIATION_SUBJECTS = 32
+const MAX_REPLACEMENT_STATE_BATCH = 50
+const MAX_REPLACEMENT_PROGRESS_BATCH = 50
+const MAX_REPLACEMENT_COMPLEX_BATCH = 1
 const MAX_STATE_ROWS = 2000
 const MAX_PROGRESS_ROWS = 500
 const MAX_PRACTICE_ROUND_ROWS = 500
@@ -62,8 +67,27 @@ const MEMBER_SYNC_ACTIONS = new Set([
 	'getRecords',
 	'getPreferences',
 	'updatePreferences',
+	'clearCurrentSubjectData',
+	'getSyncReconciliationOverview',
+	'beginSubjectDataReplacement',
+	'uploadSubjectDataBatch',
+	'completeSubjectDataReplacement',
+	'getSubjectDataExportPage'
+])
+const SUBJECT_SYNC_READY_ACTIONS = new Set([
+	'getSummary',
+	'getStateSnapshot',
+	'getProgress',
+	'getPracticeRound',
+	'getExamDraft',
+	'getExamDraftSummaries',
+	'getPracticeBootstrap',
+	'getSmartPractice',
+	'getSmartPracticeState',
+	'getRecords',
 	'clearCurrentSubjectData'
 ])
+const REPLACEMENT_RESOURCES = ['states', 'progress', 'rounds', 'examDrafts']
 const CHINA_OFFSET_MS = 8 * 60 * 60 * 1000
 const MIN_EVENT_TIME = new Date('2020-01-01T00:00:00.000Z').getTime()
 const MAX_FUTURE_TIME = 5 * 60 * 1000
@@ -349,6 +373,48 @@ function practiceRoundDocumentId(userId, subjectId, chapterId) {
 function examDraftDocumentId(userId, subjectId, scopeKey) {
 	const scopeHash = crypto.createHash('sha256').update(scopeKey).digest('hex').slice(0, 32)
 	return `${userId}|${subjectId}|exam|${scopeHash}`
+}
+
+function syncControlDocumentId(userId, subjectId) {
+	return `${userId}|${subjectId}`
+}
+
+function replacementEventId(prefix, replacementId, value) {
+	const hash = crypto.createHash('sha256')
+		.update(`${replacementId}|${value}`)
+		.digest('hex')
+		.slice(0, 24)
+	return `${prefix}-${hash}`
+}
+
+function readReplacementId(value) {
+	return readString(value, 'replacementId', {
+		required: true,
+		minLength: 8,
+		maxLength: 96,
+		pattern: EVENT_ID_PATTERN
+	})
+}
+
+function readSubjectIds(value) {
+	if (!Array.isArray(value)) invalidArgument('subjectIds必须是数组')
+	if (!value.length || value.length > MAX_RECONCILIATION_SUBJECTS) {
+		invalidArgument(`subjectIds必须包含1至${MAX_RECONCILIATION_SUBJECTS}个科目`)
+	}
+	const result = []
+	const seen = new Set()
+	value.forEach((item, index) => {
+		const subjectId = readString(item, `subjectIds[${index}]`, {
+			required: true,
+			maxLength: 64,
+			pattern: SUBJECT_ID_PATTERN
+		})
+		if (!seen.has(subjectId)) {
+			seen.add(subjectId)
+			result.push(subjectId)
+		}
+	})
+	return result
 }
 
 function examDraftScopeKey(mode, chapterId, section, knowledge, keyword) {
@@ -1140,6 +1206,257 @@ function removedCount(response) {
 	return Number.isFinite(value) ? value : 0
 }
 
+function readOptionalOccurredAt(value, fieldName, currentTime, fallback) {
+	if (value === undefined || value === null || value === '' || Number(value) <= 0) {
+		return new Date(Number(fallback) || 0)
+	}
+	try {
+		return readOccurredAt(value, currentTime)
+	} catch (error) {
+		if (error && error.errCode === 'QUESTION_BANK_USER_INVALID_ARGUMENT') {
+			invalidArgument(`${fieldName}不是有效时间`)
+		}
+		throw error
+	}
+}
+
+function readPracticeModes(value, fieldName) {
+	if (value === undefined || value === null) return []
+	if (!Array.isArray(value) || value.length > PRACTICE_ENTRY_MODES.length) {
+		invalidArgument(`${fieldName}格式不正确`)
+	}
+	const result = []
+	value.forEach((item, index) => {
+		const mode = readString(item, `${fieldName}[${index}]`, {
+			required: true,
+			values: PRACTICE_ENTRY_MODES
+		})
+		if (result.indexOf(mode) === -1) result.push(mode)
+	})
+	return result
+}
+
+function readReplacementState(value, currentTime, index) {
+	const item = requireObject(value, `items[${index}]`)
+	const attempted = readBoolean(item.attempted, `items[${index}].attempted`)
+	const favorite = readBoolean(item.favorite, `items[${index}].favorite`)
+	const attempts = readInteger(item.attempts, `items[${index}].attempts`, {
+		minimum: 0,
+		maximum: 1000000,
+		defaultValue: 0
+	})
+	if (attempted && attempts < 1) invalidArgument(`items[${index}].attempts必须大于0`)
+	const result = {
+		questionId: readQuestionId(item.questionId),
+		chapterId: readString(item.chapterId, `items[${index}].chapterId`, { maxLength: 32 }),
+		section: readString(item.section, `items[${index}].section`, { maxLength: 128 }),
+		knowledge: readString(item.knowledge, `items[${index}].knowledge`, { maxLength: 128 }),
+		attempted,
+		attempts,
+		practiceModes: readPracticeModes(item.practiceModes, `items[${index}].practiceModes`),
+		favorite,
+		lastAnsweredAt: readOptionalOccurredAt(
+			item.lastAnsweredAt,
+			`items[${index}].lastAnsweredAt`,
+			currentTime,
+			0
+		),
+		firstAnsweredAt: readOptionalOccurredAt(
+			item.firstAnsweredAt,
+			`items[${index}].firstAnsweredAt`,
+			currentTime,
+			item.lastAnsweredAt
+		),
+		favoriteUpdatedAt: readOptionalOccurredAt(
+			item.favoriteUpdatedAt,
+			`items[${index}].favoriteUpdatedAt`,
+			currentTime,
+			0
+		)
+	}
+	if (attempted) {
+		result.lastCorrect = readBoolean(item.lastCorrect, `items[${index}].lastCorrect`)
+		result.lastSelected = readSelected(item.lastSelected)
+		if (!getDateValue(result.lastAnsweredAt)) {
+			invalidArgument(`items[${index}].lastAnsweredAt不能为空`)
+		}
+	}
+	return result
+}
+
+function readReplacementProgress(value, currentTime, index) {
+	const item = requireObject(value, `items[${index}]`)
+	const mode = readString(item.mode, `items[${index}].mode`, {
+		required: true,
+		values: PROGRESS_MODES
+	})
+	const chapterId = readString(item.chapterId, `items[${index}].chapterId`, {
+		required: true,
+		maxLength: 32
+	})
+	const section = readString(item.section, `items[${index}].section`, {
+		required: mode === 'section',
+		maxLength: 128
+	})
+	const knowledge = readString(item.knowledge, `items[${index}].knowledge`, {
+		required: mode === 'knowledge',
+		maxLength: 128
+	})
+	return {
+		mode,
+		scopeKey: mode === 'chapter'
+			? chapterId
+			: (mode === 'section'
+				? sectionScopeKey(chapterId, section)
+				: knowledgeScopeKey(chapterId, knowledge)),
+		chapterId,
+		section,
+		knowledge,
+		questionId: readQuestionId(item.questionId),
+		progressAt: readOptionalOccurredAt(
+			item.progressAt,
+			`items[${index}].progressAt`,
+			currentTime,
+			currentTime.getTime()
+		)
+	}
+}
+
+function readReplacementRound(value, currentTime, index) {
+	const item = requireObject(value, `items[${index}]`)
+	const chapterId = readString(item.chapterId, `items[${index}].chapterId`, {
+		required: true,
+		maxLength: 32
+	})
+	const rawAnswers = item.answers === undefined ? [] : item.answers
+	if (!Array.isArray(rawAnswers) || rawAnswers.length > MAX_EXAM_DRAFT_QUESTIONS) {
+		invalidArgument(`items[${index}].answers格式不正确`)
+	}
+	const answerIds = new Set()
+	const answers = rawAnswers.map((answer, answerIndex) => {
+		const row = requireObject(answer, `items[${index}].answers[${answerIndex}]`)
+		const questionId = readQuestionId(row.questionId)
+		if (answerIds.has(questionId)) invalidArgument(`items[${index}].answers包含重复题目`)
+		answerIds.add(questionId)
+		return {
+			questionId,
+			section: readString(row.section, 'section', { maxLength: 128 }),
+			selected: readSelected(row.selected),
+			correct: readBoolean(row.correct, 'correct'),
+			answeredAt: readOptionalOccurredAt(row.answeredAt, 'answeredAt', currentTime, currentTime.getTime())
+		}
+	})
+	const rawPositions = item.sectionPositions === undefined ? [] : item.sectionPositions
+	if (!Array.isArray(rawPositions) || rawPositions.length > MAX_PROGRESS_ROWS) {
+		invalidArgument(`items[${index}].sectionPositions格式不正确`)
+	}
+	const sectionPositions = rawPositions.map((position, positionIndex) => {
+		const row = requireObject(position, `items[${index}].sectionPositions[${positionIndex}]`)
+		return {
+			section: readString(row.section, 'section', { required: true, maxLength: 128 }),
+			questionId: readQuestionId(row.questionId),
+			progressAt: readOptionalOccurredAt(row.progressAt, 'progressAt', currentTime, currentTime.getTime())
+		}
+	})
+	const rawResets = item.sectionResets === undefined ? [] : item.sectionResets
+	if (!Array.isArray(rawResets) || rawResets.length > MAX_PROGRESS_ROWS) {
+		invalidArgument(`items[${index}].sectionResets格式不正确`)
+	}
+	const sectionResets = rawResets.map((reset, resetIndex) => {
+		const row = requireObject(reset, `items[${index}].sectionResets[${resetIndex}]`)
+		return {
+			section: readString(row.section, 'section', { required: true, maxLength: 128 }),
+			resetAt: readOptionalOccurredAt(row.resetAt, 'resetAt', currentTime, 0)
+		}
+	})
+	let chapterPosition = null
+	if (item.chapterPosition) {
+		const row = requireObject(item.chapterPosition, `items[${index}].chapterPosition`)
+		chapterPosition = {
+			questionId: readQuestionId(row.questionId),
+			section: readString(row.section, 'section', { maxLength: 128 }),
+			progressAt: readOptionalOccurredAt(row.progressAt, 'progressAt', currentTime, currentTime.getTime())
+		}
+	}
+	return {
+		chapterId,
+		answers,
+		chapterPosition,
+		sectionPositions,
+		chapterResetAt: readOptionalOccurredAt(item.chapterResetAt, 'chapterResetAt', currentTime, 0),
+		sectionResets
+	}
+}
+
+function readReplacementDraft(value, currentTime, index) {
+	const item = requireObject(value, `items[${index}]`)
+	const mode = readString(item.mode, `items[${index}].mode`, {
+		required: true,
+		values: EXAM_DRAFT_MODES
+	})
+	const chapterId = readString(item.chapterId, 'chapterId', {
+		required: ['chapter', 'section', 'knowledge'].indexOf(mode) > -1,
+		maxLength: 32
+	})
+	const section = readString(item.section, 'section', {
+		required: mode === 'section',
+		maxLength: 128
+	})
+	const knowledge = readString(item.knowledge, 'knowledge', {
+		required: mode === 'knowledge',
+		maxLength: 128
+	})
+	const keyword = readString(item.keyword, 'keyword', {
+		required: mode === 'search',
+		maxLength: 128
+	}).toLowerCase().replace(/\s+/g, ' ')
+	const scopeKey = examDraftScopeKey(mode, chapterId, section, knowledge, keyword)
+	const questionIds = readQuestionIds(item.questionIds, 'questionIds', MAX_EXAM_DRAFT_QUESTIONS)
+	if (!questionIds.length) invalidArgument('questionIds不能为空')
+	const availableIds = new Set(questionIds)
+	const initialQuestionId = readQuestionId(item.initialQuestionId || questionIds[0])
+	const positionQuestionId = readQuestionId(item.positionQuestionId || initialQuestionId)
+	if (!availableIds.has(initialQuestionId) || !availableIds.has(positionQuestionId)) {
+		invalidArgument('考试草稿位置不在试卷中')
+	}
+	const rawAnswers = item.answers === undefined ? [] : item.answers
+	if (!Array.isArray(rawAnswers) || rawAnswers.length > questionIds.length) {
+		invalidArgument('answers格式不正确')
+	}
+	const answers = rawAnswers.map((answer, answerIndex) => {
+		const row = requireObject(answer, `answers[${answerIndex}]`)
+		const questionId = readQuestionId(row.questionId)
+		if (!availableIds.has(questionId)) invalidArgument('考试草稿答案不在试卷中')
+		return {
+			questionId,
+			selected: readSelected(row.selected),
+			updatedAt: readOptionalOccurredAt(row.updatedAt, 'updatedAt', currentTime, currentTime.getTime())
+		}
+	})
+	return {
+		mode,
+		scopeKey,
+		chapterId,
+		section,
+		knowledge,
+		keyword,
+		roundId: readString(item.roundId, 'roundId', {
+			required: true,
+			minLength: 8,
+			maxLength: 96,
+			pattern: EVENT_ID_PATTERN
+		}),
+		questionVersion: readString(item.questionVersion, 'questionVersion', { maxLength: 64 }),
+		questionIds,
+		answers,
+		initialQuestionId,
+		positionQuestionId,
+		positionAt: readOptionalOccurredAt(item.positionAt, 'positionAt', currentTime, currentTime.getTime()),
+		startedAt: readOptionalOccurredAt(item.startedAt, 'startedAt', currentTime, currentTime.getTime()),
+		stateAt: readOptionalOccurredAt(item.stateAt, 'stateAt', currentTime, item.startedAt)
+	}
+}
+
 async function loadCatalog(db, subjectId) {
 	const catalog = await getDocument(db, CATALOG_COLLECTION, subjectId)
 	if (!catalog || catalog.status !== 1 || !catalog.activeVersion) {
@@ -1282,6 +1599,25 @@ function createQuestionBankUserService(db, options) {
 	const now = typeof config.now === 'function' ? config.now : () => new Date()
 	const serverDate = () => typeof db.serverDate === 'function' ? db.serverDate() : now()
 
+	async function getSyncControl(store, userId, subjectId) {
+		return getDocument(
+			store,
+			SYNC_CONTROL_COLLECTION,
+			syncControlDocumentId(userId, subjectId)
+		)
+	}
+
+	async function requireSubjectSyncReady(store, userId, subjectId) {
+		const control = await getSyncControl(store, userId, subjectId)
+		if (control && control.status === 'replacing') {
+			throw new QuestionBankUserError(
+				'QUESTION_BANK_USER_RECONCILIATION_IN_PROGRESS',
+				'云端学习数据正在按本机进度重建，请稍后重试'
+			)
+		}
+		return control
+	}
+
 	async function syncEvents(event, userId) {
 		const rawEvents = event.events === undefined ? [] : event.events
 		if (!Array.isArray(rawEvents)) invalidArgument('events必须是数组')
@@ -1289,7 +1625,7 @@ function createQuestionBankUserService(db, options) {
 			invalidArgument(`events最多包含${MAX_SYNC_EVENTS}条记录`)
 		}
 		const currentTime = now()
-		const progress = event.progress === undefined || event.progress === null
+		let progress = event.progress === undefined || event.progress === null
 			? null
 			: readProgress(event.progress, currentTime)
 		if (!rawEvents.length && !progress) invalidArgument('events和progress不能同时为空')
@@ -1308,6 +1644,39 @@ function createQuestionBankUserService(db, options) {
 			const timeDiff = left.occurredAt.getTime() - right.occurredAt.getTime()
 			return timeDiff || left.originalIndex - right.originalIndex
 		})
+		const controlBySubject = new Map()
+		const controlSubjectIds = Array.from(new Set(events.map(item => item.subjectId)
+			.concat(progress ? [progress.subjectId] : [])))
+		for (const subjectId of controlSubjectIds) {
+			const control = await getSyncControl(db, userId, subjectId)
+			if (control && control.status === 'replacing') {
+				throw new QuestionBankUserError(
+					'QUESTION_BANK_USER_RECONCILIATION_IN_PROGRESS',
+					'云端学习数据正在按本机进度重建，请稍后重试'
+				)
+			}
+			controlBySubject.set(subjectId, control)
+		}
+		events = events.filter(item => {
+			const control = controlBySubject.get(item.subjectId)
+			const clearedAt = getDateValue(control && control.clearedAt)
+			if (!clearedAt || item.occurredAt.getTime() > clearedAt) return true
+			rejectedEventIds.push(item.eventId)
+			return false
+		})
+		let ignoredProgressResult = null
+		if (progress) {
+			const control = controlBySubject.get(progress.subjectId)
+			const clearedAt = getDateValue(control && control.clearedAt)
+			if (clearedAt && progress.occurredAt.getTime() <= clearedAt) {
+				ignoredProgressResult = {
+					progressId: progress.progressId,
+					saved: true,
+					ignored: true
+				}
+				progress = null
+			}
+		}
 		// 旧版客户端没有上传本地判题结果，发布过渡期内才回查题库。
 		// 新版事件和练习进度均直接信任客户端数据，不读取题库目录或题目答案。
 		const legacyAnswerEvents = events.filter(item => item.type === 'answer' && !item.judgedLocally)
@@ -1320,6 +1689,42 @@ function createQuestionBankUserService(db, options) {
 		const todayKey = chinaDayKey(currentTime)
 
 		return withTransaction(db, async store => {
+			let syncedEvents = events
+			let syncedProgress = progress
+			let syncedIgnoredProgressResult = ignoredProgressResult
+			const syncedRejectedEventIds = new Set(rejectedEventIds)
+			const syncedSubjectIds = Array.from(new Set(syncedEvents.map(item => item.subjectId)
+				.concat(syncedProgress ? [syncedProgress.subjectId] : [])))
+			const syncedControls = new Map()
+			for (const subjectId of syncedSubjectIds) {
+				const control = await getSyncControl(store, userId, subjectId)
+				if (control && control.status === 'replacing') {
+					throw new QuestionBankUserError(
+						'QUESTION_BANK_USER_RECONCILIATION_IN_PROGRESS',
+						'云端学习数据正在按本机进度重建，请稍后重试'
+					)
+				}
+				syncedControls.set(subjectId, control)
+			}
+			syncedEvents = syncedEvents.filter(item => {
+				const clearedAt = getDateValue(syncedControls.get(item.subjectId)
+					&& syncedControls.get(item.subjectId).clearedAt)
+				if (!clearedAt || item.occurredAt.getTime() > clearedAt) return true
+				syncedRejectedEventIds.add(item.eventId)
+				return false
+			})
+			if (syncedProgress) {
+				const control = syncedControls.get(syncedProgress.subjectId)
+				const clearedAt = getDateValue(control && control.clearedAt)
+				if (clearedAt && syncedProgress.occurredAt.getTime() <= clearedAt) {
+					syncedIgnoredProgressResult = {
+						progressId: syncedProgress.progressId,
+						saved: true,
+						ignored: true
+					}
+					syncedProgress = null
+				}
+			}
 			const stateCache = new Map()
 			const statsCache = new Map()
 			const roundCache = new Map()
@@ -1383,7 +1788,7 @@ function createQuestionBankUserService(db, options) {
 				return examDraftCache.get(id)
 			}
 
-			for (const item of events) {
+			for (const item of syncedEvents) {
 				if (item.type.indexOf('exam') === 0) {
 					const draft = await getExamDraft(item)
 					if (applyExamDraftEvent(draft, item)) {
@@ -1502,51 +1907,51 @@ function createQuestionBankUserService(db, options) {
 				acceptedEventIds.push(item.eventId)
 			}
 
-			let progressResult = null
-			if (progress && ['chapter', 'section'].indexOf(progress.mode) > -1) {
-				const round = await getRound(progress.subjectId, progress.chapterId)
-				if (applyPracticeRoundProgress(round, progress)) {
+			let progressResult = syncedIgnoredProgressResult
+			if (syncedProgress && ['chapter', 'section'].indexOf(syncedProgress.mode) > -1) {
+				const round = await getRound(syncedProgress.subjectId, syncedProgress.chapterId)
+				if (applyPracticeRoundProgress(round, syncedProgress)) {
 					round.updatedAt = serverDate()
 					dirtyRoundIds.add(round._id)
 				}
 				progressResult = {
-					progressId: progress.progressId,
+					progressId: syncedProgress.progressId,
 					saved: true
 				}
-			} else if (progress) {
+			} else if (syncedProgress) {
 				const id = progressDocumentId(
 					userId,
-					progress.subjectId,
-					progress.mode,
-					progress.scopeKey
+					syncedProgress.subjectId,
+					syncedProgress.mode,
+					syncedProgress.scopeKey
 				)
 				const saved = await getDocument(store, PROGRESS_COLLECTION, id)
 				const savedTime = getDateValue(saved && saved.progressAt)
-				if (!saved || progress.occurredAt.getTime() >= savedTime) {
+				if (!saved || syncedProgress.occurredAt.getTime() >= savedTime) {
 					const progressDocument = {
 						_id: id,
 						userId,
-						subjectId: progress.subjectId,
-						mode: progress.mode,
-						scopeKey: progress.scopeKey,
-						chapterId: progress.chapterId,
-						questionId: progress.questionId,
-						progressId: progress.progressId,
-						progressAt: progress.occurredAt,
+						subjectId: syncedProgress.subjectId,
+						mode: syncedProgress.mode,
+						scopeKey: syncedProgress.scopeKey,
+						chapterId: syncedProgress.chapterId,
+						questionId: syncedProgress.questionId,
+						progressId: syncedProgress.progressId,
+						progressAt: syncedProgress.occurredAt,
 						createdAt: saved && saved.createdAt || serverDate(),
 						updatedAt: serverDate()
 					}
-					if (progress.knowledge) progressDocument.knowledge = progress.knowledge
-					if (progress.section) progressDocument.section = progress.section
+					if (syncedProgress.knowledge) progressDocument.knowledge = syncedProgress.knowledge
+					if (syncedProgress.section) progressDocument.section = syncedProgress.section
 					await setDocument(store, PROGRESS_COLLECTION, id, progressDocument)
 				}
 				progressResult = {
-					progressId: progress.progressId,
+					progressId: syncedProgress.progressId,
 					saved: true
 				}
 			}
 
-			const summarySubjectIds = Array.from(new Set(events
+			const summarySubjectIds = Array.from(new Set(syncedEvents
 				.filter(item => item.type === 'answer' || item.type === 'favorite')
 				.map(item => item.subjectId)))
 			for (const subjectId of summarySubjectIds) await getStats(subjectId)
@@ -1575,7 +1980,7 @@ function createQuestionBankUserService(db, options) {
 			return {
 				acceptedEventIds,
 				duplicateEventIds,
-				rejectedEventIds: Array.from(new Set(rejectedEventIds)),
+				rejectedEventIds: Array.from(syncedRejectedEventIds),
 				answerResults,
 				summaries,
 				progress: progressResult
@@ -1800,12 +2205,14 @@ function createQuestionBankUserService(db, options) {
 			required: true,
 			values: ANSWER_MODES
 		})
-		const nightMode = readBoolean(event.nightMode, 'nightMode')
 		let smartPractice
 		try { smartPractice = validateSmartPractice(event.smartPractice) }
 		catch (error) { invalidArgument(error.message) }
 		const currentTime = now()
 		const saved = await getDocument(db, PREFERENCES_COLLECTION, userId)
+		const nightMode = event.nightMode === undefined
+			? Boolean(saved && saved.nightMode)
+			: readBoolean(event.nightMode, 'nightMode')
 		if (event.smartPractice === undefined) smartPractice = normalizeSmartPractice(saved && saved.smartPractice)
 		await setDocument(db, PREFERENCES_COLLECTION, userId, {
 			_id: userId,
@@ -1824,6 +2231,423 @@ function createQuestionBankUserService(db, options) {
 		}
 	}
 
+	async function getSyncReconciliationOverview(event, userId) {
+		const subjectIds = readSubjectIds(event.subjectIds)
+		const currentTime = now()
+		const subjects = []
+		for (const subjectId of subjectIds) {
+			const stats = await getDocument(db, STATS_COLLECTION, statsDocumentId(userId, subjectId))
+			const [stateResponse, progressResponse, roundResponse, draftResponse] = await Promise.all([
+				db.collection(STATE_COLLECTION).where({ userId, subjectId })
+					.field({ _id: true, updatedAt: true }).limit(1).get(),
+				db.collection(PROGRESS_COLLECTION).where({ userId, subjectId })
+					.field({ _id: true, updatedAt: true }).limit(1).get(),
+				db.collection(PRACTICE_ROUND_COLLECTION).where({ userId, subjectId })
+					.field({ _id: true, updatedAt: true }).limit(1).get(),
+				db.collection(EXAM_DRAFT_COLLECTION).where({ userId, subjectId })
+					.field({ _id: true, updatedAt: true }).limit(1).get()
+			])
+			const stateRows = getRows(stateResponse)
+			const sessionRows = []
+				.concat(getRows(progressResponse), getRows(roundResponse), getRows(draftResponse))
+			const related = stateRows.concat(sessionRows)
+			const summary = normalizeStats(stats, userId, subjectId, currentTime, chinaDayKey(currentTime))
+			const hasStatsData = Boolean(
+				(Number(summary.attempted) || 0)
+				|| (Number(summary.favorite) || 0)
+				|| (Number(summary.totalAttempts) || 0)
+			)
+			const control = await getSyncControl(db, userId, subjectId)
+			subjects.push(Object.assign({}, toSummary(summary, subjectId, currentTime), {
+				hasCloudData: hasStatsData || related.length > 0,
+				hasSessionData: sessionRows.length > 0,
+				updatedAt: Math.max(
+					getDateValue(stats && stats.updatedAt),
+					...related.map(item => getDateValue(item.updatedAt))
+				),
+				syncStatus: control && control.status || 'ready',
+				replacementId: control && control.status === 'replacing'
+					? control.replacementId || ''
+					: ''
+			}))
+		}
+		const preferences = await getPreferences(event, userId)
+		return {
+			subjects,
+			preferences,
+			serverNow: currentTime.getTime()
+		}
+	}
+
+	async function beginSubjectDataReplacement(event, userId) {
+		const subjectId = readSubjectId(event.subjectId)
+		const replacementId = readReplacementId(event.replacementId)
+		const currentTime = now()
+		const capturedAt = readOccurredAt(event.capturedAt, currentTime)
+		return withTransaction(db, async store => {
+			const documentId = syncControlDocumentId(userId, subjectId)
+			const saved = await getDocument(store, SYNC_CONTROL_COLLECTION, documentId)
+			if (saved && saved.replacementId === replacementId) {
+				return {
+					subjectId,
+					replacementId,
+					status: saved.status,
+					clearedAt: getDateValue(saved.clearedAt),
+					resumed: true
+				}
+			}
+			const deletedByCollection = {}
+			for (const collectionName of [
+				STATE_COLLECTION,
+				STATS_COLLECTION,
+				PROGRESS_COLLECTION,
+				PRACTICE_ROUND_COLLECTION,
+				EXAM_DRAFT_COLLECTION
+			]) {
+				const response = await store.collection(collectionName).where({ userId, subjectId }).remove()
+				deletedByCollection[collectionName] = removedCount(response)
+			}
+			const control = {
+				_id: documentId,
+				userId,
+				subjectId,
+				status: 'replacing',
+				replacementId,
+				capturedAt,
+				clearedAt: capturedAt,
+				createdAt: saved && saved.createdAt || serverDate(),
+				updatedAt: serverDate()
+			}
+			await setDocument(store, SYNC_CONTROL_COLLECTION, documentId, control)
+			return {
+				subjectId,
+				replacementId,
+				status: 'replacing',
+				clearedAt: capturedAt.getTime(),
+				resumed: false,
+				deletedRecords: Object.keys(deletedByCollection)
+					.reduce((total, name) => total + deletedByCollection[name], 0),
+				deletedByCollection
+			}
+		})
+	}
+
+	async function uploadSubjectDataBatch(event, userId) {
+		const subjectId = readSubjectId(event.subjectId)
+		const replacementId = readReplacementId(event.replacementId)
+		const resource = readString(event.resource, 'resource', {
+			required: true,
+			values: REPLACEMENT_RESOURCES
+		})
+		if (!Array.isArray(event.items)) invalidArgument('items必须是数组')
+		const maximum = resource === 'states'
+			? MAX_REPLACEMENT_STATE_BATCH
+			: (resource === 'progress' ? MAX_REPLACEMENT_PROGRESS_BATCH : MAX_REPLACEMENT_COMPLEX_BATCH)
+		if (event.items.length > maximum) invalidArgument(`${resource}每批最多包含${maximum}条记录`)
+		const currentTime = now()
+		return withTransaction(db, async store => {
+			const control = await getSyncControl(store, userId, subjectId)
+			if (!control || control.replacementId !== replacementId || control.status !== 'replacing') {
+				throw new QuestionBankUserError(
+					'QUESTION_BANK_USER_REPLACEMENT_NOT_ACTIVE',
+					'本次云端数据替换任务不存在或已经结束'
+				)
+			}
+			for (let index = 0; index < event.items.length; index += 1) {
+				if (resource === 'states') {
+					const item = readReplacementState(event.items[index], currentTime, index)
+					const id = stateDocumentId(userId, subjectId, item.questionId)
+					const document = {
+						_id: id,
+						userId,
+						subjectId,
+						questionId: item.questionId,
+						chapterId: item.chapterId,
+						section: item.section,
+						knowledge: item.knowledge,
+						attempted: item.attempted,
+						attempts: item.attempts,
+						practiceModes: item.practiceModes,
+						favorite: item.favorite,
+						createdAt: serverDate(),
+						updatedAt: serverDate()
+					}
+					if (item.attempted) {
+						document.lastCorrect = item.lastCorrect
+						document.lastSelected = item.lastSelected
+						document.firstAnsweredAt = item.firstAnsweredAt
+						document.lastAnsweredAt = item.lastAnsweredAt
+						document.lastAnswerEventId = replacementEventId('restore-answer', replacementId, item.questionId)
+					}
+					if (item.favorite && getDateValue(item.favoriteUpdatedAt)) {
+						document.favoriteUpdatedAt = item.favoriteUpdatedAt
+					}
+					await setDocument(store, STATE_COLLECTION, id, document)
+					continue
+				}
+				if (resource === 'progress') {
+					const item = readReplacementProgress(event.items[index], currentTime, index)
+					const id = progressDocumentId(userId, subjectId, item.mode, item.scopeKey)
+					const document = {
+						_id: id,
+						userId,
+						subjectId,
+						mode: item.mode,
+						scopeKey: item.scopeKey,
+						chapterId: item.chapterId,
+						questionId: item.questionId,
+						progressId: replacementEventId('restore-progress', replacementId, `${item.mode}|${item.scopeKey}`),
+						progressAt: item.progressAt,
+						createdAt: serverDate(),
+						updatedAt: serverDate()
+					}
+					if (item.section) document.section = item.section
+					if (item.knowledge) document.knowledge = item.knowledge
+					await setDocument(store, PROGRESS_COLLECTION, id, document)
+					continue
+				}
+				if (resource === 'rounds') {
+					const item = readReplacementRound(event.items[index], currentTime, index)
+					const id = practiceRoundDocumentId(userId, subjectId, item.chapterId)
+					const round = emptyPracticeRound(userId, subjectId, item.chapterId, serverDate())
+					round.answers = item.answers.map(answer => Object.assign({}, answer, {
+						answerEventId: replacementEventId('restore-answer', replacementId, `${item.chapterId}|${answer.questionId}`)
+					}))
+					round.chapterPosition = item.chapterPosition ? Object.assign({}, item.chapterPosition, {
+						progressId: replacementEventId('restore-progress', replacementId, `${item.chapterId}|chapter`)
+					}) : {}
+					round.sectionPositions = item.sectionPositions.map(position => Object.assign({}, position, {
+						progressId: replacementEventId('restore-progress', replacementId, `${item.chapterId}|${position.section}`)
+					}))
+					round.chapterResetAt = item.chapterResetAt
+					round.chapterResetEventId = replacementEventId('restore-reset', replacementId, `${item.chapterId}|chapter`)
+					round.sectionResets = item.sectionResets.map(reset => Object.assign({}, reset, {
+						resetEventId: replacementEventId('restore-reset', replacementId, `${item.chapterId}|${reset.section}`)
+					}))
+					round.updatedAt = serverDate()
+					refreshPracticeRoundCounts(round)
+					await setDocument(store, PRACTICE_ROUND_COLLECTION, id, round)
+					continue
+				}
+				const item = readReplacementDraft(event.items[index], currentTime, index)
+				const id = examDraftDocumentId(userId, subjectId, item.scopeKey)
+				const draft = Object.assign(
+					emptyExamDraft(userId, Object.assign({}, item, { subjectId }), serverDate()),
+					item,
+					{
+						_id: id,
+						userId,
+						subjectId,
+						active: true,
+						answers: item.answers.map(answer => Object.assign({}, answer, {
+							eventId: replacementEventId('restore-exam', replacementId, `${item.scopeKey}|${answer.questionId}`)
+						})),
+						createdAt: serverDate(),
+						updatedAt: serverDate()
+					}
+				)
+				await setDocument(store, EXAM_DRAFT_COLLECTION, id, draft)
+			}
+			control.updatedAt = serverDate()
+			await setDocument(store, SYNC_CONTROL_COLLECTION, control._id, control)
+			return { subjectId, replacementId, resource, accepted: event.items.length }
+		})
+	}
+
+	async function completeSubjectDataReplacement(event, userId) {
+		const subjectId = readSubjectId(event.subjectId)
+		const replacementId = readReplacementId(event.replacementId)
+		const todayAttempts = readInteger(event.todayAttempts, 'todayAttempts', {
+			minimum: 0,
+			maximum: 1000000,
+			defaultValue: 0
+		})
+		const currentTime = now()
+		return withTransaction(db, async store => {
+			const control = await getSyncControl(store, userId, subjectId)
+			if (control && control.replacementId === replacementId && control.status === 'ready') {
+				return {
+					subjectId,
+					replacementId,
+					status: 'ready',
+					completedAt: getDateValue(control.completedAt),
+					resumed: true
+				}
+			}
+			if (!control || control.replacementId !== replacementId || control.status !== 'replacing') {
+				throw new QuestionBankUserError(
+					'QUESTION_BANK_USER_REPLACEMENT_NOT_ACTIVE',
+					'本次云端数据替换任务不存在或已经结束'
+				)
+			}
+			const response = await store.collection(STATE_COLLECTION)
+				.where({ userId, subjectId })
+				.limit(MAX_STATE_ROWS + 1)
+				.get()
+			const states = getRows(response)
+			if (states.length > MAX_STATE_ROWS) {
+				throw new QuestionBankUserError('QUESTION_BANK_USER_STATE_LIMIT', '用户题目状态超过处理上限')
+			}
+			const stats = emptyStats(userId, subjectId, serverDate(), chinaDayKey(currentTime))
+			states.forEach(state => {
+				if (state.favorite) {
+					stats.favorite += 1
+					addUniqueId(stats.favoriteQuestionIds, state.questionId)
+				}
+				if (!state.attempted) return
+				stats.attempted += 1
+				stats.totalAttempts += Math.max(1, Number(state.attempts) || 0)
+				addUniqueId(stats.answeredQuestionIds, state.questionId)
+				if (state.lastCorrect) stats.correct += 1
+				else {
+					stats.wrong += 1
+					addUniqueId(stats.wrongQuestionIds, state.questionId)
+				}
+				const modes = normalizePracticeModes(state.practiceModes)
+				if (modes.indexOf('chapter') > -1 || modes.indexOf('section') > -1) {
+					incrementAggregate(stats.chapterAttempts, state.chapterId)
+					incrementAggregate(stats.sectionAttempts, sectionScopeKey(state.chapterId, state.section))
+				}
+				if (modes.indexOf('knowledge') > -1) {
+					incrementAggregate(stats.knowledgeAttempts, knowledgeScopeKey(state.chapterId, state.knowledge))
+				}
+			})
+			stats.todayAttempts = todayAttempts
+			stats.updatedAt = serverDate()
+			await setDocument(store, STATS_COLLECTION, stats._id, stats)
+			control.status = 'ready'
+			control.completedAt = serverDate()
+			control.updatedAt = serverDate()
+			await setDocument(store, SYNC_CONTROL_COLLECTION, control._id, control)
+			return {
+				subjectId,
+				replacementId,
+				status: 'ready',
+				completedAt: currentTime.getTime(),
+				resumed: false,
+				summary: toSummary(stats, subjectId, currentTime)
+			}
+		})
+	}
+
+	function exportState(document) {
+		return {
+			questionId: document.questionId,
+			chapterId: document.chapterId || '',
+			section: document.section || '',
+			knowledge: document.knowledge || '',
+			attempted: Boolean(document.attempted),
+			attempts: Number(document.attempts) || 0,
+			lastCorrect: Boolean(document.lastCorrect),
+			lastSelected: Array.isArray(document.lastSelected) ? document.lastSelected.slice() : [],
+			practiceModes: normalizePracticeModes(document.practiceModes),
+			favorite: Boolean(document.favorite),
+			firstAnsweredAt: getDateValue(document.firstAnsweredAt),
+			lastAnsweredAt: getDateValue(document.lastAnsweredAt),
+			favoriteUpdatedAt: getDateValue(document.favoriteUpdatedAt)
+		}
+	}
+
+	function exportProgress(document) {
+		return {
+			mode: document.mode,
+			chapterId: document.chapterId,
+			section: document.section || '',
+			knowledge: document.knowledge || '',
+			questionId: document.questionId,
+			progressAt: getDateValue(document.progressAt)
+		}
+	}
+
+	function exportRound(document) {
+		const round = normalizePracticeRound(document, document.userId, document.subjectId, document.chapterId, now())
+		return {
+			chapterId: round.chapterId,
+			answers: round.answers.map(answer => ({
+				questionId: answer.questionId,
+				section: answer.section || '',
+				selected: answer.selected.slice(),
+				correct: Boolean(answer.correct),
+				answeredAt: getDateValue(answer.answeredAt)
+			})),
+			chapterPosition: round.chapterPosition && round.chapterPosition.questionId ? {
+				questionId: round.chapterPosition.questionId,
+				section: round.chapterPosition.section || '',
+				progressAt: getDateValue(round.chapterPosition.progressAt)
+			} : null,
+			sectionPositions: round.sectionPositions.map(position => ({
+				section: position.section,
+				questionId: position.questionId,
+				progressAt: getDateValue(position.progressAt)
+			})),
+			chapterResetAt: getDateValue(round.chapterResetAt),
+			sectionResets: round.sectionResets.map(reset => ({
+				section: reset.section,
+				resetAt: getDateValue(reset.resetAt)
+			}))
+		}
+	}
+
+	function exportDraft(document) {
+		const response = examDraftResponse(normalizeExamDraft(
+			document,
+			document.userId,
+			document,
+			now()
+		))
+		if (!response.active) return null
+		return Object.assign({}, response, { stateAt: getDateValue(document.stateAt) })
+	}
+
+	async function getSubjectDataExportPage(event, userId) {
+		const subjectId = readSubjectId(event.subjectId)
+		const resource = readString(event.resource, 'resource', {
+			required: true,
+			values: REPLACEMENT_RESOURCES
+		})
+		const maximum = resource === 'states'
+			? MAX_REPLACEMENT_STATE_BATCH
+			: (resource === 'progress' ? MAX_REPLACEMENT_PROGRESS_BATCH : MAX_REPLACEMENT_COMPLEX_BATCH)
+		const pageSize = readInteger(event.pageSize, 'pageSize', {
+			minimum: 1,
+			maximum,
+			defaultValue: maximum
+		})
+		const cursor = readInteger(event.cursor, 'cursor', {
+			minimum: 0,
+			maximum: 100000,
+			defaultValue: 0
+		})
+		await requireSubjectSyncReady(db, userId, subjectId)
+		const collectionName = resource === 'states'
+			? STATE_COLLECTION
+			: (resource === 'progress'
+				? PROGRESS_COLLECTION
+				: (resource === 'rounds' ? PRACTICE_ROUND_COLLECTION : EXAM_DRAFT_COLLECTION))
+		const response = await db.collection(collectionName)
+			.where({ userId, subjectId })
+			.orderBy('_id', 'asc')
+			.skip(cursor)
+			.limit(pageSize + 1)
+			.get()
+		const rows = getRows(response)
+		const hasMore = rows.length > pageSize
+		const items = rows.slice(0, pageSize).map(document => {
+			if (resource === 'states') return exportState(document)
+			if (resource === 'progress') return exportProgress(document)
+			if (resource === 'rounds') return exportRound(document)
+			return exportDraft(document)
+		}).filter(Boolean)
+		return {
+			subjectId,
+			resource,
+			cursor,
+			nextCursor: hasMore ? cursor + pageSize : null,
+			hasMore,
+			items
+		}
+	}
+
 	async function clearCurrentSubjectData(event, userId) {
 		const subjectId = readSubjectId(event.subjectId)
 		const confirmation = readString(event.confirmation, 'confirmation', {
@@ -1833,6 +2657,10 @@ function createQuestionBankUserService(db, options) {
 		if (confirmation !== 'CLEAR_CURRENT_SUBJECT') {
 			invalidArgument('删除确认信息不正确')
 		}
+		const currentTime = now()
+		const clearedAt = event.clearedAt === undefined
+			? currentTime
+			: readOccurredAt(event.clearedAt, currentTime)
 		return withTransaction(db, async store => {
 			const targets = [
 				STATE_COLLECTION,
@@ -1848,9 +2676,29 @@ function createQuestionBankUserService(db, options) {
 					.remove()
 				deletedByCollection[collectionName] = removedCount(response)
 			}
+			const controlId = syncControlDocumentId(userId, subjectId)
+			const savedControl = await getDocument(store, SYNC_CONTROL_COLLECTION, controlId)
+			const savedClearedAt = getDateValue(savedControl && savedControl.clearedAt)
+			const effectiveClearedAt = savedClearedAt > clearedAt.getTime()
+				? new Date(savedClearedAt)
+				: clearedAt
+			await setDocument(store, SYNC_CONTROL_COLLECTION, controlId, {
+				_id: controlId,
+				userId,
+				subjectId,
+				status: 'ready',
+				replacementId: savedControl && savedControl.replacementId
+					|| `clear-${crypto.randomBytes(12).toString('hex')}`,
+				capturedAt: savedControl && savedControl.capturedAt || effectiveClearedAt,
+				clearedAt: effectiveClearedAt,
+				completedAt: serverDate(),
+				createdAt: savedControl && savedControl.createdAt || serverDate(),
+				updatedAt: serverDate()
+			})
 			return {
 				cleared: true,
 				subjectId,
+				clearedAt: effectiveClearedAt.getTime(),
 				deletedRecords: Object.keys(deletedByCollection)
 					.reduce((total, name) => total + deletedByCollection[name], 0),
 				deletedByCollection
@@ -2308,7 +3156,18 @@ function createQuestionBankUserService(db, options) {
 			}, userId)
 		} else if (preferences.answerMode === 'exam' && mode !== 'smart') {
 			sessionType = 'examDraft'
-			sessionPromise = getExamDraft(Object.assign({}, event, { subjectId, mode }), userId)
+			const scopeKey = examDraftScopeKey(
+				mode,
+				event.chapterId,
+				event.section,
+				event.knowledge,
+				event.keyword
+			)
+			sessionPromise = getExamDraft(Object.assign({}, event, {
+				subjectId,
+				mode,
+				scopeKey
+			}), userId)
 		}
 		const [snapshot, session] = await Promise.all([snapshotPromise, sessionPromise])
 		return {
@@ -2536,7 +3395,12 @@ function createQuestionBankUserService(db, options) {
 		submitQuestionFeedback,
 		getPreferences,
 		updatePreferences,
-		clearCurrentSubjectData
+		clearCurrentSubjectData,
+		getSyncReconciliationOverview,
+		beginSubjectDataReplacement,
+		uploadSubjectDataBatch,
+		completeSubjectDataReplacement,
+		getSubjectDataExportPage
 	}
 
 	async function execute(rawEvent, userId) {
@@ -2550,6 +3414,9 @@ function createQuestionBankUserService(db, options) {
 		let membership = null
 		if (MEMBER_SYNC_ACTIONS.has(action)) {
 			membership = await requireActiveMembership(db, uid, now(), '云端学习数据同步')
+		}
+		if (SUBJECT_SYNC_READY_ACTIONS.has(action)) {
+			await requireSubjectSyncReady(db, uid, readSubjectId(event.subjectId))
 		}
 		return handler(event, uid, membership)
 	}
